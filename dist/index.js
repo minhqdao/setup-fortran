@@ -31367,6 +31367,20 @@ void run();
 
 /***/ }),
 
+/***/ 991:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.installDebian = installDebian;
+async function installDebian(_) {
+    return Promise.reject(new Error("Not implemented"));
+}
+
+
+/***/ }),
+
 /***/ 1096:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -31375,57 +31389,32 @@ void run();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.installAOCC = installAOCC;
 const types_1 = __nccwpck_require__(6141);
-const linux_1 = __nccwpck_require__(6546);
+const debian_1 = __nccwpck_require__(991);
 async function installAOCC(target) {
     if (target.os !== types_1.OS.Linux) {
         throw new Error(`AOCC is only supported on Linux (got: ${target.os})`);
     }
-    return await (0, linux_1.installLinux)(target);
+    return await (0, debian_1.installDebian)(target);
 }
 
 
 /***/ }),
 
-/***/ 6546:
+/***/ 446:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installLinux = installLinux;
-async function installLinux(_) {
+exports.installDarwin = installDarwin;
+async function installDarwin(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
 
 /***/ }),
 
-/***/ 749:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installGCC = installGCC;
-const types_1 = __nccwpck_require__(6141);
-const linux_1 = __nccwpck_require__(1375);
-const macos_1 = __nccwpck_require__(668);
-const windows_1 = __nccwpck_require__(1428);
-async function installGCC(target) {
-    switch (target.os) {
-        case types_1.OS.Linux:
-            return await (0, linux_1.installLinux)(target);
-        case types_1.OS.MacOS:
-            return await (0, macos_1.installMacOS)(target);
-        case types_1.OS.Windows:
-            return await (0, windows_1.installWindows)(target);
-    }
-}
-
-
-/***/ }),
-
-/***/ 1375:
+/***/ 2536:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -31464,7 +31453,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installLinux = installLinux;
+exports.installDebian = installDebian;
 const core = __importStar(__nccwpck_require__(7484));
 const exec = __importStar(__nccwpck_require__(5236));
 const types_1 = __nccwpck_require__(6141);
@@ -31473,7 +31462,7 @@ const SUPPORTED_VERSIONS = {
     [types_1.Arch.X64]: ["15", "14", "13", "12", "11"],
     [types_1.Arch.ARM64]: ["15", "14", "13", "12", "11"],
 };
-async function installLinux(target) {
+async function installDebian(target) {
     const version = (0, resolve_version_1.resolveVersion)(target, SUPPORTED_VERSIONS);
     core.info(`Installing GCC ${version} on Linux (${target.arch})...`);
     await exec.exec("sudo", [
@@ -31523,28 +31512,39 @@ async function resolveInstalledVersion() {
 
 /***/ }),
 
-/***/ 668:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ 749:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installMacOS = installMacOS;
-async function installMacOS(_) {
-    return Promise.reject(new Error("Not implemented"));
+exports.installGCC = installGCC;
+const types_1 = __nccwpck_require__(6141);
+const debian_1 = __nccwpck_require__(2536);
+const darwin_1 = __nccwpck_require__(446);
+const win32_1 = __nccwpck_require__(7126);
+async function installGCC(target) {
+    switch (target.os) {
+        case types_1.OS.Linux:
+            return await (0, debian_1.installDebian)(target);
+        case types_1.OS.MacOS:
+            return await (0, darwin_1.installDarwin)(target);
+        case types_1.OS.Windows:
+            return await (0, win32_1.installWin32)(target);
+    }
 }
 
 
 /***/ }),
 
-/***/ 1428:
+/***/ 7126:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installWindows = installWindows;
-async function installWindows(_) {
+exports.installWin32 = installWin32;
+async function installWin32(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 // const SUPPORTED_VERSIONS = {
@@ -31564,7 +31564,7 @@ async function installWindows(_) {
 //   Arch,
 //   Record<WindowsEnv, readonly string[] | undefined>
 // >;
-// export async function installWindows(target: Target): Promise<string> {
+// export async function installWin32(target: Target): Promise<string> {
 //   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 //   // ...
 // }
@@ -31837,8 +31837,8 @@ exports.Compiler = {
 };
 exports.OS = {
     Linux: "linux",
-    MacOS: "macos",
-    Windows: "windows",
+    MacOS: "darwin",
+    Windows: "win32",
 };
 exports.Arch = {
     X64: "x64",

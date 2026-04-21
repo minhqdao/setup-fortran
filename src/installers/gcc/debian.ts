@@ -9,7 +9,7 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["15", "14", "13", "12", "11"],
 } as const satisfies Record<Arch, readonly string[]>;
 
-export async function installLinux(target: Target): Promise<string> {
+export async function installDebian(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(`Installing GCC ${version} on Linux (${target.arch})...`);
 

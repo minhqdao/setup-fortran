@@ -1,6 +1,6 @@
 import { type Target } from "../../types";
 
-export async function installWindows(_: Target): Promise<string> {
+export async function installWin32(_: Target): Promise<string> {
   return Promise.reject(new Error("Not implemented"));
 }
 
@@ -22,7 +22,7 @@ export async function installWindows(_: Target): Promise<string> {
 //   Record<WindowsEnv, readonly string[] | undefined>
 // >;
 
-// export async function installWindows(target: Target): Promise<string> {
+// export async function installWin32(target: Target): Promise<string> {
 //   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 //   // ...
 // }

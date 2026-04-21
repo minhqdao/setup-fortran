@@ -10,8 +10,8 @@ export type Compiler = (typeof Compiler)[keyof typeof Compiler];
 
 export const OS = {
   Linux: "linux",
-  MacOS: "macos",
-  Windows: "windows",
+  MacOS: "darwin",
+  Windows: "win32",
 } as const;
 export type OS = (typeof OS)[keyof typeof OS];
 

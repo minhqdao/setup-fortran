@@ -1,15 +1,15 @@
 import { OS, type Target } from "../../types";
-import { installLinux } from "./linux";
-import { installMacOS } from "./macos";
-import { installWindows } from "./windows";
+import { installDebian } from "./debian";
+import { installDarwin } from "./darwin";
+import { installWin32 } from "./win32";
 
 export async function installGCC(target: Target): Promise<string> {
   switch (target.os) {
     case OS.Linux:
-      return await installLinux(target);
+      return await installDebian(target);
     case OS.MacOS:
-      return await installMacOS(target);
+      return await installDarwin(target);
     case OS.Windows:
-      return await installWindows(target);
+      return await installWin32(target);
   }
 }
