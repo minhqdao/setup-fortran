@@ -31757,9 +31757,9 @@ function parseWindowsEnv(raw) {
     throw new Error(`Unknown windows-env "${raw}". Valid options: ${valid.join(", ")}`);
 }
 function parseInputs() {
-    const rawCompiler = core.getInput("compiler") || DEFAULTS.compiler;
-    const rawVersion = core.getInput("version") || DEFAULTS.version;
-    const rawWinEnv = core.getInput("windows-env");
+    const rawCompiler = core.getInput("compiler").trim() || DEFAULTS.compiler;
+    const rawVersion = core.getInput("version").trim() || DEFAULTS.version;
+    const rawWinEnv = core.getInput("windows-env").trim();
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
     const target = {

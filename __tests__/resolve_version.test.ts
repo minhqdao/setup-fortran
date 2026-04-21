@@ -72,4 +72,20 @@ describe("resolveVersion", () => {
       );
     });
   });
+
+  describe("error messages", () => {
+    it("uses the correct compiler name in errors", () => {
+      const target: Target = {
+        ...baseTarget,
+        compiler: Compiler.IFX,
+        version: "2024.0",
+      };
+      const supported: Record<string, readonly string[]> = {
+        [Arch.X64]: ["2024.1", "2023.2"],
+      };
+      expect(() => resolveVersion(target, supported)).toThrow(
+        "ifx 2024.0 is not supported on linux (x64). Supported versions: 2024.1, 2023.2",
+      );
+    });
+  });
 });

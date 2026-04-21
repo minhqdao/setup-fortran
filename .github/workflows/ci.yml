@@ -30,7 +30,7 @@ jobs:
         run: npm run lint
 
   unit-tests:
-    name: Test
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
