@@ -46,7 +46,7 @@ jobs:
         run: npm run test
 
   build:
-    name: Build and compare dist/
+    name: Build and compare dist/, build and save dist-tests/
     runs-on: ubuntu-latest
     needs: [ format-lint, unit-tests ]
     steps:
@@ -71,6 +71,15 @@ jobs:
             exit 1
           fi
 
+      - name: Build dist-tests/ and save
+        run: npm run build:integration-test
+
+      - name: Save dist-tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-tests
+          path: dist-tests
+
   integration-tests:
     name: ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }} ${{
       matrix.image }}
@@ -89,6 +98,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Restore Workspace
+        uses: actions/download-artifact@v8
+        with:
+          name: generated-dist-tests
 
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
