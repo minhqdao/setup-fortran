@@ -11,7 +11,7 @@ async function run(): Promise<void> {
   try {
     const target = parseInputs();
     const fc = target.compiler;
-    const testDir = "fortran_tests";
+    const testDir = path.join(process.cwd(), "fortran_tests");
 
     if (!fs.existsSync(buildDir)) {
       fs.mkdirSync(buildDir);
@@ -20,6 +20,13 @@ async function run(): Promise<void> {
     core.info(`Starting integration tests for ${fc} in ${buildDir}...`);
 
     const flags: string[] = ["-O2"];
+
+    if (fc === Compiler.GFortran || fc === Compiler.AOCC) {
+      flags.push("-J", "test_build");
+    } else if (fc === Compiler.IFX || fc === Compiler.IFort) {
+      flags.push("-module", "test_build");
+    }
+
     let ompFlag = "";
     if (fc === Compiler.GFortran || fc === Compiler.AOCC) {
       ompFlag = "-fopenmp";

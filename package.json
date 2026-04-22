@@ -19,12 +19,12 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "build": "ncc build src/index.ts -o dist --source-map",
+    "build": "ncc build src/index.ts -o dist --source-map && ncc build src/run_fortran_tests.ts -o dist/tests --source-map",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
-    "integration-test": "tsx src/run_fortran_tests.ts",
+    "integration-test": "node dist/tests/index.js",
     "all": "npm run format:check && npm run lint && npm run build && npm run test && npm run integration-test"
   },
   "dependencies": {
@@ -42,7 +42,6 @@
     "jest": "^30.3.0",
     "prettier": "^3.8.3",
     "ts-jest": "^29.4.9",
-    "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0"
   }
