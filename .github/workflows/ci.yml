@@ -98,6 +98,10 @@ jobs:
             macos-26-intel,
             macos-15,
             macos-15-intel,
+            macos-14,
+            windows-2025,
+            windows-2022,
+            # windows-11-arm,
           ]
         toolchain:
           - { compiler: gfortran, version: "15" }
@@ -109,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Restore Workspace
+      - name: Restore dist-tests
         uses: actions/download-artifact@v8
         with:
           name: generated-dist-tests

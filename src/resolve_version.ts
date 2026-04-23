@@ -1,4 +1,4 @@
-import { LATEST, type Target, type WindowsEnv } from "./types";
+import { Arch, LATEST, WindowsEnv, type Target } from "./types";
 
 export function resolveVersion<T extends readonly string[]>(
   target: Target,
@@ -33,29 +33,42 @@ export function resolveVersion<T extends readonly string[]>(
   return version;
 }
 
-export function resolveWindowsVersion<T extends readonly string[]>(
+export function resolveWindowsVersion(
   target: Target,
   supportedVersions: Record<
     string,
-    Record<WindowsEnv, T | undefined> | undefined
+    Record<WindowsEnv, readonly string[] | undefined> | undefined
   >,
 ): string {
   const archVersions = supportedVersions[target.arch];
+
   if (!archVersions) {
     throw new Error(
-      `No supported versions found for ${target.compiler} on ` +
-        `${target.os} (${target.arch}).`,
+      `Architecture "${target.arch}" is not supported for ${target.compiler} on Windows.`,
     );
   }
 
   const windowsEnv = target.windowsEnv;
-
   const versions = archVersions[windowsEnv];
 
   if (!versions) {
+    if (windowsEnv === WindowsEnv.ClangArm64 && target.arch === Arch.X64) {
+      throw new Error(
+        `Invalid configuration: "${WindowsEnv.ClangArm64}" is only available for ARM64 architecture, but the current runner is ${target.arch}.`,
+      );
+    }
+
+    if (
+      (windowsEnv === WindowsEnv.UCRT64 || windowsEnv === WindowsEnv.Clang64) &&
+      target.arch === Arch.ARM64
+    ) {
+      throw new Error(
+        `Invalid configuration: "${windowsEnv}" is not currently supported on Windows ARM64. Please use ${WindowsEnv.ClangArm64} instead.`,
+      );
+    }
+
     throw new Error(
-      `No supported versions found for ${target.compiler} on ` +
-        `${target.os} (${target.arch}, ${windowsEnv}).`,
+      `The environment "${windowsEnv}" is not supported or implemented for Windows ${target.arch}.`,
     );
   }
 

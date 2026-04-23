@@ -111,6 +111,13 @@ describe("resolveWindowsVersion", () => {
       [WindowsEnv.ClangArm64]: undefined,
       [WindowsEnv.MinGW64]: ["12"],
     },
+    [Arch.ARM64]: {
+      [WindowsEnv.Native]: ["14"],
+      [WindowsEnv.ClangArm64]: ["14"],
+      [WindowsEnv.UCRT64]: undefined,
+      [WindowsEnv.Clang64]: undefined,
+      [WindowsEnv.MinGW64]: undefined,
+    },
   };
 
   it("resolves LATEST for a specific windowsEnv", () => {
@@ -132,7 +139,32 @@ describe("resolveWindowsVersion", () => {
   it("throws if windowsEnv is not supported for the arch", () => {
     const target = { ...winTarget, windowsEnv: WindowsEnv.ClangArm64 };
     expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
-      "No supported versions found for gfortran on win32 (x64, clangarm64).",
+      'Invalid configuration: "clangarm64" is only available for ARM64 architecture, but the current runner is x64.',
+    );
+  });
+
+  it("throws if UCRT64/Clang64 is used on ARM64", () => {
+    const target = { ...winTarget, arch: Arch.ARM64, windowsEnv: WindowsEnv.UCRT64 };
+    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
+      'Invalid configuration: "ucrt64" is not currently supported on Windows ARM64. Please use clangarm64 instead.',
+    );
+  });
+
+  it("throws if the environment is not supported for that architecture", () => {
+    const target = {
+      ...winTarget,
+      windowsEnv: WindowsEnv.MinGW64,
+      arch: Arch.ARM64,
+    };
+    // Need a mock SUPPORTED_WIN where ARM64 exists but MinGW64 is missing
+    const supported: typeof SUPPORTED_WIN = {
+      ...SUPPORTED_WIN,
+      [Arch.ARM64]: {
+        [WindowsEnv.Native]: ["14"],
+      } as any,
+    };
+    expect(() => resolveWindowsVersion(target, supported)).toThrow(
+      'The environment "mingw64" is not supported or implemented for Windows arm64.',
     );
   });
 
@@ -148,9 +180,9 @@ describe("resolveWindowsVersion", () => {
   });
 
   it("throws if arch is missing", () => {
-    const target = { ...winTarget, arch: Arch.ARM64 };
+    const target = { ...winTarget, arch: "ppc64" as any };
     expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
-      "No supported versions found for gfortran on win32 (arm64).",
+      'Architecture "ppc64" is not supported for gfortran on Windows.',
     );
   });
 });
