@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { parseInputs } from "./parse_input";
+import { parseInputs } from "./parse_inputs";
 import { Compiler, OS } from "./types";
 import { installGFortran } from "./installers/gfortran";
 import { installIFX } from "./installers/ifx";

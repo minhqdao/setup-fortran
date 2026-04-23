@@ -2,7 +2,7 @@ import * as exec from "@actions/exec";
 import * as core from "@actions/core";
 import * as path from "path";
 import * as fs from "fs"; // Added for directory management
-import { parseInputs } from "./parse_input";
+import { parseInputs } from "./parse_inputs";
 import { Compiler } from "./types";
 
 async function run(): Promise<void> {

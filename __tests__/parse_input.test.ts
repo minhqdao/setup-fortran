@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import * as os from "os";
-import { parseInputs } from "../src/parse_input";
+import { parseInputs } from "../src/parse_inputs";
 import { Compiler, OS, Arch, WindowsEnv, LATEST } from "../src/types";
 
 jest.mock("@actions/core");
