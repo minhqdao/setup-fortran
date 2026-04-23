@@ -105,10 +105,10 @@ jobs:
           # windows-11-arm,
         toolchain:
           - { compiler: gfortran, version: "15" }
-          # - { compiler: gfortran, version: "14" }
-          # - { compiler: gfortran, version: "13" }
-          # - { compiler: gfortran, version: "12" }
-          # - { compiler: gfortran, version: "11" }
+          - { compiler: gfortran, version: "14" }
+          - { compiler: gfortran, version: "13" }
+          - { compiler: gfortran, version: "12" }
+          - { compiler: gfortran, version: "11" }
 
     steps:
       - uses: actions/checkout@v6
