@@ -40,7 +40,7 @@ export async function installWin32(target: Target): Promise<string> {
     return await installNative(target, version);
   }
 
-  return await installMSYS2(target);
+  throw new Error(`Unsupported Windows environment: ${target.windowsEnv}`);
 }
 
 async function installNative(target: Target, version: string): Promise<string> {
@@ -78,29 +78,6 @@ async function installNative(target: Target, version: string): Promise<string> {
   core.exportVariable("FC", gfortranPath);
   core.exportVariable("F77", gfortranPath);
   core.exportVariable("F90", gfortranPath);
-
-  return await resolveInstalledVersion();
-}
-
-async function installMSYS2(target: Target): Promise<string> {
-  const env = target.windowsEnv;
-
-  if (env === WindowsEnv.Clang64 || env === WindowsEnv.ClangArm64) {
-    throw new Error(
-      `GFortran is not available in the ${env} environment. Please use UCRT64, MinGW64, or Native.`,
-    );
-  }
-
-  core.info(`Installing GFortran (Latest) on Windows via MSYS2 ${env}...`);
-
-  const archLabel = target.arch === Arch.X64 ? "x86_64" : "aarch64";
-  const subEnv = env === WindowsEnv.UCRT64 ? "ucrt" : "x86_64";
-  const pkgName = `mingw-w64-${subEnv}-${archLabel}-gcc-fortran`;
-
-  await exec.exec("bash", ["-c", `pacman -S --noconfirm --needed ${pkgName}`]);
-
-  const msysBin = path.join("C:", "msys64", env, "bin");
-  core.addPath(msysBin);
 
   return await resolveInstalledVersion();
 }
