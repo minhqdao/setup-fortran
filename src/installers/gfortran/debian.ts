@@ -4,6 +4,8 @@ import { Arch } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Target } from "../../types";
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["15", "14", "13", "12", "11"],
   [Arch.ARM64]: ["15", "14", "13", "12", "11"],

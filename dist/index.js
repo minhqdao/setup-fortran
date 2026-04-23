@@ -34512,6 +34512,7 @@ function resolveVersion(target, supportedVersions) {
         throw new Error(`No supported versions found for ${target.compiler} on ` +
             `${target.os} (${target.arch}).`);
     }
+    // If the version is LATEST, use the first version (should be the highest)
     const version = target.version === LATEST ? versions[0] : target.version;
     if (!version) {
         throw new Error(`No supported versions found for ${target.compiler} on ` +
@@ -34549,6 +34550,8 @@ function resolveWindowsVersion(target, supportedVersions) {
 
 
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
     [Arch.X64]: ["15", "14", "13", "12", "11"],
     [Arch.ARM64]: ["15", "14", "13", "12", "11"],
@@ -34610,6 +34613,8 @@ var external_path_ = __nccwpck_require__(6928);
 
 
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const darwin_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["15", "14", "13", "12", "11"],
     [Arch.ARM64]: ["15", "14", "13", "12", "11"],
@@ -38420,6 +38425,8 @@ function _unique(values) {
 
 
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],

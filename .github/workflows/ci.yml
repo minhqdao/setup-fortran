@@ -107,9 +107,9 @@ jobs:
           # - { compiler: gfortran, version: "12" }
           # - { compiler: gfortran, version: "11" }
         include:
-          - image: ubuntu-latest # no compiler and version specified, should default to the latest gfortran
-          - image: macos-latest # no compiler and version specified, should default to the latest gfortran
-          - image: windows-latest # no compiler and version specified, should default to the latest gfortran
+          - image: ubuntu-latest # no compiler and version specified, should default to the latest gfortran version
+          - image: macos-latest # no compiler and version specified, should default to the latest gfortran version
+          - image: windows-latest # no compiler and version specified, should default to the latest gfortran version
 
     steps:
       - uses: actions/checkout@v6

@@ -5,6 +5,8 @@ import * as tc from "@actions/tool-cache";
 import { Arch, WindowsEnv, type Target } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],

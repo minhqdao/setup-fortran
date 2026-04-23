@@ -13,6 +13,7 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
+  // If the version is LATEST, use the first version (should be the highest)
   const version = target.version === LATEST ? versions[0] : target.version;
 
   if (!version) {
