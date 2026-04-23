@@ -88,7 +88,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm, macos-26 ]
+        image:
+          [
+            ubuntu-24.04,
+            ubuntu-22.04,
+            ubuntu-24.04-arm,
+            ubuntu-22.04-arm,
+            macos-26,
+            macos-26-intel,
+            macos-15,
+            macos-15-intel,
+          ]
         toolchain:
           - { compiler: gfortran, version: "15" }
           - { compiler: gfortran, version: "14" }
