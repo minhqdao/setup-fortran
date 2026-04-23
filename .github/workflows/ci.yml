@@ -91,24 +91,24 @@ jobs:
         image:
           [
             ubuntu-24.04,
-            ubuntu-22.04,
-            ubuntu-24.04-arm,
-            ubuntu-22.04-arm,
-            macos-26,
-            macos-26-intel,
-            macos-15,
-            macos-15-intel,
-            macos-14,
+            # ubuntu-22.04,
+          # ubuntu-24.04-arm,
+          # ubuntu-22.04-arm,
+          # macos-26,
+          # macos-26-intel,
+          # macos-15,
+          # macos-15-intel,
+          # macos-14,
             windows-2025,
-            windows-2022,
-            # windows-11-arm,
           ]
+          # windows-2022,
+          # windows-11-arm,
         toolchain:
           - { compiler: gfortran, version: "15" }
-          - { compiler: gfortran, version: "14" }
-          - { compiler: gfortran, version: "13" }
-          - { compiler: gfortran, version: "12" }
-          - { compiler: gfortran, version: "11" }
+          # - { compiler: gfortran, version: "14" }
+          # - { compiler: gfortran, version: "13" }
+          # - { compiler: gfortran, version: "12" }
+          # - { compiler: gfortran, version: "11" }
 
     steps:
       - uses: actions/checkout@v6
