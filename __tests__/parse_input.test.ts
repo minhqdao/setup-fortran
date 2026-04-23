@@ -168,7 +168,8 @@ describe("parseInputs", () => {
 
     it.each([
       [WindowsEnv.MinGW64, "mingw64"],
-      [WindowsEnv.MSYS2, "msys2"],
+      [WindowsEnv.Clang64, "clang64"],
+      [WindowsEnv.ClangArm64, "clangarm64"],
     ])("parses %s windows-env", (expected, input) => {
       mockedGetInput.mockImplementation((name) => {
         if (name === "windows-env") return input;
@@ -183,7 +184,7 @@ describe("parseInputs", () => {
         return "";
       });
       expect(() => parseInputs()).toThrow(
-        'Unknown windows-env "msys". Valid options: ucrt64, mingw64, msys2, native',
+        'Unknown windows-env "msys". Valid options: native, ucrt64, clang64, clangarm64, mingw64',
       );
     });
   });

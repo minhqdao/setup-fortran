@@ -1,4 +1,7 @@
-import { resolveVersion } from "../src/resolve_version";
+import {
+  resolveVersion,
+  resolveWindowsVersion,
+} from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, WindowsEnv } from "../src/types";
 import type { Target } from "../src/types";
 
@@ -88,5 +91,66 @@ describe("resolveVersion", () => {
         "ifx 2024.0 is not supported on linux (x64). Supported versions: 2024.1, 2023.2",
       );
     });
+  });
+});
+
+describe("resolveWindowsVersion", () => {
+  const winTarget: Target = {
+    ...baseTarget,
+    os: OS.Windows,
+  };
+
+  const SUPPORTED_WIN: Record<
+    string,
+    Record<WindowsEnv, readonly string[] | undefined>
+  > = {
+    [Arch.X64]: {
+      [WindowsEnv.Native]: ["15", "14"],
+      [WindowsEnv.UCRT64]: ["14", "13"],
+      [WindowsEnv.Clang64]: ["15"],
+      [WindowsEnv.ClangArm64]: undefined,
+      [WindowsEnv.MinGW64]: ["12"],
+    },
+  };
+
+  it("resolves LATEST for a specific windowsEnv", () => {
+    const target = { ...winTarget, windowsEnv: WindowsEnv.UCRT64 };
+    const result = resolveWindowsVersion(target, SUPPORTED_WIN);
+    expect(result).toBe("14");
+  });
+
+  it("resolves a specific version for a specific windowsEnv", () => {
+    const target = {
+      ...winTarget,
+      windowsEnv: WindowsEnv.Native,
+      version: "14",
+    };
+    const result = resolveWindowsVersion(target, SUPPORTED_WIN);
+    expect(result).toBe("14");
+  });
+
+  it("throws if windowsEnv is not supported for the arch", () => {
+    const target = { ...winTarget, windowsEnv: WindowsEnv.ClangArm64 };
+    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
+      "No supported versions found for gfortran on win32 (x64, clangarm64).",
+    );
+  });
+
+  it("throws if the version is not supported for that windowsEnv", () => {
+    const target = {
+      ...winTarget,
+      windowsEnv: WindowsEnv.UCRT64,
+      version: "15",
+    };
+    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
+      "gfortran 15 is not supported on win32 (x64). Supported versions: 14, 13",
+    );
+  });
+
+  it("throws if arch is missing", () => {
+    const target = { ...winTarget, arch: Arch.ARM64 };
+    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
+      "No supported versions found for gfortran on win32 (arm64).",
+    );
   });
 });
