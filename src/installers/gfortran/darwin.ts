@@ -20,6 +20,7 @@ export async function installDarwin(target: Target): Promise<string> {
 
   await exec.exec("brew", ["install", formula]);
 
+  // Homebrew usually installs to /opt/homebrew/bin (ARM) or /usr/local/bin (x64)
   const brewPrefixOutput = await getBrewPrefix();
   const binDir = path.join(brewPrefixOutput, "bin");
   const gfortranBinary = path.join(binDir, `gfortran-${version}`);
@@ -28,6 +29,24 @@ export async function installDarwin(target: Target): Promise<string> {
   core.info(`Symlinking ${gfortranBinary} to ${genericGfortran}`);
 
   await exec.exec("ln", ["-sf", gfortranBinary, genericGfortran]);
+
+  // Help ld find -lSystem on newer macOS versions
+  let sdkPath = "";
+  try {
+    await exec.exec("xcrun", ["--show-sdk-path"], {
+      listeners: {
+        stdout: (data: Buffer) => (sdkPath += data.toString().trim()),
+      },
+    });
+    if (sdkPath) {
+      core.exportVariable("SDKROOT", sdkPath);
+      // Also helpful for some older C-interop scenarios:
+      core.exportVariable("LIBRARY_PATH", `${sdkPath}/usr/lib`);
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    core.warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
+  }
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
