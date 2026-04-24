@@ -12,7 +12,9 @@ const SUPPORTED_VERSIONS = {
 
 export async function installDarwin(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  core.info(`Installing Flang (via LLVM ${version}) on macOS (${target.arch}) via Homebrew...`);
+  core.info(
+    `Installing Flang (via LLVM ${version}) on macOS (${target.arch}) via Homebrew...`,
+  );
 
   const formula = `llvm@${version}`;
   await exec.exec("brew", ["install", formula]);
@@ -29,7 +31,9 @@ export async function installDarwin(target: Target): Promise<string> {
   const genericFlang = path.join(binDir, "flang");
 
   await exec.exec("ln", ["-sf", flangNewBinary, genericFlang]).catch(() => {
-    core.info(`Could not symlink ${flangNewBinary} to ${genericFlang}, maybe it already exists or is named differently.`);
+    core.info(
+      `Could not symlink ${flangNewBinary} to ${genericFlang}, maybe it already exists or is named differently.`,
+    );
   });
 
   const resolvedVersion = await resolveInstalledVersion();
@@ -50,22 +54,22 @@ async function resolveInstalledVersion(): Promise<string> {
   // Flang might be flang or flang-new
   let tool = "flang";
   try {
-      await exec.exec("flang", ["--version"], {
-        listeners: {
-          stdout: (data: Buffer) => {
-            output += data.toString();
-          },
+    await exec.exec("flang", ["--version"], {
+      listeners: {
+        stdout: (data: Buffer) => {
+          output += data.toString();
         },
-      });
+      },
+    });
   } catch (e) {
-      tool = "flang-new";
-      await exec.exec("flang-new", ["--version"], {
-        listeners: {
-          stdout: (data: Buffer) => {
-            output += data.toString();
-          },
+    tool = "flang-new";
+    await exec.exec("flang-new", ["--version"], {
+      listeners: {
+        stdout: (data: Buffer) => {
+          output += data.toString();
         },
-      });
+      },
+    });
   }
   return output.trim();
 }

@@ -23,7 +23,9 @@ export async function installWin32(target: Target): Promise<string> {
 
   switch (target.windowsEnv) {
     case WindowsEnv.Native:
-        throw new Error("Flang is not supported on Windows native environment yet.");
+      throw new Error(
+        "Flang is not supported on Windows native environment yet.",
+      );
     case WindowsEnv.UCRT64:
       return await installMSYS2(target);
   }
@@ -62,12 +64,12 @@ async function resolveInstalledVersion(): Promise<string> {
   } catch (err) {
     // try flang-new
     try {
-        await exec.exec("flang-new", ["--version"], {
-            silent: true,
-            listeners: { stdout: (data) => (stdout += data.toString()) },
-          });
+      await exec.exec("flang-new", ["--version"], {
+        silent: true,
+        listeners: { stdout: (data) => (stdout += data.toString()) },
+      });
     } catch (err2) {
-        throw new Error(`Failed to verify ${tool} installation`, { cause: err2 });
+      throw new Error(`Failed to verify ${tool} installation`, { cause: err2 });
     }
   }
 

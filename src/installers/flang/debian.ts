@@ -18,28 +18,25 @@ export async function installDebian(target: Target): Promise<string> {
   await exec.exec("sudo", ["./llvm.sh", version]);
 
   await exec.exec("sudo", ["apt-get", "update", "-y"]);
-  await exec.exec("sudo", [
-    "apt-get",
-    "install",
-    "-y",
-    `flang-${version}`,
-  ]);
+  await exec.exec("sudo", ["apt-get", "install", "-y", `flang-${version}`]);
 
   // Symlink flang-new-<version> to flang if flang-<version> doesn't exist
   // Based on apt.llvm.org, the binary is often flang-new-<version>
   const flangBinary = `/usr/bin/flang-${version}`;
   const flangNewBinary = `/usr/bin/flang-new-${version}`;
 
-  await exec.exec("sudo", [
-    "update-alternatives",
-    "--install",
-    "/usr/bin/flang",
-    "flang",
-    flangBinary,
-    "100",
-  ]).catch(async () => {
-    core.info(`${flangBinary} not found, trying ${flangNewBinary}`);
-    await exec.exec("sudo", [
+  await exec
+    .exec("sudo", [
+      "update-alternatives",
+      "--install",
+      "/usr/bin/flang",
+      "flang",
+      flangBinary,
+      "100",
+    ])
+    .catch(async () => {
+      core.info(`${flangBinary} not found, trying ${flangNewBinary}`);
+      await exec.exec("sudo", [
         "update-alternatives",
         "--install",
         "/usr/bin/flang",
@@ -47,7 +44,7 @@ export async function installDebian(target: Target): Promise<string> {
         flangNewBinary,
         "100",
       ]);
-  });
+    });
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`Flang ${resolvedVersion} installed successfully.`);

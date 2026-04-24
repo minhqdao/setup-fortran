@@ -38780,12 +38780,7 @@ async function flang_debian_installDebian(target) {
     await lib_exec.exec("chmod", ["+x", "llvm.sh"]);
     await lib_exec.exec("sudo", ["./llvm.sh", version]);
     await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
-    await lib_exec.exec("sudo", [
-        "apt-get",
-        "install",
-        "-y",
-        `flang-${version}`,
-    ]);
+    await lib_exec.exec("sudo", ["apt-get", "install", "-y", `flang-${version}`]);
     // Symlink flang-new-<version> to flang if flang-<version> doesn't exist
     // Based on apt.llvm.org, the binary is often flang-new-<version>
     const flangBinary = `/usr/bin/flang-${version}`;
@@ -38797,7 +38792,8 @@ async function flang_debian_installDebian(target) {
         "flang",
         flangBinary,
         "100",
-    ]).catch(async () => {
+    ])
+        .catch(async () => {
         lib_core.info(`${flangBinary} not found, trying ${flangNewBinary}`);
         await lib_exec.exec("sudo", [
             "update-alternatives",
