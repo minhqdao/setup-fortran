@@ -53,7 +53,7 @@ export async function installDebian(target: Target): Promise<string> {
 
 async function resolveInstalledVersion(): Promise<string> {
   let output = "";
-  await exec.exec("flang", ["--version"], {
+  await exec.exec("/usr/bin/flang", ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {
         output += data.toString();

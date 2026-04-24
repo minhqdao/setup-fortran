@@ -38810,7 +38810,7 @@ async function flang_debian_installDebian(target) {
 }
 async function flang_debian_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("flang", ["--version"], {
+    await lib_exec.exec("/usr/bin/flang", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -38840,13 +38840,19 @@ async function darwin_installDarwin(target) {
     const binDir = external_path_.join(llvmDir, "bin");
     // Add LLVM bin to PATH
     lib_core.addPath(binDir);
+    if (process.env.PATH) {
+        process.env.PATH = `${binDir}${external_path_.delimiter}${process.env.PATH}`;
+    }
+    else {
+        process.env.PATH = binDir;
+    }
     // Symlink flang-new to flang if it exists
     const flangNewBinary = external_path_.join(binDir, "flang-new");
     const genericFlang = external_path_.join(binDir, "flang");
     await lib_exec.exec("ln", ["-sf", flangNewBinary, genericFlang]).catch(() => {
         lib_core.info(`Could not symlink ${flangNewBinary} to ${genericFlang}, maybe it already exists or is named differently.`);
     });
-    const resolvedVersion = await flang_darwin_resolveInstalledVersion();
+    const resolvedVersion = await flang_darwin_resolveInstalledVersion(binDir);
     lib_core.info(`Flang ${resolvedVersion} installed successfully on Darwin.`);
     return resolvedVersion;
 }
@@ -38857,11 +38863,13 @@ async function darwin_getBrewPrefix() {
     });
     return output.trim();
 }
-async function flang_darwin_resolveInstalledVersion() {
+async function flang_darwin_resolveInstalledVersion(binDir) {
     let output = "";
+    const flang = external_path_.join(binDir, "flang");
+    const flangNew = external_path_.join(binDir, "flang-new");
     // Flang might be flang or flang-new
     try {
-        await lib_exec.exec("flang", ["--version"], {
+        await lib_exec.exec(flang, ["--version"], {
             listeners: {
                 stdout: (data) => {
                     output += data.toString();
@@ -38870,7 +38878,7 @@ async function flang_darwin_resolveInstalledVersion() {
         });
     }
     catch {
-        await lib_exec.exec("flang-new", ["--version"], {
+        await lib_exec.exec(flangNew, ["--version"], {
             listeners: {
                 stdout: (data) => {
                     output += data.toString();
@@ -38915,18 +38923,25 @@ async function win32_installMSYS2(target) {
     ]);
     const msysBin = external_path_.join("C:", "msys64", target.windowsEnv, "bin");
     lib_core.addPath(msysBin);
+    if (process.env.PATH) {
+        process.env.PATH = `${msysBin}${external_path_.delimiter}${process.env.PATH}`;
+    }
+    else {
+        process.env.PATH = msysBin;
+    }
     lib_core.info(`Setting FC, F77, and F90 environment variables...`);
     const flangPath = external_path_.join(msysBin, "flang.exe");
     lib_core.exportVariable("FC", flangPath);
     lib_core.exportVariable("F77", flangPath);
     lib_core.exportVariable("F90", flangPath);
-    return await flang_win32_resolveInstalledVersion();
+    return await flang_win32_resolveInstalledVersion(msysBin);
 }
-async function flang_win32_resolveInstalledVersion() {
+async function flang_win32_resolveInstalledVersion(binDir) {
     let stdout = "";
-    const tool = "flang";
+    const flang = external_path_.join(binDir, "flang.exe");
+    const flangNew = external_path_.join(binDir, "flang-new.exe");
     try {
-        await lib_exec.exec(tool, ["--version"], {
+        await lib_exec.exec(flang, ["--version"], {
             silent: true,
             listeners: { stdout: (data) => (stdout += data.toString()) },
         });
@@ -38934,13 +38949,13 @@ async function flang_win32_resolveInstalledVersion() {
     catch {
         // try flang-new
         try {
-            await lib_exec.exec("flang-new", ["--version"], {
+            await lib_exec.exec(flangNew, ["--version"], {
                 silent: true,
                 listeners: { stdout: (data) => (stdout += data.toString()) },
             });
         }
         catch (err2) {
-            throw new Error(`Failed to verify ${tool} installation`, { cause: err2 });
+            throw new Error(`Failed to verify flang installation`, { cause: err2 });
         }
     }
     return stdout.trim();

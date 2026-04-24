@@ -42,6 +42,11 @@ async function installMSYS2(target: Target): Promise<string> {
 
   const msysBin = path.join("C:", "msys64", target.windowsEnv, "bin");
   core.addPath(msysBin);
+  if (process.env.PATH) {
+    process.env.PATH = `${msysBin}${path.delimiter}${process.env.PATH}`;
+  } else {
+    process.env.PATH = msysBin;
+  }
 
   core.info(`Setting FC, F77, and F90 environment variables...`);
   const flangPath = path.join(msysBin, "flang.exe");
@@ -49,27 +54,28 @@ async function installMSYS2(target: Target): Promise<string> {
   core.exportVariable("F77", flangPath);
   core.exportVariable("F90", flangPath);
 
-  return await resolveInstalledVersion();
+  return await resolveInstalledVersion(msysBin);
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(binDir: string): Promise<string> {
   let stdout = "";
-  const tool = "flang";
+  const flang = path.join(binDir, "flang.exe");
+  const flangNew = path.join(binDir, "flang-new.exe");
 
   try {
-    await exec.exec(tool, ["--version"], {
+    await exec.exec(flang, ["--version"], {
       silent: true,
       listeners: { stdout: (data) => (stdout += data.toString()) },
     });
   } catch {
     // try flang-new
     try {
-      await exec.exec("flang-new", ["--version"], {
+      await exec.exec(flangNew, ["--version"], {
         silent: true,
         listeners: { stdout: (data) => (stdout += data.toString()) },
       });
     } catch (err2) {
-      throw new Error(`Failed to verify ${tool} installation`, { cause: err2 });
+      throw new Error(`Failed to verify flang installation`, { cause: err2 });
     }
   }
 

@@ -25,6 +25,11 @@ export async function installDarwin(target: Target): Promise<string> {
 
   // Add LLVM bin to PATH
   core.addPath(binDir);
+  if (process.env.PATH) {
+    process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH}`;
+  } else {
+    process.env.PATH = binDir;
+  }
 
   // Symlink flang-new to flang if it exists
   const flangNewBinary = path.join(binDir, "flang-new");
@@ -36,7 +41,7 @@ export async function installDarwin(target: Target): Promise<string> {
     );
   });
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion(binDir);
   core.info(`Flang ${resolvedVersion} installed successfully on Darwin.`);
   return resolvedVersion;
 }
@@ -49,11 +54,14 @@ async function getBrewPrefix(): Promise<string> {
   return output.trim();
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(binDir: string): Promise<string> {
   let output = "";
+  const flang = path.join(binDir, "flang");
+  const flangNew = path.join(binDir, "flang-new");
+
   // Flang might be flang or flang-new
   try {
-    await exec.exec("flang", ["--version"], {
+    await exec.exec(flang, ["--version"], {
       listeners: {
         stdout: (data: Buffer) => {
           output += data.toString();
@@ -61,7 +69,7 @@ async function resolveInstalledVersion(): Promise<string> {
       },
     });
   } catch {
-    await exec.exec("flang-new", ["--version"], {
+    await exec.exec(flangNew, ["--version"], {
       listeners: {
         stdout: (data: Buffer) => {
           output += data.toString();
