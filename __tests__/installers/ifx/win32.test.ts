@@ -43,11 +43,11 @@ describe("IFX installWin32", () => {
     (mockedFs.existsSync as jest.Mock).mockReturnValue(true);
   });
 
-  it("calls winget via cmd /c to install", async () => {
+  it("calls winget via powershell to install", async () => {
     await installWin32(baseTarget);
 
-    expect(mockedExec).toHaveBeenCalledWith("cmd", [
-      "/c",
+    expect(mockedExec).toHaveBeenCalledWith("powershell", [
+      "-Command",
       "winget install --id Intel.FortranCompiler --accept-package-agreements --accept-source-agreements",
     ]);
   });

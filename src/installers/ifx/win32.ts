@@ -27,7 +27,7 @@ export async function installWin32(target: Target): Promise<string> {
     `Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`,
   );
 
-  // Use cmd /c winget to avoid EACCES issues with App Execution Aliases in Node.js stat
+  // Use PowerShell to call winget as it handles App Execution Aliases better
   let wingetCmd =
     "winget install --id Intel.FortranCompiler --accept-package-agreements --accept-source-agreements";
   if (version !== LATEST) {
@@ -35,7 +35,16 @@ export async function installWin32(target: Target): Promise<string> {
   }
 
   core.info(`Running: ${wingetCmd}`);
-  await exec.exec("cmd", ["/c", wingetCmd]);
+  try {
+    await exec.exec("powershell", ["-Command", wingetCmd]);
+  } catch (err) {
+    core.warning(
+      `winget failed: ${err instanceof Error ? err.message : String(err)}. Trying alternative...`,
+    );
+    // Fallback or just rethrow. Many runners don't have winget in the path for the service account.
+    // If it fails, there might not be an easy alternative without the installer URL.
+    throw err;
+  }
 
   // The default installation directory for oneAPI on Windows
   const oneApiRoot = "C:\\Program Files (x86)\\Intel\\oneAPI";
@@ -49,9 +58,10 @@ export async function installWin32(target: Target): Promise<string> {
 
   core.info(`Sourcing ${varsBatPath} and exporting environment...`);
 
-  // In Windows, we use 'cmd /c "setvars.bat && set"' to get environment variables
+  // In Windows, we use 'cmd /c "call ... && set"' to get environment variables
+  // Using 'call' explicitly can help with batch file execution.
   let envOutput = "";
-  await exec.exec("cmd", ["/c", `"${varsBatPath}" && set`], {
+  await exec.exec("cmd", ["/c", `call "${varsBatPath}" && set`], {
     listeners: {
       stdout: (data: Buffer) => {
         envOutput += data.toString();
@@ -75,8 +85,6 @@ export async function installWin32(target: Target): Promise<string> {
       ) {
         if (key === "PATH") {
           const newPaths = value.split(";");
-          // On Windows, PATH is case-insensitive, but process.env.PATH usually works.
-          // We add each part to GITHUB_PATH.
           for (const p of newPaths) {
             if (p && fs.existsSync(p)) {
               core.addPath(p);
