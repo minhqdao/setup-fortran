@@ -1,10 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_call:
 
 env:
   NODE_VERSION: "24"
@@ -20,10 +17,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Check formatting
+      - name: Check Formatting
         run: npm run format:check
 
       - name: Lint
@@ -79,60 +76,3 @@ jobs:
         with:
           name: generated-dist-tests
           path: dist-tests
-
-  integration-tests:
-    name: ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }} ${{
-      matrix.image }} ${{ matrix.toolchain.windowsEnv }}
-    runs-on: ${{ matrix.image }}
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [ ubuntu-24.04 ]
-          # ubuntu-22.04,
-          # ubuntu-24.04-arm,
-          # ubuntu-22.04-arm,
-          # macos-26,
-          # macos-26-intel,
-          # macos-15,
-          # macos-15-intel,
-          # macos-14,
-          # windows-2025,
-          # windows-2022,
-        toolchain:
-          - { compiler: gfortran, version: "15" }
-          # - { compiler: gfortran, version: "14" }
-          # - { compiler: gfortran, version: "13" }
-          # - { compiler: gfortran, version: "12" }
-          # - { compiler: gfortran, version: "11" }
-        include:
-          # - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
-          # - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
-          # - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
-          - image: windows-2025
-            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # sets up MSYS2 and uses rolling gcc release from pacman
-          - image: windows-2022
-            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # sets up MSYS2 and uses rolling gcc release from pacman
-          - image: windows-11-arm # test failure
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Restore dist-tests
-        uses: actions/download-artifact@v8
-        with:
-          name: generated-dist-tests
-          path: dist-tests
-
-      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
-        id: setup
-        uses: ./
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-
-      - name: Verify installed version
-        run: "echo \"Output: ${{ steps.setup.outputs.compiler-version }}\""
-
-      - name: Run Integration Tests
-        run: npm run integration-test
