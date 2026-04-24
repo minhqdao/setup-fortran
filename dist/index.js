@@ -34589,10 +34589,7 @@ async function resolveInstalledVersion() {
             },
         },
     });
-    const match = /\d+\.\d+\.\d+/.exec(output);
-    if (!match)
-        throw new Error(`Could not parse gfortran version from: ${output}`);
-    return match[0];
+    return output.trim();
 }
 
 // EXTERNAL MODULE: external "path"
@@ -34659,10 +34656,7 @@ async function darwin_resolveInstalledVersion() {
             },
         },
     });
-    const match = /\d+\.\d+\.\d+/.exec(output);
-    if (!match)
-        throw new Error(`Could not parse gfortran version from: ${output}`);
-    return match[0];
+    return output.trim();
 }
 
 ;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/node_modules/@actions/core/lib/utils.js
@@ -38493,11 +38487,7 @@ async function win32_resolveInstalledVersion() {
     catch (err) {
         throw new Error(`Failed to verify ${tool} installation`, { cause: err });
     }
-    const version = stdout.trim();
-    if (!/^\d+/.test(version)) {
-        throw new Error(`Unexpected version format: ${version}`);
-    }
-    return version;
+    return stdout.trim();
 }
 
 ;// CONCATENATED MODULE: ./src/installers/gfortran/index.ts
@@ -38642,12 +38632,7 @@ async function debian_resolveInstalledVersion() {
             },
         },
     });
-    // flang --version outputs e.g. "AMD clang version 17.0.6 (CLANG: AOCC_5.1.0-Build#1...)"
-    const match = /AOCC_(\d+\.\d+\.\d+)/.exec(output);
-    if (!match)
-        throw new Error(`Could not parse AOCC version from: ${output}`);
-    // Normalize to major.minor (e.g. "5.1.0" -> "5.1")
-    return match[1].split(".").slice(0, 2).join(".");
+    return output.trim();
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/index.ts

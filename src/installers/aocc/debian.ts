@@ -129,9 +129,5 @@ async function resolveInstalledVersion(): Promise<string> {
       },
     },
   });
-  // flang --version outputs e.g. "AMD clang version 17.0.6 (CLANG: AOCC_5.1.0-Build#1...)"
-  const match = /AOCC_(\d+\.\d+\.\d+)/.exec(output);
-  if (!match) throw new Error(`Could not parse AOCC version from: ${output}`);
-  // Normalize to major.minor (e.g. "5.1.0" -> "5.1")
-  return match[1].split(".").slice(0, 2).join(".");
+  return output.trim();
 }

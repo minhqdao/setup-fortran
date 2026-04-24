@@ -59,8 +59,5 @@ async function resolveInstalledVersion(): Promise<string> {
       },
     },
   });
-  const match = /\d+\.\d+\.\d+/.exec(output);
-  if (!match)
-    throw new Error(`Could not parse gfortran version from: ${output}`);
-  return match[0];
+  return output.trim();
 }

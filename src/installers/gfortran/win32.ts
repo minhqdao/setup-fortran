@@ -111,9 +111,5 @@ async function resolveInstalledVersion(): Promise<string> {
     throw new Error(`Failed to verify ${tool} installation`, { cause: err });
   }
 
-  const version = stdout.trim();
-  if (!/^\d+/.test(version)) {
-    throw new Error(`Unexpected version format: ${version}`);
-  }
-  return version;
+  return stdout.trim();
 }
