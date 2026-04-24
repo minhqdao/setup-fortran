@@ -36,9 +36,9 @@ jobs:
                     # - { compiler: gfortran, version: "12" }
                     # - { compiler: gfortran, version: "11" }
                 include:
-                    # - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
-                    # - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
-                    # - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
+                    - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
+                    - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
+                    - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
                     - image: windows-2025
                       toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # set up MSYS2 and use rolling gcc release from pacman
                     - image: windows-2022

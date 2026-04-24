@@ -45,7 +45,7 @@ export function resolveWindowsVersion(
 
   if (!archVersions) {
     throw new Error(
-      `Architecture "${target.arch}" is currently not supported for ${target.compiler} on Windows.`,
+      `Architecture "${target.arch}" is not supported for ${target.compiler} on Windows.`,
     );
   }
 
