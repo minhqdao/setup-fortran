@@ -56,6 +56,32 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
 
+  // NVHPC depends on libncursesw5 and libtinfo5, which are not available in Ubuntu 24.04 (noble).
+  // We need to add the Ubuntu 22.04 (jammy) repository to install them.
+  if (target.osVersion.includes("24")) {
+    core.info(
+      "Ubuntu 24.04 detected. Adding Ubuntu 22.04 repository for legacy dependencies...",
+    );
+    const repoUrl =
+      target.arch === Arch.X64
+        ? "http://azure.archive.ubuntu.com/ubuntu/"
+        : "http://ports.ubuntu.com/ubuntu-ports/";
+
+    await exec.exec("sudo", [
+      "add-apt-repository",
+      "-y",
+      `deb ${repoUrl} jammy main universe`,
+    ]);
+    await exec.exec("sudo", ["apt-get", "update", "-y"]);
+    await exec.exec("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "libncursesw5",
+      "libtinfo5",
+    ]);
+  }
+
   // Add the NVIDIA HPC SDK apt repository if not already present.
   // Key URL: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
   // Repo URL: https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
