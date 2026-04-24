@@ -1,4 +1,4 @@
-import { Arch, LATEST, WindowsEnv, type Target } from "./types";
+import { LATEST, type WindowsEnv, type Target } from "./types";
 
 export function resolveVersion<T extends readonly string[]>(
   target: Target,
@@ -53,21 +53,6 @@ export function resolveWindowsVersion(
   const versions = archVersions[windowsEnv];
 
   if (!versions) {
-    if (windowsEnv === WindowsEnv.ClangArm64 && target.arch === Arch.X64) {
-      throw new Error(
-        `Invalid configuration: "${WindowsEnv.ClangArm64}" is only available for ARM64 architecture, but the current runner is ${target.arch}.`,
-      );
-    }
-
-    if (
-      (windowsEnv === WindowsEnv.UCRT64 || windowsEnv === WindowsEnv.Clang64) &&
-      target.arch === Arch.ARM64
-    ) {
-      throw new Error(
-        `Invalid configuration: "${windowsEnv}" is not currently supported on Windows ARM64. Please use ${WindowsEnv.ClangArm64} instead.`,
-      );
-    }
-
     throw new Error(
       `The environment "${windowsEnv}" is not supported or implemented for Windows ${target.arch}.`,
     );

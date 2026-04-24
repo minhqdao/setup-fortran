@@ -99,7 +99,6 @@ jobs:
           # macos-14,
           # windows-2025,
           # windows-2022,
-          # windows-11-arm,
         toolchain:
           - { compiler: gfortran, version: "15" }
           # - { compiler: gfortran, version: "14" }
@@ -107,9 +106,13 @@ jobs:
           # - { compiler: gfortran, version: "12" }
           # - { compiler: gfortran, version: "11" }
         include:
-          - image: ubuntu-latest # no compiler and version specified, should default to the latest gfortran version
-          - image: macos-latest # no compiler and version specified, should default to the latest gfortran version
-          - image: windows-latest # no compiler and version specified, should default to the latest gfortran version
+          - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: windows-2025
+            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # uses rolling gcc release from pacman
+          - image: windows-2022
+            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # uses rolling gcc release from pacman
 
     steps:
       - uses: actions/checkout@v6

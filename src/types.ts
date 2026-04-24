@@ -24,9 +24,6 @@ export type Arch = (typeof Arch)[keyof typeof Arch];
 export const WindowsEnv = {
   Native: "native",
   UCRT64: "ucrt64",
-  Clang64: "clang64",
-  ClangArm64: "clangarm64",
-  MinGW64: "mingw64",
 } as const;
 export type WindowsEnv = (typeof WindowsEnv)[keyof typeof WindowsEnv];
 

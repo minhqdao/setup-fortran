@@ -107,16 +107,10 @@ describe("resolveWindowsVersion", () => {
     [Arch.X64]: {
       [WindowsEnv.Native]: ["15", "14"],
       [WindowsEnv.UCRT64]: ["14", "13"],
-      [WindowsEnv.Clang64]: ["15"],
-      [WindowsEnv.ClangArm64]: undefined,
-      [WindowsEnv.MinGW64]: ["12"],
     },
     [Arch.ARM64]: {
       [WindowsEnv.Native]: ["14"],
-      [WindowsEnv.ClangArm64]: ["14"],
       [WindowsEnv.UCRT64]: undefined,
-      [WindowsEnv.Clang64]: undefined,
-      [WindowsEnv.MinGW64]: undefined,
     },
   };
 
@@ -136,35 +130,14 @@ describe("resolveWindowsVersion", () => {
     expect(result).toBe("14");
   });
 
-  it("throws if windowsEnv is not supported for the arch", () => {
-    const target = { ...winTarget, windowsEnv: WindowsEnv.ClangArm64 };
-    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
-      'Invalid configuration: "clangarm64" is only available for ARM64 architecture, but the current runner is x64.',
-    );
-  });
-
-  it("throws if UCRT64/Clang64 is used on ARM64", () => {
-    const target = { ...winTarget, arch: Arch.ARM64, windowsEnv: WindowsEnv.UCRT64 };
-    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
-      'Invalid configuration: "ucrt64" is not currently supported on Windows ARM64. Please use clangarm64 instead.',
-    );
-  });
-
   it("throws if the environment is not supported for that architecture", () => {
     const target = {
       ...winTarget,
-      windowsEnv: WindowsEnv.MinGW64,
+      windowsEnv: WindowsEnv.UCRT64,
       arch: Arch.ARM64,
     };
-    // Need a mock SUPPORTED_WIN where ARM64 exists but MinGW64 is missing
-    const supported: typeof SUPPORTED_WIN = {
-      ...SUPPORTED_WIN,
-      [Arch.ARM64]: {
-        [WindowsEnv.Native]: ["14"],
-      } as any,
-    };
-    expect(() => resolveWindowsVersion(target, supported)).toThrow(
-      'The environment "mingw64" is not supported or implemented for Windows arm64.',
+    expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
+      'The environment "ucrt64" is not supported or implemented for Windows arm64.',
     );
   });
 

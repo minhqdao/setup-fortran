@@ -166,25 +166,13 @@ describe("parseInputs", () => {
       expect(result.windowsEnv).toBe(WindowsEnv.UCRT64);
     });
 
-    it.each([
-      [WindowsEnv.MinGW64, "mingw64"],
-      [WindowsEnv.Clang64, "clang64"],
-      [WindowsEnv.ClangArm64, "clangarm64"],
-    ])("parses %s windows-env", (expected, input) => {
-      mockedGetInput.mockImplementation((name) => {
-        if (name === "windows-env") return input;
-        return "";
-      });
-      expect(parseInputs().windowsEnv).toBe(expected);
-    });
-
     it("throws error for unknown windows-env", () => {
       mockedGetInput.mockImplementation((name) => {
         if (name === "windows-env") return "msys"; // incomplete
         return "";
       });
       expect(() => parseInputs()).toThrow(
-        'Unknown windows-env "msys". Valid options: native, ucrt64, clang64, clangarm64, mingw64',
+        'Unknown windows-env "msys". Valid options: native, ucrt64',
       );
     });
   });

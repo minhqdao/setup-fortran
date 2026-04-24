@@ -34390,9 +34390,6 @@ const Arch = {
 const WindowsEnv = {
     Native: "native",
     UCRT64: "ucrt64",
-    Clang64: "clang64",
-    ClangArm64: "clangarm64",
-    MinGW64: "mingw64",
 };
 const LATEST = "latest";
 
@@ -34533,13 +34530,6 @@ function resolveWindowsVersion(target, supportedVersions) {
     const windowsEnv = target.windowsEnv;
     const versions = archVersions[windowsEnv];
     if (!versions) {
-        if (windowsEnv === WindowsEnv.ClangArm64 && target.arch === Arch.X64) {
-            throw new Error(`Invalid configuration: "${WindowsEnv.ClangArm64}" is only available for ARM64 architecture, but the current runner is ${target.arch}.`);
-        }
-        if ((windowsEnv === WindowsEnv.UCRT64 || windowsEnv === WindowsEnv.Clang64) &&
-            target.arch === Arch.ARM64) {
-            throw new Error(`Invalid configuration: "${windowsEnv}" is not currently supported on Windows ARM64. Please use ${WindowsEnv.ClangArm64} instead.`);
-        }
         throw new Error(`The environment "${windowsEnv}" is not supported or implemented for Windows ${target.arch}.`);
     }
     return resolveVersion(target, { [target.arch]: versions });
@@ -38425,22 +38415,14 @@ function _unique(values) {
 
 
 
-// Make sure the versions are always in descending order. The first one will be
-// used as the default if no version was specified by the user.
 const win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
-        [WindowsEnv.UCRT64]: undefined,
-        [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
-        [WindowsEnv.MinGW64]: undefined,
+        [WindowsEnv.UCRT64]: [LATEST],
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: undefined,
         [WindowsEnv.UCRT64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
-        [WindowsEnv.MinGW64]: undefined,
-        [WindowsEnv.Clang64]: undefined,
     },
 };
 const GCC_RELEASES = {
@@ -38452,10 +38434,12 @@ const GCC_RELEASES = {
 };
 async function installWin32(target) {
     const version = resolveWindowsVersion(target, win32_SUPPORTED_VERSIONS);
-    if (target.windowsEnv === WindowsEnv.Native) {
-        return await installNative(target, version);
+    switch (target.windowsEnv) {
+        case WindowsEnv.Native:
+            return await installNative(target, version);
+        case WindowsEnv.UCRT64:
+            return await installMSYS2(target);
     }
-    throw new Error(`Unsupported Windows environment: ${target.windowsEnv}`);
 }
 async function installNative(target, version) {
     const downloadUrl = GCC_RELEASES[version];
@@ -38476,6 +38460,22 @@ async function installNative(target, version) {
     lib_core.addPath(binPath);
     lib_core.info(`Setting FC, F77, and F90 environment variables...`);
     const gfortranPath = external_path_.join(binPath, "gfortran.exe");
+    lib_core.exportVariable("FC", gfortranPath);
+    lib_core.exportVariable("F77", gfortranPath);
+    lib_core.exportVariable("F90", gfortranPath);
+    return await win32_resolveInstalledVersion();
+}
+async function installMSYS2(target) {
+    const pkgName = "mingw-w64-ucrt-x86_64-gcc-fortran";
+    lib_core.info(`Installing ${pkgName} via MSYS2 pacman (${target.windowsEnv})...`);
+    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+        "-lc",
+        `pacman -S --noconfirm --needed ${pkgName}`,
+    ]);
+    const msysBin = external_path_.join("C:", "msys64", target.windowsEnv, "bin");
+    lib_core.addPath(msysBin);
+    lib_core.info(`Setting FC, F77, and F90 environment variables...`);
+    const gfortranPath = external_path_.join(msysBin, "gfortran.exe");
     lib_core.exportVariable("FC", gfortranPath);
     lib_core.exportVariable("F77", gfortranPath);
     lib_core.exportVariable("F90", gfortranPath);

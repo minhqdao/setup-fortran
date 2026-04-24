@@ -2,25 +2,17 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as tc from "@actions/tool-cache";
-import { Arch, WindowsEnv, type Target } from "../../types";
+import { Arch, LATEST, WindowsEnv, type Target } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 
-// Make sure the versions are always in descending order. The first one will be
-// used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
-    [WindowsEnv.UCRT64]: undefined,
-    [WindowsEnv.Clang64]: undefined,
-    [WindowsEnv.ClangArm64]: undefined,
-    [WindowsEnv.MinGW64]: undefined,
+    [WindowsEnv.UCRT64]: [LATEST],
   },
   [Arch.ARM64]: {
     [WindowsEnv.Native]: undefined,
     [WindowsEnv.UCRT64]: undefined,
-    [WindowsEnv.ClangArm64]: undefined,
-    [WindowsEnv.MinGW64]: undefined,
-    [WindowsEnv.Clang64]: undefined,
   },
 } as const satisfies Record<
   Arch,
@@ -38,11 +30,12 @@ const GCC_RELEASES: Record<string, string> = {
 export async function installWin32(target: Target): Promise<string> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
-  if (target.windowsEnv === WindowsEnv.Native) {
-    return await installNative(target, version);
+  switch (target.windowsEnv) {
+    case WindowsEnv.Native:
+      return await installNative(target, version);
+    case WindowsEnv.UCRT64:
+      return await installMSYS2(target);
   }
-
-  throw new Error(`Unsupported Windows environment: ${target.windowsEnv}`);
 }
 
 async function installNative(target: Target, version: string): Promise<string> {
@@ -84,9 +77,29 @@ async function installNative(target: Target, version: string): Promise<string> {
   return await resolveInstalledVersion();
 }
 
+async function installMSYS2(target: Target): Promise<string> {
+  const pkgName = "mingw-w64-ucrt-x86_64-gcc-fortran";
+  core.info(`Installing ${pkgName} via MSYS2 pacman (${target.windowsEnv})...`);
+
+  await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+    "-lc",
+    `pacman -S --noconfirm --needed ${pkgName}`,
+  ]);
+
+  const msysBin = path.join("C:", "msys64", target.windowsEnv, "bin");
+  core.addPath(msysBin);
+
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  const gfortranPath = path.join(msysBin, "gfortran.exe");
+  core.exportVariable("FC", gfortranPath);
+  core.exportVariable("F77", gfortranPath);
+  core.exportVariable("F90", gfortranPath);
+
+  return await resolveInstalledVersion();
+}
+
 async function resolveInstalledVersion(): Promise<string> {
   let stdout = "";
-
   const tool = "gfortran";
 
   try {
