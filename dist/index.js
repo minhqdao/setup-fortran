@@ -38506,9 +38506,226 @@ async function installGFortran(target) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
+
+
+
+
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
+const debian_SUPPORTED_VERSIONS = {
+    [Arch.X64]: [
+        "2025.3",
+        "2025.2",
+        "2025.1",
+        "2025.0",
+        "2024.2",
+        "2024.1",
+        "2024.0",
+        "2023.2.4",
+        "2023.2.3",
+        "2023.2.2",
+        "2023.2.1",
+        "2023.2.0",
+        "2023.1.0",
+        "2023.0.0",
+        "2022.2.1",
+        "2022.2.0",
+        "2022.1.0",
+        "2022.0.2",
+        "2022.0.1",
+    ],
+    [Arch.ARM64]: undefined, // IFX does not support ARM64
+};
+async function debian_installDebian(target) {
+    const version = resolveVersion(target, debian_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing IFX ${version} on Linux (${target.arch})...`);
+    // Setup Intel repository
+    // https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/current/apt.html
+    await lib_exec.exec("bash", [
+        "-c",
+        "wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null",
+    ]);
+    await lib_exec.exec("bash", [
+        "-c",
+        'echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list',
+    ]);
+    await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
+    const pkgName = `intel-oneapi-compiler-fortran-${version}`;
+    lib_core.info(`Installing package ${pkgName}...`);
+    await lib_exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        pkgName,
+    ]);
+    // Source setvars.sh and export environment variables
+    const setvarsPath = "/opt/intel/oneapi/setvars.sh";
+    lib_core.info(`Sourcing ${setvarsPath} and exporting environment...`);
+    let envOutput = "";
+    // We use "bash -c 'source ... && env'" to get the environment after sourcing
+    await lib_exec.exec("bash", ["-c", `source "${setvarsPath}" && env`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    const lines = envOutput.split("\n");
+    for (const line of lines) {
+        const parts = line.split("=");
+        if (parts.length >= 2) {
+            const key = parts[0];
+            const value = parts.slice(1).join("=");
+            // Export relevant variables: PATH, LD_LIBRARY_PATH, and anything starting with INTEL or ONEAPI
+            if (key === "PATH" ||
+                key === "LD_LIBRARY_PATH" ||
+                key.startsWith("INTEL") ||
+                key.startsWith("ONEAPI")) {
+                if (key === "PATH") {
+                    // Add new entries to path
+                    const newPaths = value.split(":");
+                    const oldPaths = (process.env.PATH || "").split(":");
+                    for (const p of newPaths) {
+                        if (p && !oldPaths.includes(p)) {
+                            lib_core.addPath(p);
+                        }
+                    }
+                }
+                else {
+                    lib_core.exportVariable(key, value);
+                }
+            }
+        }
+    }
+    lib_core.exportVariable("FC", "ifx");
+    lib_core.exportVariable("CC", "icx");
+    lib_core.exportVariable("CXX", "icpx");
+    const resolvedVersion = await debian_resolveInstalledVersion();
+    lib_core.info(`IFX ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function debian_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifx", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+
+
+
+
+
+
+// For Windows, we'll use winget as it's the easiest way to install IFX.
+// Supported versions will mostly be "latest" or specific versions winget supports.
+const ifx_win32_SUPPORTED_VERSIONS = {
+    [Arch.X64]: {
+        [WindowsEnv.Native]: [LATEST],
+        [WindowsEnv.UCRT64]: [LATEST],
+    },
+    [Arch.ARM64]: {
+        [WindowsEnv.Native]: undefined,
+        [WindowsEnv.UCRT64]: undefined,
+    },
+};
+async function win32_installWin32(target) {
+    const version = resolveWindowsVersion(target, ifx_win32_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`);
+    // winget install Intel.FortranCompiler
+    const wingetArgs = ["install", "--id", "Intel.FortranCompiler", "--accept-package-agreements", "--accept-source-agreements"];
+    if (version !== LATEST) {
+        wingetArgs.push("--version", version);
+    }
+    await lib_exec.exec("winget", wingetArgs);
+    // The default installation directory for oneAPI on Windows
+    const oneApiRoot = "C:\\Program Files (x86)\\Intel\\oneAPI";
+    const varsBatPath = external_path_.join(oneApiRoot, "setvars.bat");
+    if (!external_fs_.existsSync(varsBatPath)) {
+        throw new Error(`setvars.bat not found at ${varsBatPath}. Installation might have failed.`);
+    }
+    lib_core.info(`Sourcing ${varsBatPath} and exporting environment...`);
+    // In Windows, we use 'cmd /c "setvars.bat && set"' to get environment variables
+    let envOutput = "";
+    await lib_exec.exec("cmd", ["/c", `"${varsBatPath}" && set`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    const lines = envOutput.split("\r\n");
+    for (const line of lines) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx !== -1) {
+            const key = line.substring(0, eqIdx);
+            const value = line.substring(eqIdx + 1);
+            if (key === "PATH" ||
+                key === "LIB" ||
+                key === "INCLUDE" ||
+                key.startsWith("INTEL") ||
+                key.startsWith("ONEAPI")) {
+                if (key === "PATH") {
+                    const newPaths = value.split(";");
+                    // On Windows, PATH is case-insensitive, but process.env.PATH usually works.
+                    // We add each part to GITHUB_PATH.
+                    for (const p of newPaths) {
+                        if (p && external_fs_.existsSync(p)) {
+                            lib_core.addPath(p);
+                        }
+                    }
+                }
+                else {
+                    lib_core.exportVariable(key, value);
+                }
+            }
+        }
+    }
+    lib_core.exportVariable("FC", "ifx");
+    lib_core.exportVariable("CC", "icx");
+    lib_core.exportVariable("CXX", "icpx");
+    const resolvedVersion = await ifx_win32_resolveInstalledVersion();
+    lib_core.info(`IFX ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function ifx_win32_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifx", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifx/index.ts
-async function installIFX(_) {
-    return Promise.reject(new Error("Not implemented"));
+
+
+
+async function installIFX(target) {
+    if (target.arch === Arch.ARM64) {
+        throw new Error(`IFX is not supported on ARM64 architecture.`);
+    }
+    switch (target.os) {
+        case OS.Linux:
+            return await debian_installDebian(target);
+        case OS.Windows:
+            return await win32_installWin32(target);
+        case OS.MacOS:
+            throw new Error(`IFX is not supported on macOS (Darwin).`);
+        default:
+            throw new Error(`Unsupported OS for IFX: ${target.os}`);
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/index.ts
@@ -38525,7 +38742,7 @@ async function installIFort(_) {
 // used as the default if no version was specified by the user.
 // Version scheme: YY.M (e.g. "26.1" = January 2026).
 // Releases ship roughly every two months; only LTS-ish ones listed here.
-const debian_SUPPORTED_VERSIONS = {
+const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
         "26.3",
         "26.1",
@@ -38565,8 +38782,8 @@ const APT_ARCH = {
     [Arch.X64]: "amd64",
     [Arch.ARM64]: "arm64",
 };
-async function debian_installDebian(target) {
-    const version = resolveVersion(target, debian_SUPPORTED_VERSIONS);
+async function nvfortran_debian_installDebian(target) {
+    const version = resolveVersion(target, nvfortran_debian_SUPPORTED_VERSIONS);
     const aptArch = APT_ARCH[target.arch];
     lib_core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
     // Add the NVIDIA HPC SDK apt repository if not already present.
@@ -38611,11 +38828,11 @@ async function debian_installDebian(target) {
     const libDir = `${installDir}/compilers/lib`;
     const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
     lib_core.exportVariable("LD_LIBRARY_PATH", existingLdPath ? `${libDir}:${existingLdPath}` : libDir);
-    const resolvedVersion = await debian_resolveInstalledVersion();
+    const resolvedVersion = await nvfortran_debian_resolveInstalledVersion();
     lib_core.info(`nvfortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
 }
-async function debian_resolveInstalledVersion() {
+async function nvfortran_debian_resolveInstalledVersion() {
     let output = "";
     await lib_exec.exec("nvfortran", ["--version"], {
         listeners: {
@@ -38634,7 +38851,7 @@ async function installNVFortran(target) {
     if (target.os !== OS.Linux) {
         throw new Error(`NVFortran is only supported on Linux (got: ${target.os})`);
     }
-    return await debian_installDebian(target);
+    return await nvfortran_debian_installDebian(target);
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/debian.ts
