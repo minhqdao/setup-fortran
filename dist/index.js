@@ -38532,7 +38532,7 @@ async function installNVFortran(_) {
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const debian_SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["5.1", "5.0", "4.2", "4.1", "4.0", "3.2"],
+    [Arch.X64]: ["5.1", "5.0", "4.2", "4.1"],
     [Arch.ARM64]: undefined,
 };
 const AOCC_RELEASES = {
@@ -38559,18 +38559,6 @@ const AOCC_RELEASES = {
         url: "https://download.amd.com/developer/eula/aocc/aocc-4-1/aocc-compiler-4.1.0_1_amd64.deb",
         sha256: "013ecc70ba7d6a2fb434dc686def95b7f87a41a091cecebc890a5fd68ad83a3e",
         installDir: "/opt/AMD/aocc-compiler-4.1.0",
-    },
-    "4.0": {
-        deb: "aocc-compiler-4.0.0_1_amd64.deb",
-        url: "https://download.amd.com/developer/eula/aocc/aocc-4-0/aocc-compiler-4.0.0_1_amd64.deb",
-        sha256: "3433e6f3da48e481a4ae00e4f8c990a429492f2d1ab8e5df8e35cd91aae44291",
-        installDir: "/opt/AMD/aocc-compiler-4.0.0",
-    },
-    "3.2": {
-        deb: "aocc-compiler-3.2.0_1_amd64.deb",
-        url: "https://download.amd.com/developer/eula/aocc/aocc-3-2/aocc-compiler-3.2.0_1_amd64.deb",
-        sha256: "98ef7f3007fa40105f2a7fdb94e7f5869495c353f3ec558c32442d9b83f75201",
-        installDir: "/opt/AMD/aocc-compiler-3.2.0",
     },
 };
 async function debian_installDebian(target) {
