@@ -1,0 +1,62 @@
+name: flang
+
+on:
+    push:
+        branches: [ main ]
+    pull_request:
+
+jobs:
+    build:
+        name: ci
+        uses: ./.github/workflows/ci.yml
+
+    integration-tests:
+        name: ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+            matrix.toolchain.windowsEnv }}
+        runs-on: ${{ matrix.image }}
+        needs: [ build ]
+        strategy:
+            fail-fast: false
+            matrix:
+                image: [ ubuntu-24.04, ubuntu-22.04, macos-15, macos-14, windows-2025 ]
+                toolchain:
+                    - { compiler: flang, version: "20" }
+                    - { compiler: flang, version: "19" }
+                    - { compiler: flang, version: "18" }
+                include:
+                    - image: windows-2025
+                      toolchain: { compiler: flang, windowsEnv: ucrt64 }
+                    - image: ubuntu-24.04-arm
+                      toolchain: { compiler: flang, version: "19" }
+                    - image: ubuntu-22.04-arm
+                      toolchain: { compiler: flang, version: "19" }
+                exclude:
+                    - image: windows-2025
+                      toolchain: { compiler: flang, version: "20" }
+                    - image: windows-2025
+                      toolchain: { compiler: flang, version: "19" }
+                    - image: windows-2025
+                      toolchain: { compiler: flang, version: "18" }
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Restore dist-tests
+              uses: actions/download-artifact@v8
+              with:
+                  name: generated-dist-tests
+                  path: dist-tests
+
+            - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+              id: setup
+              uses: ./
+              with:
+                  compiler: ${{ matrix.toolchain.compiler }}
+                  version: ${{ matrix.toolchain.version }}
+                  windows-env: ${{ matrix.toolchain.windowsEnv }}
+
+            - name: Verify installed version
+              run: "echo \"Output: ${{ steps.setup.outputs.compiler-version }}\""
+
+            - name: Run Integration Tests
+              run: npm run integration-test

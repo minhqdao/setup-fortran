@@ -7,6 +7,7 @@ import { installIFort } from "./installers/ifort";
 import { installNVFortran } from "./installers/nvfortran";
 import { installAOCC } from "./installers/aocc";
 import { installLFortran } from "./installers/lfortran";
+import { installFlang } from "./installers/flang";
 
 async function run(): Promise<void> {
   try {
@@ -42,6 +43,9 @@ async function run(): Promise<void> {
         break;
       case Compiler.LFortran:
         installedVersion = await installLFortran(target);
+        break;
+      case Compiler.Flang:
+        installedVersion = await installFlang(target);
         break;
     }
 

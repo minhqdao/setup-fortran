@@ -34377,6 +34377,7 @@ const Compiler = {
     NVFortran: "nvfortran",
     AOCC: "aocc",
     LFortran: "lfortran",
+    Flang: "flang",
 };
 const OS = {
     Linux: "linux",
@@ -38763,7 +38764,212 @@ async function installLFortran(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
+;// CONCATENATED MODULE: ./src/installers/flang/debian.ts
+
+
+
+
+const flang_debian_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["20", "19", "18", "17", "16", "15"],
+    [Arch.ARM64]: ["20", "19", "18", "17", "16", "15"],
+};
+async function flang_debian_installDebian(target) {
+    const version = resolveVersion(target, flang_debian_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
+    await lib_exec.exec("wget", ["-O", "llvm.sh", "https://apt.llvm.org/llvm.sh"]);
+    await lib_exec.exec("chmod", ["+x", "llvm.sh"]);
+    await lib_exec.exec("sudo", ["./llvm.sh", version]);
+    await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
+    await lib_exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        `flang-${version}`,
+    ]);
+    // Symlink flang-new-<version> to flang if flang-<version> doesn't exist
+    // Based on apt.llvm.org, the binary is often flang-new-<version>
+    const flangBinary = `/usr/bin/flang-${version}`;
+    const flangNewBinary = `/usr/bin/flang-new-${version}`;
+    await lib_exec.exec("sudo", [
+        "update-alternatives",
+        "--install",
+        "/usr/bin/flang",
+        "flang",
+        flangBinary,
+        "100",
+    ]).catch(async () => {
+        lib_core.info(`${flangBinary} not found, trying ${flangNewBinary}`);
+        await lib_exec.exec("sudo", [
+            "update-alternatives",
+            "--install",
+            "/usr/bin/flang",
+            "flang",
+            flangNewBinary,
+            "100",
+        ]);
+    });
+    const resolvedVersion = await flang_debian_resolveInstalledVersion();
+    lib_core.info(`Flang ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function flang_debian_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("flang", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/darwin.ts
+
+
+
+
+
+const flang_darwin_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["20", "19", "18", "17", "16", "15"],
+    [Arch.ARM64]: ["20", "19", "18", "17", "16", "15"],
+};
+async function darwin_installDarwin(target) {
+    const version = resolveVersion(target, flang_darwin_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing Flang (via LLVM ${version}) on macOS (${target.arch}) via Homebrew...`);
+    const formula = `llvm@${version}`;
+    await lib_exec.exec("brew", ["install", formula]);
+    const brewPrefixOutput = await darwin_getBrewPrefix();
+    const llvmDir = external_path_.join(brewPrefixOutput, "opt", formula);
+    const binDir = external_path_.join(llvmDir, "bin");
+    // Add LLVM bin to PATH
+    lib_core.addPath(binDir);
+    // Symlink flang-new to flang if it exists
+    const flangNewBinary = external_path_.join(binDir, "flang-new");
+    const genericFlang = external_path_.join(binDir, "flang");
+    await lib_exec.exec("ln", ["-sf", flangNewBinary, genericFlang]).catch(() => {
+        lib_core.info(`Could not symlink ${flangNewBinary} to ${genericFlang}, maybe it already exists or is named differently.`);
+    });
+    const resolvedVersion = await flang_darwin_resolveInstalledVersion();
+    lib_core.info(`Flang ${resolvedVersion} installed successfully on Darwin.`);
+    return resolvedVersion;
+}
+async function darwin_getBrewPrefix() {
+    let output = "";
+    await lib_exec.exec("brew", ["--prefix"], {
+        listeners: { stdout: (data) => (output += data.toString()) },
+    });
+    return output.trim();
+}
+async function flang_darwin_resolveInstalledVersion() {
+    let output = "";
+    // Flang might be flang or flang-new
+    let tool = "flang";
+    try {
+        await lib_exec.exec("flang", ["--version"], {
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+    }
+    catch (e) {
+        tool = "flang-new";
+        await lib_exec.exec("flang-new", ["--version"], {
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+    }
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/win32.ts
+
+
+
+
+
+const flang_win32_SUPPORTED_VERSIONS = {
+    [Arch.X64]: {
+        [WindowsEnv.Native]: undefined,
+        [WindowsEnv.UCRT64]: [LATEST],
+    },
+    [Arch.ARM64]: {
+        [WindowsEnv.Native]: undefined,
+        [WindowsEnv.UCRT64]: undefined,
+    },
+};
+async function win32_installWin32(target) {
+    const version = resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS);
+    switch (target.windowsEnv) {
+        case WindowsEnv.Native:
+            throw new Error("Flang is not supported on Windows native environment yet.");
+        case WindowsEnv.UCRT64:
+            return await win32_installMSYS2(target);
+    }
+}
+async function win32_installMSYS2(target) {
+    const pkgName = "mingw-w64-ucrt-x86_64-flang";
+    lib_core.info(`Installing ${pkgName} via MSYS2 pacman (${target.windowsEnv})...`);
+    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+        "-lc",
+        `pacman -S --noconfirm --needed ${pkgName}`,
+    ]);
+    const msysBin = external_path_.join("C:", "msys64", target.windowsEnv, "bin");
+    lib_core.addPath(msysBin);
+    lib_core.info(`Setting FC, F77, and F90 environment variables...`);
+    const flangPath = external_path_.join(msysBin, "flang.exe");
+    lib_core.exportVariable("FC", flangPath);
+    lib_core.exportVariable("F77", flangPath);
+    lib_core.exportVariable("F90", flangPath);
+    return await flang_win32_resolveInstalledVersion();
+}
+async function flang_win32_resolveInstalledVersion() {
+    let stdout = "";
+    const tool = "flang";
+    try {
+        await lib_exec.exec(tool, ["--version"], {
+            silent: true,
+            listeners: { stdout: (data) => (stdout += data.toString()) },
+        });
+    }
+    catch (err) {
+        // try flang-new
+        try {
+            await lib_exec.exec("flang-new", ["--version"], {
+                silent: true,
+                listeners: { stdout: (data) => (stdout += data.toString()) },
+            });
+        }
+        catch (err2) {
+            throw new Error(`Failed to verify ${tool} installation`, { cause: err2 });
+        }
+    }
+    return stdout.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/index.ts
+
+
+
+
+async function installFlang(target) {
+    switch (target.os) {
+        case OS.Linux:
+            return await flang_debian_installDebian(target);
+        case OS.MacOS:
+            return await darwin_installDarwin(target);
+        case OS.Windows:
+            return await win32_installWin32(target);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/index.ts
+
 
 
 
@@ -38803,6 +39009,9 @@ async function run() {
                 break;
             case Compiler.LFortran:
                 installedVersion = await installLFortran(target);
+                break;
+            case Compiler.Flang:
+                installedVersion = await installFlang(target);
                 break;
         }
         lib_core.setOutput("compiler-version", installedVersion);
