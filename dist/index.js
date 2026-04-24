@@ -38511,9 +38511,254 @@ async function installIFX(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
+;// CONCATENATED MODULE: ./src/installers/ifort/debian.ts
+
+
+
+
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
+const debian_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["2024.2", "2024.1", "2024.0", "2023.2", "2023.1", "2023.0"],
+    [Arch.ARM64]: undefined,
+};
+async function debian_installDebian(target) {
+    const version = resolveVersion(target, debian_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing ifort ${version} on Linux (${target.arch})...`);
+    // Add the Intel oneAPI apt repository
+    lib_core.info("Adding Intel oneAPI apt repository...");
+    await lib_exec.exec("bash", [
+        "-c",
+        "curl -fsSL https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | sudo gpg --dearmor -o /usr/share/keyrings/oneapi-archive-keyring.gpg",
+    ]);
+    await lib_exec.exec("bash", [
+        "-c",
+        'echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list',
+    ]);
+    await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
+    // ifort is in intel-oneapi-compiler-fortran (recent versions)
+    // or intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic
+    const pkgName = `intel-oneapi-compiler-fortran-${version}`;
+    lib_core.info(`Installing apt package ${pkgName}...`);
+    await lib_exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        pkgName,
+        "intel-oneapi-common-vars",
+    ]);
+    const setvarsPath = "/opt/intel/oneapi/setvars.sh";
+    lib_core.info(`Sourcing ${setvarsPath} and exporting environment...`);
+    let envOutput = "";
+    // We specify the version to setvars if possible, or just let it do its thing.
+    // For ifort, we want to make sure it's in the path.
+    await lib_exec.exec("bash", ["-c", `source "${setvarsPath}" && env`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx);
+        const val = line.substring(eqIdx + 1);
+        // Export variables that oneAPI sets
+        if (/^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*TBB.*|.*MKL.*|.*CMPLR.*)$/i.test(key)) {
+            lib_core.exportVariable(key, val);
+        }
+    }
+    lib_core.exportVariable("FC", "ifort");
+    lib_core.exportVariable("F77", "ifort");
+    lib_core.exportVariable("F90", "ifort");
+    const resolvedVersion = await debian_resolveInstalledVersion();
+    lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function debian_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifort", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
+
+
+
+
+
+const ifort_darwin_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["2023.2", "2023.1", "2023.0"],
+    [Arch.ARM64]: undefined, // ifort does not support ARM64 on macOS
+};
+const ONEAPI_RELEASES = {
+    "2023.2": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19163/m_fortran-compiler_p_2023.2.0.495.dmg",
+    "2023.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_fortran-compiler_p_2023.1.0.446.dmg",
+    "2023.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19005/m_fortran-compiler_p_2023.0.0.25911.dmg",
+};
+async function darwin_installDarwin(target) {
+    const version = resolveVersion(target, ifort_darwin_SUPPORTED_VERSIONS);
+    const downloadUrl = ONEAPI_RELEASES[version];
+    if (!downloadUrl) {
+        throw new Error(`Unsupported ifort version: ${version}`);
+    }
+    lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
+    const downloadPath = await downloadTool(downloadUrl);
+    lib_core.info(`Mounting DMG...`);
+    await lib_exec.exec("hdiutil", ["attach", downloadPath, "-mountpoint", "/Volumes/ifort"]);
+    lib_core.info(`Installing ifort ${version}...`);
+    // Find the .app or installer inside the DMG
+    // Usually it's something like /Volumes/ifort/bootstrapper.app/Contents/MacOS/bootstrapper
+    await lib_exec.exec("sudo", [
+        "/Volumes/ifort/bootstrapper.app/Contents/MacOS/bootstrapper",
+        "--silent",
+        "--eula",
+        "accept",
+    ]);
+    lib_core.info(`Unmounting DMG...`);
+    await lib_exec.exec("hdiutil", ["detach", "/Volumes/ifort"]);
+    const setvarsPath = "/opt/intel/oneapi/setvars.sh";
+    lib_core.info(`Sourcing ${setvarsPath} and exporting environment...`);
+    let envOutput = "";
+    await lib_exec.exec("bash", ["-c", `source "${setvarsPath}" && env`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx);
+        const val = line.substring(eqIdx + 1);
+        if (/^(PATH|LD_LIBRARY_PATH|DYLD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*TBB.*|.*MKL.*|.*CMPLR.*)$/i.test(key)) {
+            lib_core.exportVariable(key, val);
+        }
+    }
+    lib_core.exportVariable("FC", "ifort");
+    lib_core.exportVariable("F77", "ifort");
+    lib_core.exportVariable("F90", "ifort");
+    const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
+    lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function ifort_darwin_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifort", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
+
+
+
+
+
+
+const ifort_win32_SUPPORTED_VERSIONS = {
+    [Arch.X64]: {
+        [WindowsEnv.Native]: ["2024.2", "2024.1", "2024.0", "2023.2", "2023.1", "2023.0"],
+        [WindowsEnv.UCRT64]: undefined,
+    },
+    [Arch.ARM64]: {
+        [WindowsEnv.Native]: undefined,
+        [WindowsEnv.UCRT64]: undefined,
+    },
+};
+const win32_ONEAPI_RELEASES = {
+    "2024.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0572b64-07ed-4180-87a2-f6735e29a997/w_fortran-compiler_p_2024.2.1.80_offline.exe",
+    "2024.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f80f12d-8874-4b55-8d5c-3004313f8d2b/w_fortran-compiler_p_2024.1.0.962_offline.exe",
+    "2024.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/da83f360-645c-4a37-b615-58097b6968f2/w_fortran-compiler_p_2024.0.0.49608_offline.exe",
+    "2023.2": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19159/w_fortran-compiler_p_2023.2.0.495_offline.exe",
+    "2023.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19082/w_fortran-compiler_p_2023.1.0.446_offline.exe",
+    "2023.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19001/w_fortran-compiler_p_2023.0.0.25911_offline.exe",
+};
+async function win32_installWin32(target) {
+    const version = resolveWindowsVersion(target, ifort_win32_SUPPORTED_VERSIONS);
+    const downloadUrl = win32_ONEAPI_RELEASES[version];
+    if (!downloadUrl) {
+        throw new Error(`Unsupported ifort version: ${version}`);
+    }
+    lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
+    const downloadPath = await downloadTool(downloadUrl);
+    lib_core.info(`Installing ifort ${version}...`);
+    // Silent install
+    await lib_exec.exec(downloadPath, ["-s", "-a", "--silent", "--eula", "accept"]);
+    const oneapiRoot = "C:\\Program Files (x86)\\Intel\\oneAPI";
+    const setvarsBat = external_path_.join(oneapiRoot, "setvars.bat");
+    lib_core.info(`Sourcing ${setvarsBat} and exporting environment...`);
+    let envOutput = "";
+    // In Windows, we use cmd to run setvars.bat and then print the environment
+    await lib_exec.exec("cmd", ["/c", `"${setvarsBat}" && set`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\r\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx);
+        const val = line.substring(eqIdx + 1);
+        // Export variables that oneAPI sets
+        if (/^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*TBB.*|.*MKL.*|.*CMPLR.*)$/i.test(key)) {
+            lib_core.exportVariable(key, val);
+        }
+    }
+    lib_core.exportVariable("FC", "ifort");
+    lib_core.exportVariable("F77", "ifort");
+    lib_core.exportVariable("F90", "ifort");
+    const resolvedVersion = await ifort_win32_resolveInstalledVersion();
+    lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function ifort_win32_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifort", ["/version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifort/index.ts
-async function installIFort(_) {
-    return Promise.reject(new Error("Not implemented"));
+
+
+
+
+async function installIFort(target) {
+    switch (target.os) {
+        case OS.Linux:
+            return await debian_installDebian(target);
+        case OS.MacOS:
+            return await darwin_installDarwin(target);
+        case OS.Windows:
+            return await win32_installWin32(target);
+        default:
+            throw new Error(`Unsupported OS: ${target.os}`);
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
@@ -38525,7 +38770,7 @@ async function installIFort(_) {
 // used as the default if no version was specified by the user.
 // Version scheme: YY.M (e.g. "26.1" = January 2026).
 // Releases ship roughly every two months; only LTS-ish ones listed here.
-const debian_SUPPORTED_VERSIONS = {
+const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
         "26.3",
         "26.1",
@@ -38565,8 +38810,8 @@ const APT_ARCH = {
     [Arch.X64]: "amd64",
     [Arch.ARM64]: "arm64",
 };
-async function debian_installDebian(target) {
-    const version = resolveVersion(target, debian_SUPPORTED_VERSIONS);
+async function nvfortran_debian_installDebian(target) {
+    const version = resolveVersion(target, nvfortran_debian_SUPPORTED_VERSIONS);
     const aptArch = APT_ARCH[target.arch];
     lib_core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
     // Add the NVIDIA HPC SDK apt repository if not already present.
@@ -38611,11 +38856,11 @@ async function debian_installDebian(target) {
     const libDir = `${installDir}/compilers/lib`;
     const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
     lib_core.exportVariable("LD_LIBRARY_PATH", existingLdPath ? `${libDir}:${existingLdPath}` : libDir);
-    const resolvedVersion = await debian_resolveInstalledVersion();
+    const resolvedVersion = await nvfortran_debian_resolveInstalledVersion();
     lib_core.info(`nvfortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
 }
-async function debian_resolveInstalledVersion() {
+async function nvfortran_debian_resolveInstalledVersion() {
     let output = "";
     await lib_exec.exec("nvfortran", ["--version"], {
         listeners: {
@@ -38634,7 +38879,7 @@ async function installNVFortran(target) {
     if (target.os !== OS.Linux) {
         throw new Error(`NVFortran is only supported on Linux (got: ${target.os})`);
     }
-    return await debian_installDebian(target);
+    return await nvfortran_debian_installDebian(target);
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/debian.ts
