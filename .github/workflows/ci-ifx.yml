@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-24.04, ubuntu-22.04, windows-2025, windows-2022]
+        image: [ubuntu-24.04, ubuntu-22.04, windows-latest, windows-2022]
         toolchain:
           - { compiler: ifx, version: "latest" }
         include:

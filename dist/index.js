@@ -38515,6 +38515,7 @@ async function installGFortran(target) {
 // used as the default if no version was specified by the user.
 const debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "2026.0",
         "2025.3",
         "2025.2",
         "2025.1",
@@ -38586,7 +38587,7 @@ async function debian_installDebian(target) {
                 if (key === "PATH") {
                     // Add new entries to path
                     const newPaths = value.split(":");
-                    const oldPaths = (process.env.PATH || "").split(":");
+                    const oldPaths = (process.env.PATH ?? "").split(":");
                     for (const p of newPaths) {
                         if (p && !oldPaths.includes(p)) {
                             lib_core.addPath(p);
@@ -38641,7 +38642,13 @@ async function win32_installWin32(target) {
     const version = resolveWindowsVersion(target, ifx_win32_SUPPORTED_VERSIONS);
     lib_core.info(`Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`);
     // winget install Intel.FortranCompiler
-    const wingetArgs = ["install", "--id", "Intel.FortranCompiler", "--accept-package-agreements", "--accept-source-agreements"];
+    const wingetArgs = [
+        "install",
+        "--id",
+        "Intel.FortranCompiler",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+    ];
     if (version !== LATEST) {
         wingetArgs.push("--version", version);
     }
@@ -38723,8 +38730,10 @@ async function installIFX(target) {
             return await win32_installWin32(target);
         case OS.MacOS:
             throw new Error(`IFX is not supported on macOS (Darwin).`);
-        default:
-            throw new Error(`Unsupported OS for IFX: ${target.os}`);
+        default: {
+            const os = target.os;
+            throw new Error(`Unsupported OS for IFX: ${os}`);
+        }
     }
 }
 

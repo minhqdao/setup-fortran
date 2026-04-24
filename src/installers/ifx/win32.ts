@@ -23,10 +23,18 @@ const SUPPORTED_VERSIONS = {
 
 export async function installWin32(target: Target): Promise<string> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
-  core.info(`Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`);
+  core.info(
+    `Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`,
+  );
 
   // winget install Intel.FortranCompiler
-  const wingetArgs = ["install", "--id", "Intel.FortranCompiler", "--accept-package-agreements", "--accept-source-agreements"];
+  const wingetArgs = [
+    "install",
+    "--id",
+    "Intel.FortranCompiler",
+    "--accept-package-agreements",
+    "--accept-source-agreements",
+  ];
   if (version !== LATEST) {
     wingetArgs.push("--version", version);
   }
@@ -38,7 +46,9 @@ export async function installWin32(target: Target): Promise<string> {
   const varsBatPath = path.join(oneApiRoot, "setvars.bat");
 
   if (!fs.existsSync(varsBatPath)) {
-    throw new Error(`setvars.bat not found at ${varsBatPath}. Installation might have failed.`);
+    throw new Error(
+      `setvars.bat not found at ${varsBatPath}. Installation might have failed.`,
+    );
   }
 
   core.info(`Sourcing ${varsBatPath} and exporting environment...`);

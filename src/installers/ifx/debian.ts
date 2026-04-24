@@ -8,6 +8,7 @@ import type { Target } from "../../types";
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "2026.0",
     "2025.3",
     "2025.2",
     "2025.1",
@@ -89,7 +90,7 @@ export async function installDebian(target: Target): Promise<string> {
         if (key === "PATH") {
           // Add new entries to path
           const newPaths = value.split(":");
-          const oldPaths = (process.env.PATH || "").split(":");
+          const oldPaths = (process.env.PATH ?? "").split(":");
           for (const p of newPaths) {
             if (p && !oldPaths.includes(p)) {
               core.addPath(p);

@@ -14,7 +14,9 @@ export async function installIFX(target: Target): Promise<string> {
       return await installWin32(target);
     case OS.MacOS:
       throw new Error(`IFX is not supported on macOS (Darwin).`);
-    default:
-      throw new Error(`Unsupported OS for IFX: ${target.os}`);
+    default: {
+      const os: string = target.os;
+      throw new Error(`Unsupported OS for IFX: ${os}`);
+    }
   }
 }
