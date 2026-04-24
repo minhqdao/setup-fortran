@@ -27,19 +27,15 @@ export async function installWin32(target: Target): Promise<string> {
     `Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`,
   );
 
-  // winget install Intel.FortranCompiler
-  const wingetArgs = [
-    "install",
-    "--id",
-    "Intel.FortranCompiler",
-    "--accept-package-agreements",
-    "--accept-source-agreements",
-  ];
+  // Use cmd /c winget to avoid EACCES issues with App Execution Aliases in Node.js stat
+  let wingetCmd =
+    "winget install --id Intel.FortranCompiler --accept-package-agreements --accept-source-agreements";
   if (version !== LATEST) {
-    wingetArgs.push("--version", version);
+    wingetCmd += ` --version ${version}`;
   }
 
-  await exec.exec("winget", wingetArgs);
+  core.info(`Running: ${wingetCmd}`);
+  await exec.exec("cmd", ["/c", wingetCmd]);
 
   // The default installation directory for oneAPI on Windows
   const oneApiRoot = "C:\\Program Files (x86)\\Intel\\oneAPI";

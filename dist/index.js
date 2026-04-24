@@ -38641,18 +38641,13 @@ const ifx_win32_SUPPORTED_VERSIONS = {
 async function win32_installWin32(target) {
     const version = resolveWindowsVersion(target, ifx_win32_SUPPORTED_VERSIONS);
     lib_core.info(`Installing IFX ${version} on Windows (${target.arch}, ${target.windowsEnv})...`);
-    // winget install Intel.FortranCompiler
-    const wingetArgs = [
-        "install",
-        "--id",
-        "Intel.FortranCompiler",
-        "--accept-package-agreements",
-        "--accept-source-agreements",
-    ];
+    // Use cmd /c winget to avoid EACCES issues with App Execution Aliases in Node.js stat
+    let wingetCmd = "winget install --id Intel.FortranCompiler --accept-package-agreements --accept-source-agreements";
     if (version !== LATEST) {
-        wingetArgs.push("--version", version);
+        wingetCmd += ` --version ${version}`;
     }
-    await lib_exec.exec("winget", wingetArgs);
+    lib_core.info(`Running: ${wingetCmd}`);
+    await lib_exec.exec("cmd", ["/c", wingetCmd]);
     // The default installation directory for oneAPI on Windows
     const oneApiRoot = "C:\\Program Files (x86)\\Intel\\oneAPI";
     const varsBatPath = external_path_.join(oneApiRoot, "setvars.bat");
