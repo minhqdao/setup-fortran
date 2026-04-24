@@ -38585,6 +38585,14 @@ async function debian_installDebian(target) {
         "-c",
         `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /' | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
     ]);
+    if (target.osVersion.includes("24")) {
+        lib_core.info("Ubuntu 24.04 detected. Adding Jammy universe for libncursesw5 and libtinfo5...");
+        await lib_exec.exec("sudo", [
+            "add-apt-repository",
+            "-y",
+            "deb http://azure.archive.ubuntu.com/ubuntu jammy universe",
+        ]);
+    }
     await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
     // Package name format: nvhpc-YY-M  (dots replaced by dashes, no leading zeros)
     // e.g. "26.1" -> "nvhpc-26-1", "25.11" -> "nvhpc-25-11"
@@ -38835,9 +38843,7 @@ async function darwin_installDarwin(target) {
     lib_core.info(`Installing Flang (via LLVM ${version}) on macOS (${target.arch}) via Homebrew...`);
     const formula = `llvm@${version}`;
     await lib_exec.exec("brew", ["install", formula]);
-    const brewPrefixOutput = await darwin_getBrewPrefix();
-    const llvmDir = external_path_.join(brewPrefixOutput, "opt", formula);
-    const binDir = external_path_.join(llvmDir, "bin");
+    const binDir = external_path_.join(await getBrewFormulaPrefix(formula), "bin");
     // Add LLVM bin to PATH
     lib_core.addPath(binDir);
     if (process.env.PATH) {
@@ -38856,9 +38862,9 @@ async function darwin_installDarwin(target) {
     lib_core.info(`Flang ${resolvedVersion} installed successfully on Darwin.`);
     return resolvedVersion;
 }
-async function darwin_getBrewPrefix() {
+async function getBrewFormulaPrefix(formula) {
     let output = "";
-    await lib_exec.exec("brew", ["--prefix"], {
+    await lib_exec.exec("brew", ["--prefix", formula], {
         listeners: { stdout: (data) => (output += data.toString()) },
     });
     return output.trim();

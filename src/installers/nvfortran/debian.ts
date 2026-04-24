@@ -72,6 +72,17 @@ export async function installDebian(target: Target): Promise<string> {
     `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /' | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
   ]);
 
+  if (target.osVersion.includes("24")) {
+    core.info(
+      "Ubuntu 24.04 detected. Adding Jammy universe for libncursesw5 and libtinfo5...",
+    );
+    await exec.exec("sudo", [
+      "add-apt-repository",
+      "-y",
+      "deb http://azure.archive.ubuntu.com/ubuntu jammy universe",
+    ]);
+  }
+
   await exec.exec("sudo", ["apt-get", "update", "-y"]);
 
   // Package name format: nvhpc-YY-M  (dots replaced by dashes, no leading zeros)

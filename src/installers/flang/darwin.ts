@@ -19,9 +19,7 @@ export async function installDarwin(target: Target): Promise<string> {
   const formula = `llvm@${version}`;
   await exec.exec("brew", ["install", formula]);
 
-  const brewPrefixOutput = await getBrewPrefix();
-  const llvmDir = path.join(brewPrefixOutput, "opt", formula);
-  const binDir = path.join(llvmDir, "bin");
+  const binDir = path.join(await getBrewFormulaPrefix(formula), "bin");
 
   // Add LLVM bin to PATH
   core.addPath(binDir);
@@ -46,9 +44,9 @@ export async function installDarwin(target: Target): Promise<string> {
   return resolvedVersion;
 }
 
-async function getBrewPrefix(): Promise<string> {
+async function getBrewFormulaPrefix(formula: string): Promise<string> {
   let output = "";
-  await exec.exec("brew", ["--prefix"], {
+  await exec.exec("brew", ["--prefix", formula], {
     listeners: { stdout: (data: Buffer) => (output += data.toString()) },
   });
   return output.trim();
