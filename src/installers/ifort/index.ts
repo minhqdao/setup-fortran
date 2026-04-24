@@ -12,6 +12,6 @@ export async function installIFort(target: Target): Promise<string> {
     case OS.Windows:
       return await installWin32(target);
     default:
-      throw new Error(`Unsupported OS: ${target.os}`);
+      throw new Error(`Unsupported OS: ${target.os as string}`);
   }
 }

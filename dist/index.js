@@ -38614,7 +38614,12 @@ async function darwin_installDarwin(target) {
     lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
     const downloadPath = await downloadTool(downloadUrl);
     lib_core.info(`Mounting DMG...`);
-    await lib_exec.exec("hdiutil", ["attach", downloadPath, "-mountpoint", "/Volumes/ifort"]);
+    await lib_exec.exec("hdiutil", [
+        "attach",
+        downloadPath,
+        "-mountpoint",
+        "/Volumes/ifort",
+    ]);
     lib_core.info(`Installing ifort ${version}...`);
     // Find the .app or installer inside the DMG
     // Usually it's something like /Volumes/ifort/bootstrapper.app/Contents/MacOS/bootstrapper
@@ -38674,7 +38679,14 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 const ifort_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
-        [WindowsEnv.Native]: ["2024.2", "2024.1", "2024.0", "2023.2", "2023.1", "2023.0"],
+        [WindowsEnv.Native]: [
+            "2024.2",
+            "2024.1",
+            "2024.0",
+            "2023.2",
+            "2023.1",
+            "2023.0",
+        ],
         [WindowsEnv.UCRT64]: undefined,
     },
     [Arch.ARM64]: {

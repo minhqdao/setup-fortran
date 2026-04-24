@@ -7,7 +7,14 @@ import { resolveWindowsVersion } from "../../resolve_version";
 
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
-    [WindowsEnv.Native]: ["2024.2", "2024.1", "2024.0", "2023.2", "2023.1", "2023.0"],
+    [WindowsEnv.Native]: [
+      "2024.2",
+      "2024.1",
+      "2024.0",
+      "2023.2",
+      "2023.1",
+      "2023.0",
+    ],
     [WindowsEnv.UCRT64]: undefined,
   },
   [Arch.ARM64]: {
@@ -20,12 +27,18 @@ const SUPPORTED_VERSIONS = {
 >;
 
 const ONEAPI_RELEASES: Record<string, string> = {
-  "2024.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0572b64-07ed-4180-87a2-f6735e29a997/w_fortran-compiler_p_2024.2.1.80_offline.exe",
-  "2024.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f80f12d-8874-4b55-8d5c-3004313f8d2b/w_fortran-compiler_p_2024.1.0.962_offline.exe",
-  "2024.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/da83f360-645c-4a37-b615-58097b6968f2/w_fortran-compiler_p_2024.0.0.49608_offline.exe",
-  "2023.2": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19159/w_fortran-compiler_p_2023.2.0.495_offline.exe",
-  "2023.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19082/w_fortran-compiler_p_2023.1.0.446_offline.exe",
-  "2023.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19001/w_fortran-compiler_p_2023.0.0.25911_offline.exe",
+  "2024.2":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0572b64-07ed-4180-87a2-f6735e29a997/w_fortran-compiler_p_2024.2.1.80_offline.exe",
+  "2024.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f80f12d-8874-4b55-8d5c-3004313f8d2b/w_fortran-compiler_p_2024.1.0.962_offline.exe",
+  "2024.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/da83f360-645c-4a37-b615-58097b6968f2/w_fortran-compiler_p_2024.0.0.49608_offline.exe",
+  "2023.2":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/19159/w_fortran-compiler_p_2023.2.0.495_offline.exe",
+  "2023.1":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/19082/w_fortran-compiler_p_2023.1.0.446_offline.exe",
+  "2023.0":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/19001/w_fortran-compiler_p_2023.0.0.25911_offline.exe",
 };
 
 export async function installWin32(target: Target): Promise<string> {
@@ -64,7 +77,11 @@ export async function installWin32(target: Target): Promise<string> {
     const key = line.substring(0, eqIdx);
     const val = line.substring(eqIdx + 1);
     // Export variables that oneAPI sets
-    if (/^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*TBB.*|.*MKL.*|.*CMPLR.*)$/i.test(key)) {
+    if (
+      /^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*TBB.*|.*MKL.*|.*CMPLR.*)$/i.test(
+        key,
+      )
+    ) {
       core.exportVariable(key, val);
     }
   }
