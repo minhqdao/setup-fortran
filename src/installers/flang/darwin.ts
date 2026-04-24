@@ -52,7 +52,6 @@ async function getBrewPrefix(): Promise<string> {
 async function resolveInstalledVersion(): Promise<string> {
   let output = "";
   // Flang might be flang or flang-new
-  let tool = "flang";
   try {
     await exec.exec("flang", ["--version"], {
       listeners: {
@@ -61,8 +60,7 @@ async function resolveInstalledVersion(): Promise<string> {
         },
       },
     });
-  } catch (e) {
-    tool = "flang-new";
+  } catch {
     await exec.exec("flang-new", ["--version"], {
       listeners: {
         stdout: (data: Buffer) => {

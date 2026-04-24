@@ -19,7 +19,7 @@ const SUPPORTED_VERSIONS = {
 >;
 
 export async function installWin32(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
   switch (target.windowsEnv) {
     case WindowsEnv.Native:
@@ -61,7 +61,7 @@ async function resolveInstalledVersion(): Promise<string> {
       silent: true,
       listeners: { stdout: (data) => (stdout += data.toString()) },
     });
-  } catch (err) {
+  } catch {
     // try flang-new
     try {
       await exec.exec("flang-new", ["--version"], {

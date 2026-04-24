@@ -38860,7 +38860,6 @@ async function darwin_getBrewPrefix() {
 async function flang_darwin_resolveInstalledVersion() {
     let output = "";
     // Flang might be flang or flang-new
-    let tool = "flang";
     try {
         await lib_exec.exec("flang", ["--version"], {
             listeners: {
@@ -38870,8 +38869,7 @@ async function flang_darwin_resolveInstalledVersion() {
             },
         });
     }
-    catch (e) {
-        tool = "flang-new";
+    catch {
         await lib_exec.exec("flang-new", ["--version"], {
             listeners: {
                 stdout: (data) => {
@@ -38900,7 +38898,7 @@ const flang_win32_SUPPORTED_VERSIONS = {
     },
 };
 async function win32_installWin32(target) {
-    const version = resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS);
+    resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS);
     switch (target.windowsEnv) {
         case WindowsEnv.Native:
             throw new Error("Flang is not supported on Windows native environment yet.");
@@ -38933,7 +38931,7 @@ async function flang_win32_resolveInstalledVersion() {
             listeners: { stdout: (data) => (stdout += data.toString()) },
         });
     }
-    catch (err) {
+    catch {
         // try flang-new
         try {
             await lib_exec.exec("flang-new", ["--version"], {
