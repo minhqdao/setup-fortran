@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as tc from "@actions/tool-cache";
+import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
 import { Arch } from "../../types";
@@ -67,8 +67,17 @@ export async function installDebian(target: Target): Promise<string> {
   core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
 
   if (!fs.existsSync(release.installDir)) {
+    const debPath = path.join(os.tmpdir(), release.deb);
+
     core.info(`Downloading AOCC ${version} from ${release.url}...`);
-    const debPath = await tc.downloadTool(release.url);
+    await exec.exec("curl", [
+      "-fSL",
+      "--user-agent",
+      "Mozilla/5.0",
+      "-o",
+      debPath,
+      release.url,
+    ]);
 
     core.info(`Verifying checksum...`);
     await exec.exec("bash", [
@@ -77,7 +86,8 @@ export async function installDebian(target: Target): Promise<string> {
     ]);
 
     core.info(`Installing AOCC ${version}...`);
-    await exec.exec("sudo", ["apt-get", "install", "-y", debPath]);
+    await exec.exec("sudo", ["dpkg", "-i", debPath]);
+    await exec.exec("sudo", ["apt-get", "install", "-f", "-y"]); // fix any missing deps
   } else {
     core.info(
       `AOCC ${version} already installed at ${release.installDir}, skipping download.`,

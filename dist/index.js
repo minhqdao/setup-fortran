@@ -38578,15 +38578,24 @@ async function debian_installDebian(target) {
     const release = AOCC_RELEASES[version];
     lib_core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
     if (!external_fs_.existsSync(release.installDir)) {
+        const debPath = external_path_.join(external_os_.tmpdir(), release.deb);
         lib_core.info(`Downloading AOCC ${version} from ${release.url}...`);
-        const debPath = await downloadTool(release.url);
+        await lib_exec.exec("curl", [
+            "-fSL",
+            "--user-agent",
+            "Mozilla/5.0",
+            "-o",
+            debPath,
+            release.url,
+        ]);
         lib_core.info(`Verifying checksum...`);
         await lib_exec.exec("bash", [
             "-c",
             `echo "${release.sha256}  ${debPath}" | sha256sum -c -`,
         ]);
         lib_core.info(`Installing AOCC ${version}...`);
-        await lib_exec.exec("sudo", ["apt-get", "install", "-y", debPath]);
+        await lib_exec.exec("sudo", ["dpkg", "-i", debPath]);
+        await lib_exec.exec("sudo", ["apt-get", "install", "-f", "-y"]); // fix any missing deps
     }
     else {
         lib_core.info(`AOCC ${version} already installed at ${release.installDir}, skipping download.`);
