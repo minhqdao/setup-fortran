@@ -22,7 +22,7 @@ import type { Target } from "../../types";
 //     Excluded for the same reason.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16", "15", "14"],
-  [Arch.ARM64]: ["22", "21", "20", "19", "18", "17", "16"],
+  [Arch.ARM64]: ["22", "21", "20", "19", "18", "17", "16", "15", "14"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 // Returns the Ubuntu codename (e.g. "jammy", "noble").
