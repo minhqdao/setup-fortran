@@ -99408,7 +99408,7 @@ async function debian_installDebian(target) {
         const needsLegacyNcurses = isUbuntu2404OrLater(target.osVersion) &&
             compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0;
         if (needsLegacyNcurses) {
-            lib_core.info(`nvhpc ${version} requires legacy ncurses5 libs unavailable on Ubuntu 24.04; ` +
+            lib_core.info(`nvhpc ${version} requires legacy ncurses5 libs unavailable on ${target.osVersion}; ` +
                 `installing from jammy archive...`);
             await installLegacyNcurses(target);
         }
