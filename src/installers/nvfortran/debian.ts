@@ -1,5 +1,8 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as cache from "@actions/cache";
+import * as os from "os";
+import * as path from "path";
 import { Arch } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Target } from "../../types";
@@ -7,7 +10,7 @@ import type { Target } from "../../types";
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 // Version scheme: YY.M (e.g. "26.1" = January 2026).
-// Releases ship roughly every two months; only LTS-ish ones listed here.
+// Releases ship roughly every two months.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "26.3",
@@ -30,6 +33,12 @@ const SUPPORTED_VERSIONS = {
     "23.5",
     "23.3",
     "23.1",
+    "22.11",
+    "22.9",
+    "22.7",
+    "22.5",
+    "22.3",
+    "22.1",
   ],
   [Arch.ARM64]: [
     "26.3",
@@ -52,58 +61,152 @@ const SUPPORTED_VERSIONS = {
     "23.5",
     "23.3",
     "23.1",
+    "22.11",
+    "22.9",
+    "22.7",
+    "22.5",
+    "22.3",
+    "22.1",
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
+// Maps Arch to the apt repo architecture string used by NVIDIA.
 const APT_ARCH: Record<Arch, string> = {
   [Arch.X64]: "amd64",
   [Arch.ARM64]: "arm64",
 };
 
+// Maps Arch to the directory name NVIDIA uses under /opt/nvidia/hpc_sdk/.
+const NV_ARCH: Record<Arch, string> = {
+  [Arch.X64]: "Linux_x86_64",
+  [Arch.ARM64]: "Linux_aarch64",
+};
+
+// nvhpc ≤ 24.3 depend on legacy ncurses5 libs (libncursesw5, libtinfo5) that
+// were dropped in Ubuntu 24.04 (noble). We backfill them from the jammy archive.
+// Ubuntu 22.04 already has them natively so no action is needed there.
+const LEGACY_NCURSES_MAX_VERSION = "24.3";
+
+// amd64 lives on archive.ubuntu.com; other arches (including arm64) are on ports.
+const NCURSES_ARCHIVE_BASE: Record<Arch, string> = {
+  [Arch.X64]: "http://archive.ubuntu.com/ubuntu",
+  [Arch.ARM64]: "http://ports.ubuntu.com/ubuntu-ports",
+};
+
+const NCURSES_JAMMY_VERSION = "6.3-2ubuntu0.1";
+
+/**
+ * Compare two nvhpc version strings of the form "YY.M" or "YY.MM".
+ * Returns negative if a < b, 0 if equal, positive if a > b.
+ */
+function compareNvhpcVersions(a: string, b: string): number {
+  const [aYear, aMonth] = a.split(".").map(Number);
+  const [bYear, bMonth] = b.split(".").map(Number);
+  return aYear !== bYear ? aYear - bYear : aMonth - bMonth;
+}
+
+/**
+ * Returns true for Ubuntu 24.04 and any later release.
+ * osVersion strings look like "ubuntu-22.04" or "ubuntu-24.04".
+ */
+function isUbuntu2404OrLater(osVersion: string): boolean {
+  const match = /ubuntu-(\d+)\.(\d+)/.exec(osVersion);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 24 || (major === 24 && minor >= 4);
+}
+
+/**
+ * Install libncursesw5 and libtinfo5 from the Ubuntu jammy archive.
+ * Must be called before installing the nvhpc apt package.
+ * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
+ */
+async function installLegacyNcurses(target: Target): Promise<void> {
+  const base = NCURSES_ARCHIVE_BASE[target.arch];
+  const debArch = APT_ARCH[target.arch];
+  const poolPath = "pool/universe/n/ncurses";
+
+  // libtinfo5 must be installed before libncursesw5 (dependency order).
+  const debs = [
+    `libtinfo5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
+    `libncursesw5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
+  ];
+
+  for (const deb of debs) {
+    const url = `${base}/${poolPath}/${deb}`;
+    const dest = path.join(os.tmpdir(), deb);
+    core.info(`Downloading ${deb} from jammy archive...`);
+    await exec.exec("curl", ["-fsSL", "-o", dest, url]);
+    await exec.exec("sudo", ["dpkg", "-i", dest]);
+  }
+}
+
 export async function installDebian(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   const aptArch = APT_ARCH[target.arch];
+  const nvArch = NV_ARCH[target.arch];
 
   core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
 
-  // Add the NVIDIA HPC SDK apt repository if not already present.
-  // Key URL: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
-  // Repo URL: https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
-  core.info("Adding NVIDIA HPC SDK apt repository...");
-  await exec.exec("bash", [
-    "-c",
-    [
-      `curl -fsSL https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK`,
-      `| sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`,
-    ].join(" "),
-  ]);
-  await exec.exec("bash", [
-    "-c",
-    `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /' | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
-  ]);
-
-  await exec.exec("sudo", ["apt-get", "update", "-y"]);
-
-  // Package name format: nvhpc-YY-M  (dots replaced by dashes, no leading zeros)
-  // e.g. "26.1" -> "nvhpc-26-1", "25.11" -> "nvhpc-25-11"
-  const pkgVersion = version.replace(".", "-");
-  const pkgName = `nvhpc-${pkgVersion}`;
-
-  core.info(`Installing apt package ${pkgName}...`);
-  await exec.exec("sudo", [
-    "apt-get",
-    "install",
-    "-y",
-    "--no-install-recommends",
-    pkgName,
-  ]);
-
-  // NVIDIA installs into /opt/nvidia/hpc_sdk/<arch>/<version>/compilers/bin
-  // arch directory matches uname -s_uname -m convention: Linux_x86_64 / Linux_aarch64
-  const nvArch = target.arch === Arch.X64 ? "Linux_x86_64" : "Linux_aarch64";
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
+  const cacheKey = `nvhpc-${version}-${target.arch}-${target.osVersion}`;
 
+  // --- Cache restore ---
+  const cacheHit = await cache.restoreCache([installDir], cacheKey);
+  if (cacheHit) {
+    core.info(`Restored nvhpc ${version} from cache.`);
+  } else {
+    // Add NVIDIA's apt repo.
+    // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
+    // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
+    core.info("Adding NVIDIA HPC SDK apt repository...");
+    await exec.exec("bash", [
+      "-c",
+      `curl -fsSL https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK` +
+        ` | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`,
+    ]);
+    await exec.exec("bash", [
+      "-c",
+      `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
+        ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
+        ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
+    ]);
+    await exec.exec("sudo", ["apt-get", "update", "-y"]);
+
+    // nvhpc ≤ 24.3 need legacy ncurses5 libs that Ubuntu 24.04 dropped.
+    const needsLegacyNcurses =
+      isUbuntu2404OrLater(target.osVersion) &&
+      compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0;
+
+    if (needsLegacyNcurses) {
+      core.info(
+        `nvhpc ${version} requires legacy ncurses5 libs unavailable on ${target.osVersion}; ` +
+          `installing from jammy archive...`,
+      );
+      await installLegacyNcurses(target);
+    }
+
+    // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
+    const pkgName = `nvhpc-${version.replace(".", "-")}`;
+    core.info(`Installing apt package ${pkgName}...`);
+    await exec.exec("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "--no-install-recommends",
+      pkgName,
+    ]);
+
+    // --- Cache save ---
+    // The install lands entirely under installDir, so caching that directory
+    // is sufficient to skip apt on subsequent runs.
+    core.info(`Saving nvhpc ${version} to cache...`);
+    await cache.saveCache([installDir], cacheKey);
+  }
+
+  // Export environment regardless of whether we got a cache hit or did a fresh install.
   core.info(`Adding ${binDir} to PATH...`);
   core.addPath(binDir);
 
@@ -111,7 +214,7 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("CC", "nvc");
   core.exportVariable("CXX", "nvc++");
 
-  // Make math/comm libraries findable at runtime.
+  // Make the bundled math/comm libraries findable at runtime.
   const libDir = `${installDir}/compilers/lib`;
   const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
   core.exportVariable(
