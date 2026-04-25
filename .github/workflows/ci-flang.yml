@@ -18,38 +18,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image:
-          [
-            # ubuntu-24.04,
-          # ubuntu-22.04,
-          # ubuntu-24.04-arm,
-          # ubuntu-22.04-arm,
-            macos-26,
-            macos-15,
-            macos-14,
-          ]
+        image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm ]
           # windows-2025,
           # windows-2022,
           # windows-11-arm,
         toolchain:
-          - { compiler: flang }
-          #   - { compiler: flang, version: "22" }
-          #   - { compiler: flang, version: "21" }
-          #   - { compiler: flang, version: "20" }
-          #   - { compiler: flang, version: "19" }
-          #   - { compiler: flang, version: "18" }
-          #   - { compiler: flang, version: "17" }
-          # include:
-          # - image: ubuntu-22.04
-          #   toolchain: { compiler: flang, version: "16" }
-          # - image: ubuntu-22.04
-          #   toolchain: { compiler: flang, version: "15" }
-          # - image: macos-26
-          #   toolchain: { compiler: flang } # only latest version from brew available
-          # - image: macos-15
-          #   toolchain: { compiler: flang } # only latest version from brew available
-          # - image: macos-14
-          #   toolchain: { compiler: flang } # only latest version from brew available
+          - { compiler: flang, version: "22" }
+          - { compiler: flang, version: "21" }
+          - { compiler: flang, version: "20" }
+          - { compiler: flang, version: "19" }
+          - { compiler: flang, version: "18" }
+          - { compiler: flang, version: "17" }
+        include:
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "16" }
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "15" }
+          - image: macos-26
+            toolchain: { compiler: flang } # only latest version from brew available
+          - image: macos-15
+            toolchain: { compiler: flang } # only latest version from brew available
+          - image: macos-14
+            toolchain: { compiler: flang } # only latest version from brew available
           # - image: windows-2025
           #   toolchain: { compiler: flang, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
 
