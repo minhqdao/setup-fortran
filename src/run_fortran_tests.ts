@@ -21,14 +21,22 @@ async function run(): Promise<void> {
 
     const flags: string[] = ["-O2"];
 
-    if (fc === Compiler.GFortran || fc === Compiler.AOCC) {
+    if (
+      fc === Compiler.GFortran ||
+      fc === Compiler.AOCC ||
+      fc === Compiler.Flang
+    ) {
       flags.push("-J", "test_build");
     } else if (fc === Compiler.IFX || fc === Compiler.IFort) {
       flags.push("-module", "test_build");
     }
 
     let ompFlag = "";
-    if (fc === Compiler.GFortran || fc === Compiler.AOCC) {
+    if (
+      fc === Compiler.GFortran ||
+      fc === Compiler.AOCC ||
+      fc === Compiler.Flang
+    ) {
       ompFlag = "-fopenmp";
     } else if (fc === Compiler.IFX || fc === Compiler.IFort) {
       ompFlag = "-qopenmp";

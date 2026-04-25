@@ -6,6 +6,7 @@ import { installIFX } from "./installers/ifx";
 import { installIFort } from "./installers/ifort";
 import { installNVFortran } from "./installers/nvfortran";
 import { installAOCC } from "./installers/aocc";
+import { installFlang } from "./installers/flang";
 import { installLFortran } from "./installers/lfortran";
 
 async function run(): Promise<void> {
@@ -39,6 +40,9 @@ async function run(): Promise<void> {
         break;
       case Compiler.AOCC:
         installedVersion = await installAOCC(target);
+        break;
+      case Compiler.Flang:
+        installedVersion = await installFlang(target);
         break;
       case Compiler.LFortran:
         installedVersion = await installLFortran(target);

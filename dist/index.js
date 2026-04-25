@@ -34376,6 +34376,7 @@ const Compiler = {
     IFort: "ifort",
     NVFortran: "nvfortran",
     AOCC: "aocc",
+    Flang: "flang",
     LFortran: "lfortran",
 };
 const OS = {
@@ -38446,6 +38447,8 @@ function msys2PkgName(windowsEnv, pkg) {
 
 
 
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
 const win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
@@ -38789,12 +38792,107 @@ async function installAOCC(target) {
     return await aocc_debian_installDebian(target);
 }
 
+;// CONCATENATED MODULE: ./src/installers/flang/debian.ts
+
+
+
+
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
+//
+// Notes:
+//   - Only major versions are meaningful here: neither llvm.sh nor the apt
+//     repository accept minor/patch versions, so the installed patch is always
+//     whatever the LLVM apt repo currently serves for that major.
+//   - LLVM 17 introduced the F18-based rewrite shipped as `flang-new`.
+//     Versions <= 16 ship the classic Flang binary as `flang`.
+//   - LLVM 22 is in pre-release as of early 2026.
+// ARM64 is fully supported via the official LLVM apt repository.
+const flang_debian_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16", "15"],
+    [Arch.ARM64]: ["22", "21", "20", "19", "18", "17", "16", "15"],
+};
+async function flang_debian_installDebian(target) {
+    const version = resolveVersion(target, flang_debian_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
+    lib_core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
+    await lib_exec.exec("bash", [
+        "-c",
+        [
+            `curl -fsSL https://apt.llvm.org/llvm.sh`,
+            `| sudo bash -s -- ${version}`,
+        ].join(" "),
+    ]);
+    const pkgName = `flang-${version}`;
+    lib_core.info(`Installing apt package ${pkgName}...`);
+    await lib_exec.exec("sudo", ["apt-get", "install", "-y", pkgName]);
+    // Register the versioned binary under the generic `flang` name via
+    // update-alternatives so that users can always call `flang` regardless of
+    // which LLVM major is installed. For LLVM >= 17 the on-disk binary is named
+    // `flang-new-<version>`; for <= 16 it is `flang-<version>`.
+    const versionedBin = parseInt(version, 10) >= 17
+        ? `/usr/bin/flang-new-${version}`
+        : `/usr/bin/flang-${version}`;
+    await lib_exec.exec("sudo", [
+        "update-alternatives",
+        "--install",
+        "/usr/bin/flang",
+        "flang",
+        versionedBin,
+        "100",
+    ]);
+    lib_core.exportVariable("FC", "flang");
+    lib_core.exportVariable("CC", `clang-${version}`);
+    lib_core.exportVariable("CXX", `clang++-${version}`);
+    const resolvedVersion = await flang_debian_resolveInstalledVersion();
+    lib_core.info(`Flang ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function flang_debian_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("flang", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/darwin.ts
+async function darwin_installDarwin(_) {
+    return Promise.reject(new Error("Not implemented"));
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/win32.ts
+async function win32_installWin32(_) {
+    return Promise.reject(new Error("Not implemented"));
+}
+
+;// CONCATENATED MODULE: ./src/installers/flang/index.ts
+
+
+
+
+async function installFlang(target) {
+    switch (target.os) {
+        case OS.Linux:
+            return await flang_debian_installDebian(target);
+        case OS.MacOS:
+            return await darwin_installDarwin(target);
+        case OS.Windows:
+            return await win32_installWin32(target);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/installers/lfortran/index.ts
 async function installLFortran(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
+
 
 
 
@@ -38831,6 +38929,9 @@ async function run() {
                 break;
             case Compiler.AOCC:
                 installedVersion = await installAOCC(target);
+                break;
+            case Compiler.Flang:
+                installedVersion = await installFlang(target);
                 break;
             case Compiler.LFortran:
                 installedVersion = await installLFortran(target);

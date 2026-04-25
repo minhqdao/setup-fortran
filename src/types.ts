@@ -4,6 +4,7 @@ export const Compiler = {
   IFort: "ifort",
   NVFortran: "nvfortran",
   AOCC: "aocc",
+  Flang: "flang",
   LFortran: "lfortran",
 } as const;
 export type Compiler = (typeof Compiler)[keyof typeof Compiler];

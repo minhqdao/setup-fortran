@@ -82,6 +82,7 @@ describe("parseInputs", () => {
     it.each([
       [Compiler.NVFortran, "nvfortran"],
       [Compiler.AOCC, "aocc"],
+      [Compiler.Flang, "flang"],
       [Compiler.LFortran, "lfortran"],
     ])("parses %s compiler", (expected, input) => {
       mockedGetInput.mockImplementation((name) => {
@@ -97,7 +98,7 @@ describe("parseInputs", () => {
         return "";
       });
       expect(() => parseInputs()).toThrow(
-        'Unknown compiler "unknown-compiler". Valid options: gfortran, ifx, ifort, nvfortran, aocc, lfortran',
+        'Unknown compiler "unknown-compiler". Valid options: gfortran, ifx, ifort, nvfortran, aocc, flang, lfortran',
       );
     });
   });
