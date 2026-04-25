@@ -38612,7 +38612,16 @@ async function darwin_installDarwin(target) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
     lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-    const downloadPath = await downloadTool(downloadUrl);
+    // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+    const downloadPath = external_path_.join(process.env.RUNNER_TEMP ?? "/tmp", `ifort_installer_${version}.dmg`);
+    await lib_exec.exec("curl", [
+        "-fSL",
+        "-A",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "-o",
+        downloadPath,
+        downloadUrl,
+    ]);
     lib_core.info(`Mounting DMG...`);
     await lib_exec.exec("hdiutil", [
         "attach",
@@ -38676,7 +38685,6 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 
 
-
 const ifort_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [WindowsEnv.Native]: [
@@ -38709,7 +38717,16 @@ async function win32_installWin32(target) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
     lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-    const downloadPath = await downloadTool(downloadUrl);
+    // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+    const downloadPath = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\temp", `ifort_installer_${version}.exe`);
+    await lib_exec.exec("curl", [
+        "-fSL",
+        "-A",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "-o",
+        downloadPath,
+        downloadUrl,
+    ]);
     lib_core.info(`Installing ifort ${version}...`);
     // Silent install
     await lib_exec.exec(downloadPath, ["-s", "-a", "--silent", "--eula", "accept"]);
@@ -38842,27 +38859,6 @@ async function nvfortran_debian_installDebian(target) {
         `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /' | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
     ]);
     await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
-    // Older nvhpc versions (24.3 and below) depend on libncursesw5/libtinfo5,
-    // which are missing in Ubuntu 24.04 (noble). We install them from jammy.
-    if (target.osVersion.includes("24")) {
-        const legacyVersions = ["24.3", "24.1", "23.11"];
-        if (legacyVersions.includes(version)) {
-            lib_core.info("Installing legacy dependencies for nvfortran on Ubuntu 24.04...");
-            await lib_exec.exec("bash", [
-                "-c",
-                "echo 'deb http://azure.archive.ubuntu.com/ubuntu/ jammy main universe' | sudo tee /etc/apt/sources.list.d/jammy.list",
-            ]);
-            await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
-            await lib_exec.exec("sudo", [
-                "apt-get",
-                "install",
-                "-y",
-                "--no-install-recommends",
-                "libncursesw5",
-                "libtinfo5",
-            ]);
-        }
-    }
     // Package name format: nvhpc-YY-M  (dots replaced by dashes, no leading zeros)
     // e.g. "26.1" -> "nvhpc-26-1", "25.11" -> "nvhpc-25-11"
     const pkgVersion = version.replace(".", "-");

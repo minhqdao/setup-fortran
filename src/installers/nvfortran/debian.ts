@@ -74,30 +74,6 @@ export async function installDebian(target: Target): Promise<string> {
 
   await exec.exec("sudo", ["apt-get", "update", "-y"]);
 
-  // Older nvhpc versions (24.3 and below) depend on libncursesw5/libtinfo5,
-  // which are missing in Ubuntu 24.04 (noble). We install them from jammy.
-  if (target.osVersion.includes("24")) {
-    const legacyVersions = ["24.3", "24.1", "23.11"];
-    if (legacyVersions.includes(version)) {
-      core.info(
-        "Installing legacy dependencies for nvfortran on Ubuntu 24.04...",
-      );
-      await exec.exec("bash", [
-        "-c",
-        "echo 'deb http://azure.archive.ubuntu.com/ubuntu/ jammy main universe' | sudo tee /etc/apt/sources.list.d/jammy.list",
-      ]);
-      await exec.exec("sudo", ["apt-get", "update", "-y"]);
-      await exec.exec("sudo", [
-        "apt-get",
-        "install",
-        "-y",
-        "--no-install-recommends",
-        "libncursesw5",
-        "libtinfo5",
-      ]);
-    }
-  }
-
   // Package name format: nvhpc-YY-M  (dots replaced by dashes, no leading zeros)
   // e.g. "26.1" -> "nvhpc-26-1", "25.11" -> "nvhpc-25-11"
   const pkgVersion = version.replace(".", "-");

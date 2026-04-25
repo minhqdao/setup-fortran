@@ -36,6 +36,19 @@ jobs:
                     - { compiler: nvfortran, version: "24.3" }
                     - { compiler: nvfortran, version: "24.1" }
                     - { compiler: nvfortran, version: "23.11" }
+                exclude:
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: nvfortran, version: "24.3" }
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: nvfortran, version: "24.1" }
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: nvfortran, version: "23.11" }
+                    - image: ubuntu-24.04-arm
+                      toolchain: { compiler: nvfortran, version: "24.3" }
+                    - image: ubuntu-24.04-arm
+                      toolchain: { compiler: nvfortran, version: "24.1" }
+                    - image: ubuntu-24.04-arm
+                      toolchain: { compiler: nvfortran, version: "23.11" }
 
         steps:
             - uses: actions/checkout@v6

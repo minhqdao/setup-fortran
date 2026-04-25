@@ -1,7 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
-import * as tc from "@actions/tool-cache";
 import { Arch, WindowsEnv, type Target } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 
@@ -50,7 +49,19 @@ export async function installWin32(target: Target): Promise<string> {
   }
 
   core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-  const downloadPath = await tc.downloadTool(downloadUrl);
+  // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+  const downloadPath = path.join(
+    process.env.RUNNER_TEMP ?? "C:\\temp",
+    `ifort_installer_${version}.exe`,
+  );
+  await exec.exec("curl", [
+    "-fSL",
+    "-A",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "-o",
+    downloadPath,
+    downloadUrl,
+  ]);
 
   core.info(`Installing ifort ${version}...`);
   // Silent install

@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as tc from "@actions/tool-cache";
+import * as path from "path";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
@@ -27,7 +27,19 @@ export async function installDarwin(target: Target): Promise<string> {
   }
 
   core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-  const downloadPath = await tc.downloadTool(downloadUrl);
+  // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+  const downloadPath = path.join(
+    process.env.RUNNER_TEMP ?? "/tmp",
+    `ifort_installer_${version}.dmg`,
+  );
+  await exec.exec("curl", [
+    "-fSL",
+    "-A",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "-o",
+    downloadPath,
+    downloadUrl,
+  ]);
 
   core.info(`Mounting DMG...`);
   await exec.exec("hdiutil", [
