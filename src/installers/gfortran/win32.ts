@@ -86,10 +86,22 @@ async function installMSYS2(target: Target): Promise<string> {
     `pacman -S --noconfirm --needed ${pkgName}`,
   ]);
 
-  const msysBin = path.join("C:", "msys64", target.windowsEnv, "bin");
+  const msysRoot = path.join("C:", "msys64", target.windowsEnv);
+  const msysBin = path.join(msysRoot, "bin");
+  const msysLib = path.join(msysRoot, "lib");
+
+  // Add both bin (executables + DLLs) to PATH
   core.addPath(msysBin);
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
+  // Set MSYS2 environment variables so shells and tools behave correctly
+  core.exportVariable("MSYSTEM", target.windowsEnv.toUpperCase()); // "UCRT64"
+  core.exportVariable("MSYS2_PATH_TYPE", "inherit");
+
+  // Library and pkg-config paths
+  core.exportVariable("PKG_CONFIG_PATH", path.join(msysLib, "pkgconfig"));
+
+  // Standard Fortran compiler variables
+  core.info(`Setting FC, F77, F90, CC, and CXX environment variables...`);
   const gfortranPath = path.join(msysBin, "gfortran.exe");
   core.exportVariable("FC", gfortranPath);
   core.exportVariable("F77", gfortranPath);

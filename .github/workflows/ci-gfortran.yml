@@ -41,8 +41,8 @@ jobs:
                     # - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
                     - image: windows-2025
                       toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
-                    # - image: windows-2022
-                    #   toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
+                    - image: windows-2022
+                      toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
 
         steps:
             - uses: actions/checkout@v6
