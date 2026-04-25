@@ -34,11 +34,25 @@ jobs:
                     - { compiler: flang, version: "19" }
                     - { compiler: flang, version: "18" }
                     - { compiler: flang, version: "17" }
-                    - { compiler: flang, version: "16" }
-                    - { compiler: flang, version: "15" }
-                    # include:
+                include:
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: flang, version: "16" }
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: flang, version: "16" }
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: flang, version: "15" }
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: flang, version: "15" }
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: flang, version: "14" }
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: flang, version: "14" }
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: flang, version: "13" }
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: flang, version: "13" }
                     # - image: windows-2025
-                    #   toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
+                    #   toolchain: { compiler: flang, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
 
         steps:
             - uses: actions/checkout@v6
