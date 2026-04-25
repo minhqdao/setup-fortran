@@ -28,12 +28,12 @@ jobs:
           # windows-2022,
           # windows-11-arm,
         toolchain:
-          - { compiler: flang, version: "22" }
-          # - { compiler: flang, version: "21" }
-          # - { compiler: flang, version: "20" }
-          # - { compiler: flang, version: "19" }
-          # - { compiler: flang, version: "18" }
-          # - { compiler: flang, version: "17" }
+          # - { compiler: flang, version: "22" }
+          - { compiler: flang, version: "21" }
+          - { compiler: flang, version: "20" }
+          - { compiler: flang, version: "19" }
+          - { compiler: flang, version: "18" }
+          - { compiler: flang, version: "17" }
           # include:
           #   - image: ubuntu-24.04
           #     toolchain: { compiler: flang, version: "16" }
