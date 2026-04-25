@@ -1,9 +1,11 @@
 name: aocc
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+    # it works, disable automatic trigger for now
+    workflow_dispatch:
+        # push:
+        #     branches: [ main ]
+        # pull_request:
 
 jobs:
     build:
@@ -22,9 +24,9 @@ jobs:
 
                 toolchain:
                     - { compiler: aocc, version: "5.1" }
-                    # - { compiler: aocc, version: "5.0" }
-                    # - { compiler: aocc, version: "4.2" }
-                    # - { compiler: aocc, version: "4.1" }
+                    - { compiler: aocc, version: "5.0" }
+                    - { compiler: aocc, version: "4.2" }
+                    - { compiler: aocc, version: "4.1" }
 
         steps:
             - uses: actions/checkout@v6

@@ -25,6 +25,11 @@ const SUPPORTED_VERSIONS = {
     "24.3",
     "24.1",
     "23.11",
+    "23.9",
+    "23.7",
+    "23.5",
+    "23.3",
+    "23.1",
   ],
   [Arch.ARM64]: [
     "26.3",
@@ -42,6 +47,11 @@ const SUPPORTED_VERSIONS = {
     "24.3",
     "24.1",
     "23.11",
+    "23.9",
+    "23.7",
+    "23.5",
+    "23.3",
+    "23.1",
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
