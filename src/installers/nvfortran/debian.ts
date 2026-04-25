@@ -46,10 +46,10 @@ const SUPPORTED_VERSIONS = {
     "21.5",
     "21.3",
     "21.2",
-    "21.1",
+    // 21.1 excluded: corrupted package on NVIDIA's x64 apt mirror
     "20.11",
-    "20.9",
-    "20.7",
+    // 20.9 excluded: predates the apt repo (tarball-only releases)
+    // 20.7 excluded: predates the apt repo (tarball-only releases)
   ],
   [Arch.ARM64]: [
     "26.3",
@@ -87,8 +87,8 @@ const SUPPORTED_VERSIONS = {
     "21.2",
     "21.1",
     "20.11",
-    "20.9",
-    "20.7",
+    // 20.9 excluded: predates the apt repo (tarball-only releases)
+    // 20.7 excluded: predates the apt repo (tarball-only releases)
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 

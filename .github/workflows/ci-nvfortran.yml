@@ -1,9 +1,11 @@
 name: nvfortran
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+    # it works, disable automatic trigger for now
+    workflow_dispatch:
+        # push:
+        #     branches: [ main ]
+        # pull_request:
 
 jobs:
     build:
@@ -19,19 +21,18 @@ jobs:
             fail-fast: false
             matrix:
                 image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm ]
-
                 toolchain:
-                    # - { compiler: nvfortran, version: "26.3" }
-                    # - { compiler: nvfortran, version: "26.1" }
-                    # - { compiler: nvfortran, version: "25.11" }
-                    # - { compiler: nvfortran, version: "25.9" }
-                    # - { compiler: nvfortran, version: "25.7" }
-                    # - { compiler: nvfortran, version: "25.5" }
-                    # - { compiler: nvfortran, version: "25.3" }
-                    # - { compiler: nvfortran, version: "25.1" }
-                    # - { compiler: nvfortran, version: "24.11" }
-                    # - { compiler: nvfortran, version: "24.9" }
-                    # - { compiler: nvfortran, version: "24.7" }
+                    - { compiler: nvfortran, version: "26.3" }
+                    - { compiler: nvfortran, version: "26.1" }
+                    - { compiler: nvfortran, version: "25.11" }
+                    - { compiler: nvfortran, version: "25.9" }
+                    - { compiler: nvfortran, version: "25.7" }
+                    - { compiler: nvfortran, version: "25.5" }
+                    - { compiler: nvfortran, version: "25.3" }
+                    - { compiler: nvfortran, version: "25.1" }
+                    - { compiler: nvfortran, version: "24.11" }
+                    - { compiler: nvfortran, version: "24.9" }
+                    - { compiler: nvfortran, version: "24.7" }
                     - { compiler: nvfortran, version: "24.5" }
                     - { compiler: nvfortran, version: "24.3" }
                     - { compiler: nvfortran, version: "24.1" }
@@ -56,8 +57,11 @@ jobs:
                     - { compiler: nvfortran, version: "21.2" }
                     - { compiler: nvfortran, version: "21.1" }
                     - { compiler: nvfortran, version: "20.11" }
-                    - { compiler: nvfortran, version: "20.9" }
-                    - { compiler: nvfortran, version: "20.7" }
+                exclude:
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: nvfortran, version: "21.1" } # broken link
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: nvfortran, version: "21.1" } # broken link
 
         steps:
             - uses: actions/checkout@v6
