@@ -46,7 +46,18 @@ jobs:
                     - { compiler: nvfortran, version: "22.7" }
                     - { compiler: nvfortran, version: "22.5" }
                     - { compiler: nvfortran, version: "22.3" }
+                    - { compiler: nvfortran, version: "22.2" }
                     - { compiler: nvfortran, version: "22.1" }
+                    - { compiler: nvfortran, version: "21.11" }
+                    - { compiler: nvfortran, version: "21.9" }
+                    - { compiler: nvfortran, version: "21.7" }
+                    - { compiler: nvfortran, version: "21.5" }
+                    - { compiler: nvfortran, version: "21.3" }
+                    - { compiler: nvfortran, version: "21.2" }
+                    - { compiler: nvfortran, version: "21.1" }
+                    - { compiler: nvfortran, version: "20.11" }
+                    - { compiler: nvfortran, version: "20.9" }
+                    - { compiler: nvfortran, version: "20.7" }
 
         steps:
             - uses: actions/checkout@v6

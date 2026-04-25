@@ -38,7 +38,18 @@ const SUPPORTED_VERSIONS = {
     "22.7",
     "22.5",
     "22.3",
+    "22.2",
     "22.1",
+    "21.11",
+    "21.9",
+    "21.7",
+    "21.5",
+    "21.3",
+    "21.2",
+    "21.1",
+    "20.11",
+    "20.9",
+    "20.7",
   ],
   [Arch.ARM64]: [
     "26.3",
@@ -66,7 +77,18 @@ const SUPPORTED_VERSIONS = {
     "22.7",
     "22.5",
     "22.3",
+    "22.2",
     "22.1",
+    "21.11",
+    "21.9",
+    "21.7",
+    "21.5",
+    "21.3",
+    "21.2",
+    "21.1",
+    "20.11",
+    "20.9",
+    "20.7",
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
@@ -105,16 +127,16 @@ function compareNvhpcVersions(a: string, b: string): number {
   return aYear !== bYear ? aYear - bYear : aMonth - bMonth;
 }
 
-/**
- * Returns true for Ubuntu 24.04 and any later release.
- * osVersion strings look like "ubuntu-22.04" or "ubuntu-24.04".
- */
-function isUbuntu2404OrLater(osVersion: string): boolean {
-  const match = /ubuntu-(\d+)\.(\d+)/.exec(osVersion);
-  if (!match) return false;
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  return major > 24 || (major === 24 && minor >= 4);
+async function needsLegacyNcursesInstall(): Promise<boolean> {
+  const result = await exec.getExecOutput(
+    "dpkg-query",
+    ["-W", "-f=${Status}", "libncursesw5", "libtinfo5"],
+    { ignoreReturnCode: true },
+  );
+  // "install ok installed" must appear twice (once per package)
+  const installedCount = (result.stdout.match(/install ok installed/g) ?? [])
+    .length;
+  return installedCount < 2;
 }
 
 /**
@@ -175,15 +197,14 @@ export async function installDebian(target: Target): Promise<string> {
     ]);
     await exec.exec("sudo", ["apt-get", "update", "-y"]);
 
-    // nvhpc ≤ 24.3 need legacy ncurses5 libs that Ubuntu 24.04 dropped.
-    const needsLegacyNcurses =
-      isUbuntu2404OrLater(target.osVersion) &&
-      compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0;
+    core.info("Checking if ");
 
-    if (needsLegacyNcurses) {
+    if (
+      compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
+      (await needsLegacyNcursesInstall())
+    ) {
       core.info(
-        `nvhpc ${version} requires legacy ncurses5 libs unavailable on ${target.osVersion}; ` +
-          `installing from jammy archive...`,
+        `nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`,
       );
       await installLegacyNcurses(target);
     }

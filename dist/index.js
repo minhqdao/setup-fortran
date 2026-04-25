@@ -99280,7 +99280,18 @@ const debian_SUPPORTED_VERSIONS = {
         "22.7",
         "22.5",
         "22.3",
+        "22.2",
         "22.1",
+        "21.11",
+        "21.9",
+        "21.7",
+        "21.5",
+        "21.3",
+        "21.2",
+        "21.1",
+        "20.11",
+        "20.9",
+        "20.7",
     ],
     [Arch.ARM64]: [
         "26.3",
@@ -99308,7 +99319,18 @@ const debian_SUPPORTED_VERSIONS = {
         "22.7",
         "22.5",
         "22.3",
+        "22.2",
         "22.1",
+        "21.11",
+        "21.9",
+        "21.7",
+        "21.5",
+        "21.3",
+        "21.2",
+        "21.1",
+        "20.11",
+        "20.9",
+        "20.7",
     ],
 };
 // Maps Arch to the apt repo architecture string used by NVIDIA.
@@ -99340,17 +99362,12 @@ function compareNvhpcVersions(a, b) {
     const [bYear, bMonth] = b.split(".").map(Number);
     return aYear !== bYear ? aYear - bYear : aMonth - bMonth;
 }
-/**
- * Returns true for Ubuntu 24.04 and any later release.
- * osVersion strings look like "ubuntu-22.04" or "ubuntu-24.04".
- */
-function isUbuntu2404OrLater(osVersion) {
-    const match = /ubuntu-(\d+)\.(\d+)/.exec(osVersion);
-    if (!match)
-        return false;
-    const major = Number(match[1]);
-    const minor = Number(match[2]);
-    return major > 24 || (major === 24 && minor >= 4);
+async function needsLegacyNcursesInstall() {
+    const result = await lib_exec.getExecOutput("dpkg-query", ["-W", "-f=${Status}", "libncursesw5", "libtinfo5"], { ignoreReturnCode: true });
+    // "install ok installed" must appear twice (once per package)
+    const installedCount = (result.stdout.match(/install ok installed/g) ?? [])
+        .length;
+    return installedCount < 2;
 }
 /**
  * Install libncursesw5 and libtinfo5 from the Ubuntu jammy archive.
@@ -99404,12 +99421,10 @@ async function debian_installDebian(target) {
                 ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
         ]);
         await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
-        // nvhpc ≤ 24.3 need legacy ncurses5 libs that Ubuntu 24.04 dropped.
-        const needsLegacyNcurses = isUbuntu2404OrLater(target.osVersion) &&
-            compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0;
-        if (needsLegacyNcurses) {
-            lib_core.info(`nvhpc ${version} requires legacy ncurses5 libs unavailable on ${target.osVersion}; ` +
-                `installing from jammy archive...`);
+        lib_core.info("Checking if ");
+        if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
+            (await needsLegacyNcursesInstall())) {
+            lib_core.info(`nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`);
             await installLegacyNcurses(target);
         }
         // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
