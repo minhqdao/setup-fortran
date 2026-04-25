@@ -38612,10 +38612,14 @@ async function darwin_installDarwin(target) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
     lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-    // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+    // Use curl with a user-agent, cookie and referer to avoid 403 Forbidden errors from Intel's servers
     const downloadPath = external_path_.join(process.env.RUNNER_TEMP ?? "/tmp", `ifort_installer_${version}.dmg`);
     await lib_exec.exec("curl", [
         "-fSL",
+        "-H",
+        "Cookie: gp_is_accepted=yes",
+        "-H",
+        "Referer: https://registrationcenter.intel.com/",
         "-A",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "-o",
@@ -38703,12 +38707,12 @@ const ifort_win32_SUPPORTED_VERSIONS = {
     },
 };
 const win32_ONEAPI_RELEASES = {
-    "2024.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0572b64-07ed-4180-87a2-f6735e29a997/w_fortran-compiler_p_2024.2.1.80_offline.exe",
-    "2024.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f80f12d-8874-4b55-8d5c-3004313f8d2b/w_fortran-compiler_p_2024.1.0.962_offline.exe",
-    "2024.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/da83f360-645c-4a37-b615-58097b6968f2/w_fortran-compiler_p_2024.0.0.49608_offline.exe",
-    "2023.2": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19159/w_fortran-compiler_p_2023.2.0.495_offline.exe",
-    "2023.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19082/w_fortran-compiler_p_2023.1.0.446_offline.exe",
-    "2023.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19001/w_fortran-compiler_p_2023.0.0.25911_offline.exe",
+    "2024.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0572b64-07ed-4180-87a2-f6735e29a997/w_fortran-compiler_p_2024.2.1.80.exe",
+    "2024.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f80f12d-8874-4b55-8d5c-3004313f8d2b/w_fortran-compiler_p_2024.1.0.962.exe",
+    "2024.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/da83f360-645c-4a37-b615-58097b6968f2/w_fortran-compiler_p_2024.0.0.49608.exe",
+    "2023.2": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19159/w_fortran-compiler_p_2023.2.0.495.exe",
+    "2023.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19082/w_fortran-compiler_p_2023.1.0.446.exe",
+    "2023.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19001/w_fortran-compiler_p_2023.0.0.25911.exe",
 };
 async function win32_installWin32(target) {
     const version = resolveWindowsVersion(target, ifort_win32_SUPPORTED_VERSIONS);
@@ -38717,10 +38721,14 @@ async function win32_installWin32(target) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
     lib_core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-    // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+    // Use curl with a user-agent and referer to avoid 403 Forbidden errors from Intel's servers
     const downloadPath = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\temp", `ifort_installer_${version}.exe`);
     await lib_exec.exec("curl", [
         "-fSL",
+        "-H",
+        "Cookie: gp_is_accepted=yes",
+        "-H",
+        "Referer: https://registrationcenter.intel.com/",
         "-A",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "-o",

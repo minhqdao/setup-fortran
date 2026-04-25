@@ -27,13 +27,17 @@ export async function installDarwin(target: Target): Promise<string> {
   }
 
   core.info(`Downloading ifort ${version} from ${downloadUrl}`);
-  // Use curl with a user-agent to avoid 403 Forbidden errors from Intel's servers
+  // Use curl with a user-agent, cookie and referer to avoid 403 Forbidden errors from Intel's servers
   const downloadPath = path.join(
     process.env.RUNNER_TEMP ?? "/tmp",
     `ifort_installer_${version}.dmg`,
   );
   await exec.exec("curl", [
     "-fSL",
+    "-H",
+    "Cookie: gp_is_accepted=yes",
+    "-H",
+    "Referer: https://registrationcenter.intel.com/",
     "-A",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "-o",
