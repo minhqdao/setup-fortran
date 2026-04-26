@@ -44,36 +44,9 @@ export async function installDarwin(target: Target): Promise<string> {
   core.exportVariable("CXX", path.join(llvmBinDir, "clang++"));
 
   const libDir = path.join(flangOptDir, "lib");
-  const libompDir = path.join(brewPrefix, "opt", "libomp", "lib");
+  const libompDir = path.join(brewPrefix, "opt", "llvm", "lib");
   const existingLibPath = process.env.LIBRARY_PATH ?? "";
   const libPaths = [libDir, libompDir].filter(fs.existsSync).join(":");
-
-  core.info(`DEBUG: libPaths = "${libPaths}"`);
-  if (libPaths) {
-    core.exportVariable(
-      "LIBRARY_PATH",
-      existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths,
-    );
-  }
-  core.info(`DEBUG: libDir exists: ${fs.existsSync(libDir).toString()}`);
-  core.info(`DEBUG: libompDir exists: ${fs.existsSync(libompDir).toString()}`);
-  const optDir = path.join(brewPrefix, "opt");
-  for (const formula of fs.readdirSync(optDir)) {
-    if (
-      formula.toLowerCase().includes("omp") ||
-      formula.toLowerCase().includes("llvm")
-    ) {
-      core.info(`DEBUG: found formula: ${formula}`);
-      const fLib = path.join(optDir, formula, "lib");
-      if (fs.existsSync(fLib)) {
-        for (const f of fs.readdirSync(fLib)) {
-          if (f.toLowerCase().includes("omp"))
-            core.info(`  DEBUG: ${fLib}/${f}`);
-        }
-      }
-    }
-  }
-
   core.exportVariable(
     "LIBRARY_PATH",
     existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths,
