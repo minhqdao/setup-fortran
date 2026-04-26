@@ -10,8 +10,8 @@ import { resolveVersion } from "../../resolve_version";
 // used as the default if no version was specified by the user.
 //
 // Windows availability of official LLVM installer packages:
-//   x64:   LLVM-*.exe (win64) — checking from 18+
-//   ARM64: LLVM-*.exe (woa64) — checking from 20+
+//   x64:   LLVM-*.exe (win64) — available from 18+
+//   ARM64: LLVM-*.exe (woa64) — available from 20+
 //
 // Only major versions are listed here. Full patch versions (e.g. "22.1.3")
 // are validated by extracting the major and checking it against this table.
@@ -116,50 +116,96 @@ async function verifyPatchExists(patch: string, arch: Arch): Promise<void> {
   }
 }
 
-// Extracts an LLVM .exe installer using 7-Zip (pre-installed on all GitHub
-// Actions Windows runners). LLVM .exe installers are NSIS-based and can be
-// extracted directly by 7-Zip without running the installer UI.
-// Returns the path to the directory containing the extracted contents.
+// Extracts an LLVM NSIS .exe installer using 7-Zip (pre-installed on all
+// GitHub Actions Windows runners).
 async function extractExe(
   installerPath: string,
   destDir: string,
 ): Promise<string> {
   const sevenZip = "C:\\Program Files\\7-Zip\\7z.exe";
-
   core.info("Extracting installer with 7-Zip...");
   await exec.exec(`"${sevenZip}"`, ["x", installerPath, `-o${destDir}`, "-y"]);
-
-  // DEBUG: list all extracted top-level entries so we can see the layout
-  core.info("DEBUG: top-level extracted entries:");
-  for (const f of fs.readdirSync(destDir)) {
-    const fullPath = path.join(destDir, f);
-    const isDir = fs.statSync(fullPath).isDirectory();
-    core.info(`  ${isDir ? "[DIR] " : "      "}${f}`);
-  }
-
-  // DEBUG: search for flang anywhere in the extracted tree
-  core.info("DEBUG: searching for flang in extracted tree...");
-  function findFlang(dir: string): void {
-    for (const f of fs.readdirSync(dir)) {
-      const fullPath = path.join(dir, f);
-      if (f.toLowerCase().includes("flang")) {
-        core.info(`  FOUND: ${fullPath}`);
-      }
-      if (fs.statSync(fullPath).isDirectory()) {
-        findFlang(fullPath);
-      }
-    }
-  }
-  findFlang(destDir);
-
   return destDir;
+}
+
+// Locates the MSVC toolchain and Windows SDK library directories using vswhere
+// and adds them to the LIB environment variable so flang's linker backend can
+// find libcmt.lib, oldnames.lib, libcpmt.lib, and the Windows SDK libs.
+//
+// Flang on Windows uses lld-link as its linker, which reads LIB the same way
+// MSVC's link.exe does. The GitHub Actions Windows runners have VS installed
+// but don't pre-populate LIB for non-MSVC workflows.
+async function setupMsvcLibs(arch: Arch): Promise<void> {
+  core.info("Locating MSVC and Windows SDK libraries for flang linker...");
+
+  const vswhere =
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+
+  // Find VS installation path.
+  let vsInstallPath = "";
+  await exec.exec(
+    `"${vswhere}"`,
+    ["-latest", "-property", "installationPath"],
+    {
+      listeners: {
+        stdout: (data: Buffer) => {
+          vsInstallPath += data.toString();
+        },
+      },
+    },
+  );
+  vsInstallPath = vsInstallPath.trim();
+
+  if (!vsInstallPath) {
+    core.warning(
+      "Could not locate Visual Studio via vswhere. Linker may fail to find CRT libs.",
+    );
+    return;
+  }
+
+  core.info(`Found Visual Studio at: ${vsInstallPath}`);
+
+  // Find the MSVC tools version (e.g. 14.38.33130).
+  const vcToolsRoot = path.join(vsInstallPath, "VC", "Tools", "MSVC");
+  const vcVersions = fs.readdirSync(vcToolsRoot).sort().reverse();
+  const vcVersion = vcVersions[0];
+  if (!vcVersion) {
+    core.warning("Could not find MSVC tools version directory.");
+    return;
+  }
+
+  const msvcLibDir = path.join(vcToolsRoot, vcVersion, "lib", arch);
+  core.info(`MSVC lib dir: ${msvcLibDir}`);
+
+  // Find the Windows SDK lib directory. The SDK installs under
+  // C:\Program Files (x86)\Windows Kits\10\Lib\<version>\um\<arch> and
+  // ...\ucrt\<arch>.
+  const winsdk10Root = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib";
+  const sdkVersions = fs.readdirSync(winsdk10Root).sort().reverse();
+  const sdkVersion = sdkVersions[0];
+  if (!sdkVersion) {
+    core.warning("Could not find Windows SDK version directory.");
+    return;
+  }
+
+  const winsdkUmDir = path.join(winsdk10Root, sdkVersion, "um", arch);
+  const winsdkUcrtDir = path.join(winsdk10Root, sdkVersion, "ucrt", arch);
+  core.info(`Windows SDK um dir:   ${winsdkUmDir}`);
+  core.info(`Windows SDK ucrt dir: ${winsdkUcrtDir}`);
+
+  // Prepend all three dirs to LIB.
+  const existing = process.env.LIB ?? "";
+  const libDirs = [msvcLibDir, winsdkUmDir, winsdkUcrtDir]
+    .filter(fs.existsSync)
+    .join(";");
+
+  core.exportVariable("LIB", existing ? `${libDirs};${existing}` : libDirs);
 }
 
 export async function installWin32(target: Target): Promise<string> {
   const { major, patch: userPatch } = parseVersionInput(target.version);
 
-  // Always validate the major against SUPPORTED_VERSIONS regardless of whether
-  // the user supplied a bare major or a full patch.
+  // Always validate the major against SUPPORTED_VERSIONS.
   resolveVersion({ ...target, version: major }, SUPPORTED_VERSIONS);
 
   let patch: string;
@@ -191,25 +237,10 @@ export async function installWin32(target: Target): Promise<string> {
     );
     fs.mkdirSync(tempExtractDir, { recursive: true });
 
-    const extractedDir = await extractExe(downloadPath, tempExtractDir);
-
-    // DEBUG: log what we're about to cache
-    core.info(`DEBUG: caching contents of: ${extractedDir}`);
+    await extractExe(downloadPath, tempExtractDir);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(extractedDir, "flang", patch, target.arch);
-
-    // DEBUG: confirm toolRoot and list its bin contents
-    core.info(`DEBUG: toolRoot = ${toolRoot}`);
-    const binDir2 = path.join(toolRoot, "bin");
-    if (fs.existsSync(binDir2)) {
-      core.info("DEBUG: bin/ contents:");
-      for (const f of fs.readdirSync(binDir2)) {
-        core.info(`  bin/${f}`);
-      }
-    } else {
-      core.info("DEBUG: no bin/ directory found in toolRoot");
-    }
+    toolRoot = await tc.cacheDir(tempExtractDir, "flang", patch, target.arch);
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,
@@ -229,9 +260,16 @@ export async function installWin32(target: Target): Promise<string> {
   core.exportVariable("FORTRAN_COMPILER", "flang");
   core.exportVariable("FORTRAN_COMPILER_VERSION", major);
 
-  const libDir = path.join(toolRoot, "lib");
+  // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
+  // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
+  const flangLibDir = path.join(toolRoot, "lib");
   const existingLib = process.env.LIB ?? "";
-  core.exportVariable("LIB", existingLib ? `${libDir};${existingLib}` : libDir);
+  core.exportVariable(
+    "LIB",
+    existingLib ? `${flangLibDir};${existingLib}` : flangLibDir,
+  );
+
+  await setupMsvcLibs(target.arch);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully.`);
