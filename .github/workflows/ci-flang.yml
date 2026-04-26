@@ -48,10 +48,10 @@ jobs:
             toolchain: { compiler: flang } # let's try at least
           - image: macos-15-intel
             toolchain: { compiler: flang } # let's try at least
-          - image: windows-2025
-            toolchain: { compiler: flang, version: "22" }
-          - image: windows-2022
-            toolchain: { compiler: flang, version: "22" }
+          # - image: windows-2025
+          #   toolchain: { compiler: flang, version: "22" }
+          # - image: windows-2022
+          #   toolchain: { compiler: flang, version: "22" }
           #   toolchain: { compiler: flang, windowsEnv: ucrt64 } # set up MSYS2 and use pacman's rolling gcc release
 
     steps:

@@ -25,7 +25,7 @@ import { resolveVersion } from "../../resolve_version";
 // are validated by extracting the major and checking it against this table.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["22"],
-  [Arch.ARM64]: ["22", "21", "20"],
+  [Arch.ARM64]: ["22", "21", "20", "19", "18", "17", "16", "15", "14", "13"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 // Windows installer suffix per arch, as used in official LLVM GitHub releases.

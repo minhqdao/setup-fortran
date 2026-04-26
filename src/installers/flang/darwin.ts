@@ -22,7 +22,7 @@ import type { Target } from "../../types";
 // explains this so users copying a Linux workflow aren't surprised.
 const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: [LATEST],
-  [Arch.X64]: undefined,
+  [Arch.X64]: [LATEST],
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 export async function installDarwin(target: Target): Promise<string> {

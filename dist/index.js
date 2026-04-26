@@ -99767,7 +99767,7 @@ async function flang_debian_resolveInstalledVersion() {
 // explains this so users copying a Linux workflow aren't surprised.
 const flang_darwin_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: [LATEST],
-    [Arch.X64]: undefined,
+    [Arch.X64]: [LATEST],
 };
 async function darwin_installDarwin(target) {
     // if (target.arch === Arch.X64) {
@@ -99875,7 +99875,7 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 // are validated by extracting the major and checking it against this table.
 const flang_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["22"],
-    [Arch.ARM64]: ["22", "21", "20"],
+    [Arch.ARM64]: ["22", "21", "20", "19", "18", "17", "16", "15", "14", "13"],
 };
 // Windows installer suffix per arch, as used in official LLVM GitHub releases.
 // win64 = x86_64, woa64 = Windows on ARM64.
