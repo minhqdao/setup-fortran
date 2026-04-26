@@ -99674,6 +99674,14 @@ async function flang_debian_installDebian(target) {
     const pkgName = `flang-${version}`;
     lib_core.info(`Installing apt package ${pkgName}...`);
     await lib_exec.exec("sudo", ["apt-get", "install", "-y", pkgName]);
+    lib_core.info(`Installing apt package libomp-${version}-dev...`);
+    await lib_exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        pkgName,
+        `libomp-${version}-dev`,
+    ]);
     const binaryPath = resolveFlangBinaryPath(major, version);
     // Register the binary under the generic `flang` name so users can always
     // call `flang` regardless of which LLVM major is installed.
@@ -99699,6 +99707,8 @@ async function flang_debian_installDebian(target) {
     lib_core.exportVariable("FC", "flang");
     lib_core.exportVariable("CC", `clang-${version}`);
     lib_core.exportVariable("CXX", `clang++-${version}`);
+    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
+    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
     // time. This is particularly important for LLVM 15/16 where the runtime
     // libs (libFortranRuntime, libFortranDecimal, etc.) are not in the default
