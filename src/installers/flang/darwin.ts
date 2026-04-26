@@ -20,7 +20,6 @@ import type { Target } from "../../types";
 // `llvm@N` formulae exist but do not include flang as a built component.
 // Any version input is accepted and silently ignored; an info message
 // explains this so users copying a Linux workflow aren't surprised.
-
 const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: [LATEST],
   [Arch.X64]: undefined,

@@ -1,9 +1,11 @@
 name: gfortran
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+    # it works, disable automatic trigger for now
+    workflow_dispatch:
+        # push:
+        #     branches: [ main ]
+        # pull_request:
 
 jobs:
     build:

@@ -46406,9 +46406,9 @@ function extractTar(file_1, dest_1) {
         // Create dest
         dest = yield _createExtractFolder(dest);
         // Determine whether GNU tar
-        core.debug('Checking tar --version');
+        core_debug('Checking tar --version');
         let versionOutput = '';
-        yield exec('tar --version', [], {
+        yield exec_exec('tar --version', [], {
             ignoreReturnCode: true,
             silent: true,
             listeners: {
@@ -46416,7 +46416,7 @@ function extractTar(file_1, dest_1) {
                 stderr: (data) => (versionOutput += data.toString())
             }
         });
-        core.debug(versionOutput.trim());
+        core_debug(versionOutput.trim());
         const isGnuTar = versionOutput.toUpperCase().includes('GNU TAR');
         // Initialize args
         let args;
@@ -46426,7 +46426,7 @@ function extractTar(file_1, dest_1) {
         else {
             args = [flags];
         }
-        if (core.isDebug() && !flags.includes('v')) {
+        if (isDebug() && !flags.includes('v')) {
             args.push('-v');
         }
         let destArg = dest;
@@ -46444,7 +46444,7 @@ function extractTar(file_1, dest_1) {
             args.push('--overwrite');
         }
         args.push('-C', destArg, '-f', fileArg);
-        yield exec(`tar`, args);
+        yield exec_exec(`tar`, args);
         return dest;
     });
 }
@@ -99847,8 +99847,147 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/win32.ts
-async function win32_installWin32(_) {
-    return Promise.reject(new Error("Not implemented"));
+
+
+
+
+
+
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
+//
+// Windows availability of official LLVM clang+llvm-*.tar.xz archives:
+//   x64:   18+ (flang absent from official x64 Windows binaries before 18)
+//   ARM64: 20+ (no ARM64 Windows archive for 18 or 19)
+//
+// Only major versions are listed here. Full patch versions (e.g. "22.1.3")
+// are validated by extracting the major and checking it against this table.
+const flang_win32_SUPPORTED_VERSIONS = {
+    [Arch.X64]: ["22", "21", "20", "19", "18"],
+    [Arch.ARM64]: ["22", "21", "20"],
+};
+// Windows archive suffix per arch, as used in official LLVM GitHub releases.
+const WINDOWS_ARCH_SUFFIX = {
+    [Arch.X64]: "x86_64-pc-windows-msvc",
+    [Arch.ARM64]: "aarch64-pc-windows-msvc",
+};
+// Accepts either a bare major ("22") or a full patch version ("22.1.3").
+// Rejects anything else (e.g. "22.1") to avoid ambiguity.
+function parseVersionInput(input) {
+    const parts = input.split(".");
+    if (parts.length === 1)
+        return { major: parts[0], patch: undefined };
+    if (parts.length === 3)
+        return { major: parts[0], patch: input };
+    throw new Error(`Invalid version format: "${input}". ` +
+        `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`);
+}
+// Fetches the latest stable patch version for a given LLVM major from the
+// GitHub releases API. Returns a full version string like "22.1.3".
+async function resolveLatestPatch(major) {
+    lib_core.info(`Resolving latest patch version for LLVM ${major} via GitHub API...`);
+    const response = await fetch(`https://api.github.com/repos/llvm/llvm-project/releases?per_page=100`, { headers: { Accept: "application/vnd.github+json" } });
+    if (!response.ok) {
+        throw new Error(`GitHub API request failed: ${response.status.toString()} ${response.statusText}`);
+    }
+    const releases = (await response.json());
+    const match = releases.find((r) => r.tag_name.startsWith(`llvmorg-${major}.`) &&
+        !r.prerelease &&
+        !r.tag_name.includes("rc"));
+    if (!match) {
+        throw new Error(`No stable release found for LLVM major ${major} in the last 100 GitHub releases.`);
+    }
+    return match.tag_name.replace("llvmorg-", "");
+}
+// Verifies that a specific patch release exists on GitHub and that the
+// platform-specific archive asset is present. Throws with a clear message
+// (and a link to the release page) if either check fails.
+async function verifyPatchExists(patch, arch) {
+    const tag = `llvmorg-${patch}`;
+    const filename = `clang+llvm-${patch}-${WINDOWS_ARCH_SUFFIX[arch]}.tar.xz`;
+    lib_core.info(`Verifying that ${filename} exists for release ${tag}...`);
+    const response = await fetch(`https://api.github.com/repos/llvm/llvm-project/releases/tags/${tag}`, { headers: { Accept: "application/vnd.github+json" } });
+    if (response.status === 404) {
+        throw new Error(`Requested LLVM version "${patch}" does not exist (no release for ${tag}).`);
+    }
+    if (!response.ok) {
+        throw new Error(`GitHub API request failed for ${tag}: ${response.status.toString()} ${response.statusText}`);
+    }
+    const release = (await response.json());
+    if (!release.assets.some((a) => a.name === filename)) {
+        throw new Error(`LLVM "${patch}" exists but has no Windows ${arch} archive (expected: ${filename}). ` +
+            `See https://github.com/llvm/llvm-project/releases/tag/${tag} for available assets.`);
+    }
+}
+async function win32_installWin32(target) {
+    const { major, patch: userPatch } = parseVersionInput(target.version);
+    // Always validate the major against SUPPORTED_VERSIONS regardless of whether
+    // the user supplied a bare major or a full patch. This is the single source
+    // of truth for what we support on each arch.
+    resolveVersion({ ...target, version: major }, flang_win32_SUPPORTED_VERSIONS);
+    let patch;
+    if (userPatch !== undefined) {
+        // User pinned an exact patch — verify it exists before attempting download.
+        await verifyPatchExists(userPatch, target.arch);
+        patch = userPatch;
+    }
+    else {
+        // Bare major (or no version at all, which resolveVersion maps to the first
+        // entry) — resolve the latest stable patch via the GitHub API.
+        patch = await resolveLatestPatch(major);
+    }
+    const archSuffix = WINDOWS_ARCH_SUFFIX[target.arch];
+    const filename = `clang+llvm-${patch}-${archSuffix}.tar.xz`;
+    const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
+    lib_core.info(`Installing Flang ${major} (${patch}) on Windows (${target.arch})...`);
+    // Key the cache on the full patch version so a new patch release always
+    // triggers a fresh download rather than serving a stale cached binary.
+    let toolRoot = find("flang", patch, target.arch);
+    if (!toolRoot) {
+        lib_core.info(`Downloading ${filename}...`);
+        const downloadPath = await downloadTool(downloadUrl);
+        lib_core.info("Extracting archive...");
+        // Strip the single top-level directory (e.g. clang+llvm-22.1.3-x86_64-...)
+        // so toolRoot is directly the install dir containing bin/, lib/, etc.
+        const extractPath = await extractTar(downloadPath, undefined, [
+            "x",
+            "--strip-components=1",
+        ]);
+        lib_core.info("Caching...");
+        toolRoot = await cacheDir(extractPath, "flang", patch, target.arch);
+    }
+    else {
+        lib_core.info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
+    }
+    const binDir = external_path_.join(toolRoot, "bin");
+    lib_core.addPath(binDir);
+    const flangExe = external_path_.join(binDir, "flang.exe");
+    const clangExe = external_path_.join(binDir, "clang.exe");
+    const clangPPExe = external_path_.join(binDir, "clang++.exe");
+    lib_core.exportVariable("FC", flangExe);
+    lib_core.exportVariable("CC", clangExe);
+    lib_core.exportVariable("CXX", clangPPExe);
+    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
+    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", major);
+    // Add the lib dir to LIB so the Fortran runtime libraries are findable at
+    // link time. On Windows the linker reads LIB, not LIBRARY_PATH.
+    const libDir = external_path_.join(toolRoot, "lib");
+    const existingLib = process.env.LIB ?? "";
+    lib_core.exportVariable("LIB", existingLib ? `${libDir};${existingLib}` : libDir);
+    const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
+    lib_core.info(`Flang ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function flang_win32_resolveInstalledVersion(flangExe) {
+    let output = "";
+    await lib_exec.exec(flangExe, ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/index.ts
