@@ -48,6 +48,13 @@ export async function installDarwin(target: Target): Promise<string> {
   const existingLibPath = process.env.LIBRARY_PATH ?? "";
   const libPaths = [libDir, libompDir].filter(fs.existsSync).join(":");
 
+  core.info(`DEBUG: libPaths = "${libPaths}"`);
+  if (libPaths) {
+    core.exportVariable(
+      "LIBRARY_PATH",
+      existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths,
+    );
+  }
   core.info(`DEBUG: libDir exists: ${fs.existsSync(libDir).toString()}`);
   core.info(`DEBUG: libompDir exists: ${fs.existsSync(libompDir).toString()}`);
   const optDir = path.join(brewPrefix, "opt");

@@ -99782,6 +99782,10 @@ async function darwin_installDarwin(target) {
     const libompDir = external_path_.join(brewPrefix, "opt", "libomp", "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
     const libPaths = [libDir, libompDir].filter(external_fs_.existsSync).join(":");
+    lib_core.info(`DEBUG: libPaths = "${libPaths}"`);
+    if (libPaths) {
+        lib_core.exportVariable("LIBRARY_PATH", existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths);
+    }
     lib_core.info(`DEBUG: libDir exists: ${external_fs_.existsSync(libDir).toString()}`);
     lib_core.info(`DEBUG: libompDir exists: ${external_fs_.existsSync(libompDir).toString()}`);
     const optDir = external_path_.join(brewPrefix, "opt");
