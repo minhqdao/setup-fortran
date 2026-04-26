@@ -99930,7 +99930,8 @@ async function extractTarXz(archivePath, destDir) {
     // Pass 1: decompress .tar.xz -> .tar in destDir
     lib_core.info("Decompressing .xz with 7-Zip (pass 1/2)...");
     await lib_exec.exec(`"${sevenZip}"`, ["x", archivePath, `-o${destDir}`, "-y"]);
-    const tarFile = external_fs_.readdirSync(destDir).find((f) => f.endsWith(".tar"));
+    const tarFile = external_fs_.readdirSync(destDir)
+        .find((f) => external_fs_.statSync(external_path_.join(destDir, f)).isFile());
     if (!tarFile) {
         throw new Error(`7-Zip pass 1 did not produce a .tar file in ${destDir}.`);
     }
