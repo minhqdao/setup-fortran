@@ -71,7 +71,14 @@ async function run(): Promise<void> {
       core.endGroup();
     };
 
-    await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
+    if (!isFlang || compilerVersion >= 16) {
+      await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
+    } else {
+      core.info(
+        `Skipping iso_fortran_env_test: not supported by flang ${compilerVersion.toString()} (requires LLVM 16+).`,
+      );
+    }
+
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"]);
 
