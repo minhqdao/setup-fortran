@@ -45,6 +45,11 @@ export async function installDebian(target: Target): Promise<string> {
     `/usr/bin/gfortran-${version}`,
   ]);
 
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  core.exportVariable("FC", `gfortran-${version}`);
+  core.exportVariable("F77", `gfortran-${version}`);
+  core.exportVariable("F90", `gfortran-${version}`);
+
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
   return resolvedVersion;

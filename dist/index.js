@@ -42994,6 +42994,10 @@ async function installDebian(target) {
         "gfortran",
         `/usr/bin/gfortran-${version}`,
     ]);
+    lib_core.info(`Setting FC, F77, and F90 environment variables...`);
+    lib_core.exportVariable("FC", `gfortran-${version}`);
+    lib_core.exportVariable("F77", `gfortran-${version}`);
+    lib_core.exportVariable("F90", `gfortran-${version}`);
     const resolvedVersion = await resolveInstalledVersion();
     lib_core.info(`GFortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -43054,6 +43058,10 @@ async function installDarwin(target) {
         const error = e instanceof Error ? e.message : String(e);
         lib_core.warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
     }
+    lib_core.info(`Setting FC, F77, and F90 environment variables...`);
+    lib_core.exportVariable("FC", gfortranBinary);
+    lib_core.exportVariable("F77", gfortranBinary);
+    lib_core.exportVariable("F90", gfortranBinary);
     const resolvedVersion = await darwin_resolveInstalledVersion();
     lib_core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     return resolvedVersion;

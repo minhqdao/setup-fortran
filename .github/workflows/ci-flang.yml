@@ -1,9 +1,11 @@
 name: flang
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  # it works, disable automatic trigger for now
+  workflow_dispatch:
+    # push:
+    #     branches: [ main ]
+    # pull_request:
 
 jobs:
   build:
@@ -32,9 +34,9 @@ jobs:
           # - { compiler: flang, version: "19" }
           # - { compiler: flang, version: "18" }
           - { compiler: flang, version: "17" }
-        include:
-          - image: ubuntu-22.04
-            toolchain: { compiler: flang, version: "16" }
+          # include:
+          #   - image: ubuntu-22.04
+          #     toolchain: { compiler: flang, version: "16" }
           # - image: macos-26
           #   toolchain: { compiler: flang } # only latest version from brew available, x64 not available
           # - image: macos-15

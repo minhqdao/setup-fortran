@@ -50,6 +50,11 @@ export async function installDarwin(target: Target): Promise<string> {
     core.warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
   }
 
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  core.exportVariable("FC", gfortranBinary);
+  core.exportVariable("F77", gfortranBinary);
+  core.exportVariable("F90", gfortranBinary);
+
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
   return resolvedVersion;
