@@ -5,7 +5,6 @@ import * as fs from "fs";
 import * as tc from "@actions/tool-cache";
 import { Arch, LATEST, WindowsEnv, type Target } from "../../types";
 import {
-  resolveVersion,
   resolveWindowsVersion,
   parseMajorOrPatch,
   resolveLatestPatch,
@@ -147,21 +146,9 @@ export async function installWin32(target: Target): Promise<string> {
 }
 
 async function installNative(target: Target): Promise<string> {
-  const { major, patch: userPatch } = parseMajorOrPatch(
-    resolveWindowsVersion(target, SUPPORTED_VERSIONS),
-  );
-
-  // Re-validate the major explicitly — resolveWindowsVersion already checks
-  // against SUPPORTED_VERSIONS, but parseVersionInput may have produced a
-  // major from a full user-supplied patch (e.g. "22.1.3" → major "22") that
-  // needs to be confirmed as supported for this arch/env combination.
-  resolveVersion(
-    { ...target, version: major },
-    {
-      [Arch.X64]: SUPPORTED_VERSIONS[Arch.X64][WindowsEnv.Native],
-      [Arch.ARM64]: SUPPORTED_VERSIONS[Arch.ARM64][WindowsEnv.Native],
-    },
-  );
+  // resolveWindowsVersion handles patch versions internally via resolveVersion.
+  resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  const { major, patch: userPatch } = parseMajorOrPatch(target.version);
 
   let patch: string;
 

@@ -155,22 +155,6 @@ async function installFromGitHub(
     );
   }
 
-  // DEBUG: list bin contents after caching
-  const binDebug = path.join(toolRoot, "bin");
-  if (fs.existsSync(binDebug)) {
-    for (const f of fs.readdirSync(binDebug)) {
-      if (
-        f.toLowerCase().includes("flang") ||
-        f.toLowerCase().includes("clang")
-      ) {
-        core.info(`  DEBUG bin: ${f}`);
-      }
-    }
-  } else {
-    core.info("DEBUG: no bin/ directory found");
-    for (const f of fs.readdirSync(toolRoot)) core.info(`  DEBUG root: ${f}`);
-  }
-
   const binDir = path.join(toolRoot, "bin");
   core.addPath(binDir);
 

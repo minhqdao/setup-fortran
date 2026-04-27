@@ -15,7 +15,7 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
-  // If the version is LATEST, use the first version (should be the highest)
+  // If the version is LATEST, use the first version (should be the highest).
   const version = target.version === LATEST ? versions[0] : target.version;
 
   if (!version) {
@@ -25,7 +25,15 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
-  if (!(versions as readonly string[]).includes(version)) {
+  // If a full patch version was supplied (e.g. "22.1.0"), validate either the
+  // major or the full version against the supported list. The caller is
+  // responsible for using the full patch for download resolution.
+  const { major } = parseMajorOrPatch(version);
+
+  if (
+    !(versions as readonly string[]).includes(major) &&
+    !(versions as readonly string[]).includes(version)
+  ) {
     throw new Error(
       `${target.compiler} ${version} is not supported on ` +
         `${target.os} (${target.arch}). ` +
@@ -63,45 +71,34 @@ export function resolveWindowsVersion(
   return resolveVersion(target, { [target.arch]: versions });
 }
 
-// Accepts either a bare major ("22") or a full patch version ("22.1.3").
-// Rejects anything else (e.g. "22.1") to avoid ambiguity.
-export function parseMaxVersion(input: string): {
-  major: string;
-  patch: string | undefined;
-} {
-  const parts = input.split(".");
-  if (parts.length === 1) return { major: parts[0], patch: undefined };
-  if (parts.length === 3) return { major: parts[0], patch: input };
-  throw new Error(
-    `Invalid version format: "${input}". ` +
-      `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`,
-  );
-}
 // Parses a version string into a major and an optional full patch version.
 //
 // Accepted formats:
 //   "22"       → { major: "22", patch: undefined }  — resolve latest patch via API
+//   "22.1"     → { major: "22", patch: "22.1" }     — use exactly this minor
 //   "22.1.3"   → { major: "22", patch: "22.1.3" }   — use exactly this patch
 //
-// Any other format (e.g. "22.1") is rejected to avoid ambiguity.
+// Other formats are rejected to avoid ambiguity.
 export function parseMajorOrPatch(input: string): {
   major: string;
   patch: string | undefined;
 } {
   const parts = input.split(".");
   if (parts.length === 1) return { major: parts[0], patch: undefined };
-  if (parts.length === 3) return { major: parts[0], patch: input };
+  if (parts.length === 2 || parts.length === 3) {
+    return { major: parts[0], patch: input };
+  }
   throw new Error(
     `Invalid version format: "${input}". ` +
-      `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`,
+      `Specify a major version (e.g. "22"), a minor version (e.g. "22.1"), or a full patch version (e.g. "22.1.3").`,
   );
 }
 
 // Fetches the latest stable patch version for a given major from a GitHub
 // repository's releases. Returns a full version string like "22.1.3".
 //
-// The tag is expected to follow the "llvmorg-X.Y.Z" convention used by
-// llvm/llvm-project. For other repos, tags are matched by prefix "{major}.".
+// tagPrefix: prefix used to match release tags (default: "llvmorg-{major}.").
+// tagStripper: converts a matched tag to a version string (default: strips "llvmorg-").
 export async function resolveLatestPatch(
   repo: string,
   major: string,

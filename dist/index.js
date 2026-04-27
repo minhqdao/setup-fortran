@@ -90465,13 +90465,18 @@ function resolveVersion(target, supportedVersions) {
         throw new Error(`No supported versions found for ${target.compiler} on ` +
             `${target.os} (${target.arch}).`);
     }
-    // If the version is LATEST, use the first version (should be the highest)
+    // If the version is LATEST, use the first version (should be the highest).
     const version = target.version === LATEST ? versions[0] : target.version;
     if (!version) {
         throw new Error(`No supported versions found for ${target.compiler} on ` +
             `${target.os} (${target.arch}).`);
     }
-    if (!versions.includes(version)) {
+    // If a full patch version was supplied (e.g. "22.1.0"), validate either the
+    // major or the full version against the supported list. The caller is
+    // responsible for using the full patch for download resolution.
+    const { major } = parseMajorOrPatch(version);
+    if (!versions.includes(major) &&
+        !versions.includes(version)) {
         throw new Error(`${target.compiler} ${version} is not supported on ` +
             `${target.os} (${target.arch}). ` +
             `Supported versions: ${versions.join(", ")}`);
@@ -90490,38 +90495,29 @@ function resolveWindowsVersion(target, supportedVersions) {
     }
     return resolveVersion(target, { [target.arch]: versions });
 }
-// Accepts either a bare major ("22") or a full patch version ("22.1.3").
-// Rejects anything else (e.g. "22.1") to avoid ambiguity.
-function parseMaxVersion(input) {
-    const parts = input.split(".");
-    if (parts.length === 1)
-        return { major: parts[0], patch: undefined };
-    if (parts.length === 3)
-        return { major: parts[0], patch: input };
-    throw new Error(`Invalid version format: "${input}". ` +
-        `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`);
-}
 // Parses a version string into a major and an optional full patch version.
 //
 // Accepted formats:
 //   "22"       → { major: "22", patch: undefined }  — resolve latest patch via API
+//   "22.1"     → { major: "22", patch: "22.1" }     — use exactly this minor
 //   "22.1.3"   → { major: "22", patch: "22.1.3" }   — use exactly this patch
 //
-// Any other format (e.g. "22.1") is rejected to avoid ambiguity.
+// Other formats are rejected to avoid ambiguity.
 function parseMajorOrPatch(input) {
     const parts = input.split(".");
     if (parts.length === 1)
         return { major: parts[0], patch: undefined };
-    if (parts.length === 3)
+    if (parts.length === 2 || parts.length === 3) {
         return { major: parts[0], patch: input };
+    }
     throw new Error(`Invalid version format: "${input}". ` +
-        `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`);
+        `Specify a major version (e.g. "22"), a minor version (e.g. "22.1"), or a full patch version (e.g. "22.1.3").`);
 }
 // Fetches the latest stable patch version for a given major from a GitHub
 // repository's releases. Returns a full version string like "22.1.3".
 //
-// The tag is expected to follow the "llvmorg-X.Y.Z" convention used by
-// llvm/llvm-project. For other repos, tags are matched by prefix "{major}.".
+// tagPrefix: prefix used to match release tags (default: "llvmorg-{major}.").
+// tagStripper: converts a matched tag to a version string (default: strips "llvmorg-").
 async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
     lib_core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
     const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers: githubHeaders() });
@@ -95206,21 +95202,6 @@ async function installFromGitHub(target, major, patch) {
     else {
         lib_core.info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
     }
-    // DEBUG: list bin contents after caching
-    const binDebug = external_path_.join(toolRoot, "bin");
-    if (external_fs_.existsSync(binDebug)) {
-        for (const f of external_fs_.readdirSync(binDebug)) {
-            if (f.toLowerCase().includes("flang") ||
-                f.toLowerCase().includes("clang")) {
-                lib_core.info(`  DEBUG bin: ${f}`);
-            }
-        }
-    }
-    else {
-        lib_core.info("DEBUG: no bin/ directory found");
-        for (const f of external_fs_.readdirSync(toolRoot))
-            lib_core.info(`  DEBUG root: ${f}`);
-    }
     const binDir = external_path_.join(toolRoot, "bin");
     lib_core.addPath(binDir);
     const flangBin = resolveFlangBinary(binDir);
@@ -95398,15 +95379,9 @@ async function win32_installWin32(target) {
     }
 }
 async function win32_installNative(target) {
-    const { major, patch: userPatch } = parseMajorOrPatch(resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS));
-    // Re-validate the major explicitly — resolveWindowsVersion already checks
-    // against SUPPORTED_VERSIONS, but parseVersionInput may have produced a
-    // major from a full user-supplied patch (e.g. "22.1.3" → major "22") that
-    // needs to be confirmed as supported for this arch/env combination.
-    resolveVersion({ ...target, version: major }, {
-        [Arch.X64]: flang_win32_SUPPORTED_VERSIONS[Arch.X64][WindowsEnv.Native],
-        [Arch.ARM64]: flang_win32_SUPPORTED_VERSIONS[Arch.ARM64][WindowsEnv.Native],
-    });
+    // resolveWindowsVersion handles patch versions internally via resolveVersion.
+    resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS);
+    const { major, patch: userPatch } = parseMajorOrPatch(target.version);
     let patch;
     if (userPatch !== undefined) {
         const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[target.arch]}.exe`;

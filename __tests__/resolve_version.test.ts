@@ -40,6 +40,13 @@ describe("resolveVersion", () => {
       expect(result).toBe("14");
     });
 
+    it("handles 2-part versions like 24.1 if present in supported list", () => {
+      const target: Target = { ...baseTarget, version: "24.1" };
+      const supported = { [Arch.X64]: ["24.3", "24.1"] };
+      const result = resolveVersion(target, supported);
+      expect(result).toBe("24.1");
+    });
+
     it("throws if the version is not supported on this arch", () => {
       const target: Target = { ...baseTarget, arch: Arch.ARM64, version: "15" };
       expect(() => resolveVersion(target, SUPPORTED)).toThrow(
