@@ -90524,7 +90524,12 @@ function parseMajorOrPatch(input) {
 // llvm/llvm-project. For other repos, tags are matched by prefix "{major}.".
 async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
     lib_core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
-    const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, {
+        headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
+        },
+    });
     if (!response.ok) {
         throw new Error(`GitHub API request failed: ${response.status.toString()} ${response.statusText}`);
     }
@@ -90546,7 +90551,12 @@ async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, 
 async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `llvmorg-${p}`) {
     const tag = tagFromPatch(patch);
     lib_core.info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
-    const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, {
+        headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
+        },
+    });
     if (response.status === 404) {
         throw new Error(`Requested version "${patch}" does not exist (no release for ${tag} in ${repo}).`);
     }
@@ -95196,6 +95206,21 @@ async function installFromGitHub(target, major, patch) {
     }
     else {
         lib_core.info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
+    }
+    // DEBUG: list bin contents after caching
+    const binDebug = external_path_.join(toolRoot, "bin");
+    if (external_fs_.existsSync(binDebug)) {
+        for (const f of external_fs_.readdirSync(binDebug)) {
+            if (f.toLowerCase().includes("flang") ||
+                f.toLowerCase().includes("clang")) {
+                lib_core.info(`  DEBUG bin: ${f}`);
+            }
+        }
+    }
+    else {
+        lib_core.info("DEBUG: no bin/ directory found");
+        for (const f of external_fs_.readdirSync(toolRoot))
+            lib_core.info(`  DEBUG root: ${f}`);
     }
     const binDir = external_path_.join(toolRoot, "bin");
     lib_core.addPath(binDir);

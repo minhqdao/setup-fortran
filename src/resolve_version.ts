@@ -114,7 +114,12 @@ export async function resolveLatestPatch(
 
   const response = await fetch(
     `https://api.github.com/repos/${repo}/releases?per_page=100`,
-    { headers: { Accept: "application/vnd.github+json" } },
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
+      },
+    },
   );
 
   if (!response.ok) {
@@ -161,7 +166,12 @@ export async function verifyAssetExists(
 
   const response = await fetch(
     `https://api.github.com/repos/${repo}/releases/tags/${tag}`,
-    { headers: { Accept: "application/vnd.github+json" } },
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
+      },
+    },
   );
 
   if (response.status === 404) {
