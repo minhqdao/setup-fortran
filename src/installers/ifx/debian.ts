@@ -1,77 +1,83 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import { Arch } from "../../types";
+import { Arch, LATEST } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Target } from "../../types";
 
-// Make sure the versions are always in descending order. The first one will be
-// used as the default if no version was specified by the user.
-//
-// Intel ifx versions follow a YY.minor[.patch] scheme (e.g. "2025.1.0").
-// Both "2025.1" and "2025.1.0" are valid inputs and matched exactly against
-// this list — no major-stripping is applied for Intel versions.
+// A clean list of supported base versions (YYYY.MINOR).
+// The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "2026.0",
-    "2026.0.0",
     "2025.3",
-    "2025.3.2",
-    "2025.3.1",
-    "2025.3.0",
     "2025.2",
-    "2025.2.1",
-    "2025.2.0",
     "2025.1",
-    "2025.1.1",
     "2025.0",
-    "2025.0.1",
-    "2025.0.0",
     "2024.2",
-    "2024.2.0",
     "2024.1",
-    "2024.1.0",
     "2024.0",
-    "2024.0.3",
-    "2024.0.2",
-    "2024.0.1",
-    "2024.0.0",
     "2023.2",
-    "2023.2.4",
-    "2023.2.3",
-    "2023.2.2",
-    "2023.2.1",
-    "2023.2.0",
     "2023.1",
-    "2023.1.0",
     "2023.0",
-    "2023.0.0",
     "2022.2",
-    "2022.2.1",
-    "2022.2.0",
     "2022.1",
-    "2022.1.0",
     "2022.0",
-    "2022.0.0",
     "2021.4",
-    "2021.4.0",
     "2021.3",
-    "2021.3.0",
     "2021.2",
-    "2021.2.0",
     "2021.1",
-    "2021.1.2",
-    "2021.1.1",
-    "2021.1.0",
   ],
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  const pkgVersion = mapVersion(version);
+// Maps a base version to its specific Intel oneAPI apt package suffix.
+// Only versions that deviate from the standard YYYY.MINOR format need to be listed here.
+const APT_PACKAGE_SUFFIX: Record<string, string> = {
+  "2023.2": "2023.2.0",
+  "2023.1": "2023.1.0",
+  "2023.0": "2023.0.0",
+  "2022.2": "2022.3.0",
+  "2022.1": "2022.2.0",
+  "2022.0": "2022.1.0",
+  "2021.4": "2021.4.0",
+  "2021.3": "2021.3.0",
+  "2021.2": "2021.2.0",
+  "2021.1": "2021.1.2",
+};
 
-  core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
+/**
+ * Extracts the YYYY.MINOR part from an Intel version string.
+ * e.g., "2025.1.2" -> "2025.1", "2024.2" -> "2024.2"
+ */
+function extractBaseVersion(version: string): string {
+  const parts = version.split(".");
+  if (parts.length >= 2) {
+    return `${parts[0]}.${parts[1]}`;
+  }
+  return version;
+}
+
+export async function installDebian(target: Target): Promise<string> {
+  // Normalize the requested version down to its YYYY.MINOR base.
+  // This bypasses `parseMajorOrPatch` throwing an error on 2-part inputs.
+  const requestedVersion =
+    target.version === LATEST ? LATEST : extractBaseVersion(target.version);
+
+  // Resolve against our clean SUPPORTED_VERSIONS array
+  const baseVersion = resolveVersion(
+    { ...target, version: requestedVersion },
+    SUPPORTED_VERSIONS,
+  );
+
+  // Get the exact package suffix (fallback to baseVersion if no special mapping exists)
+  const pkgVersion = APT_PACKAGE_SUFFIX[baseVersion] ?? baseVersion;
+
+  // Preserve originally requested version (if available) for better UX in logs
+  const displayVersion =
+    target.version === LATEST ? baseVersion : target.version;
+
+  core.info(`Installing ifx ${displayVersion} on Linux (${target.arch})...`);
 
   // Add the Intel oneAPI apt repository if not already present.
   core.info("Adding Intel oneAPI apt repository...");
@@ -145,7 +151,7 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("CC", "icx");
   core.exportVariable("CXX", "icpx");
   core.exportVariable("FORTRAN_COMPILER", "ifx");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+  core.exportVariable("FORTRAN_COMPILER_VERSION", displayVersion);
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
@@ -162,46 +168,4 @@ async function resolveInstalledVersion(): Promise<string> {
     },
   });
   return output.trim();
-}
-
-/**
- * Maps a user-provided version string to the specific version suffix used in
- * the Intel oneAPI apt repository package names.
- */
-function mapVersion(version: string): string {
-  const mapping: Record<string, string> = {
-    "2026.0": "2026.0",
-    "2026.0.0": "2026.0",
-    "2025.3": "2025.3",
-    "2025.3.2": "2025.3",
-    "2025.3.1": "2025.3",
-    "2025.3.0": "2025.3",
-    "2025.2": "2025.2",
-    "2025.2.1": "2025.2",
-    "2025.2.0": "2025.2",
-    "2025.1": "2025.1",
-    "2025.1.1": "2025.1",
-    "2025.0": "2025.0",
-    "2025.0.1": "2025.0",
-    "2025.0.0": "2025.0",
-    "2024.2": "2024.2",
-    "2024.2.0": "2024.2",
-    "2024.1": "2024.1",
-    "2024.1.0": "2024.1",
-    "2024.0": "2024.0",
-    "2024.0.3": "2024.0",
-    "2024.0.2": "2024.0",
-    "2024.0.1": "2024.0",
-    "2024.0.0": "2024.0",
-    "2023.2": "2023.2.0",
-    "2023.1": "2023.1.0",
-    "2023.0": "2023.0.0",
-    "2022.2": "2022.3.0",
-    "2022.1": "2022.2.0",
-    "2021.4": "2021.4.0",
-    "2021.3": "2021.3.0",
-    "2021.2": "2021.2.0",
-    "2021.1": "2021.1.2",
-  };
-  return mapping[version] || version;
 }

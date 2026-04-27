@@ -22,8 +22,24 @@ jobs:
                     # windows-2025,
                     # windows-2022 
                 toolchain:
-                    - { compiler: ifx, version: "2026.0.0" }
-                    - { compiler: ifx, version: "2025.2.1" }
+                    - { compiler: ifx, version: "2026.0" }
+                    - { compiler: ifx, version: "2025.3" }
+                    - { compiler: ifx, version: "2025.2" }
+                    - { compiler: ifx, version: "2025.1" }
+                    - { compiler: ifx, version: "2025.0" }
+                    - { compiler: ifx, version: "2024.2" }
+                    - { compiler: ifx, version: "2024.1" }
+                    - { compiler: ifx, version: "2024.0" }
+                    - { compiler: ifx, version: "2023.2" }
+                    - { compiler: ifx, version: "2023.1" }
+                    - { compiler: ifx, version: "2023.0" }
+                    - { compiler: ifx, version: "2022.2" }
+                    - { compiler: ifx, version: "2022.1" }
+                    - { compiler: ifx, version: "2022.0" }
+                    - { compiler: ifx, version: "2021.4" }
+                    - { compiler: ifx, version: "2021.3" }
+                    - { compiler: ifx, version: "2021.2" }
+                    - { compiler: ifx, version: "2021.1" }
 
         steps:
             - uses: actions/checkout@v6
