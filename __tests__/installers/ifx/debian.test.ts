@@ -17,7 +17,7 @@ describe("installDebian ifx", () => {
 
   const baseTarget: Target = {
     compiler: Compiler.IFX,
-    version: "2025.2.1",
+    version: "2023.2.4",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
@@ -29,29 +29,20 @@ describe("installDebian ifx", () => {
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifx" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("ifx (IFX) 2025.2.1 20250101"));
+          options.listeners.stdout(Buffer.from("ifx (IFX) 2023.2.4 20230101"));
         }
       }
       if (commandLine === "bash" && args?.[1]?.includes("setvars.sh")) {
         if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("PATH=/opt/intel/oneapi/compiler/latest/bin\nONEAPI_ROOT=/opt/intel/oneapi"));
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=/opt/intel/oneapi/compiler/latest/bin\nONEAPI_ROOT=/opt/intel/oneapi",
+            ),
+          );
         }
       }
       return 0;
     });
-  });
-
-  it("installs the correct versioned packages for 2025.2.1", async () => {
-    await installDebian(baseTarget);
-
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      "intel-oneapi-compiler-fortran-2025.2",
-      "intel-oneapi-compiler-dpcpp-cpp-2025.2",
-    ]);
   });
 
   it("installs the correct versioned packages for 2023.2.0", async () => {
@@ -87,7 +78,9 @@ describe("installDebian ifx", () => {
 
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
-      expect.stringContaining("https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"),
+      expect.stringContaining(
+        "https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB",
+      ),
     ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",

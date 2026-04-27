@@ -94582,7 +94582,6 @@ async function installGFortran(target) {
 
 
 
-
 // A clean list of supported base versions (YYYY.MINOR).
 // The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
@@ -94596,52 +94595,38 @@ const debian_SUPPORTED_VERSIONS = {
         "2024.2",
         "2024.1",
         "2024.0",
-        "2023.2",
-        "2023.1",
-        "2023.0",
-        "2022.1",
-        "2022.0",
-        "2021.4",
-        "2021.3",
-        "2021.2",
-        "2021.1",
+        "2023.2.4",
+        "2023.2.3",
+        "2023.2.2",
+        "2023.2.1",
+        "2023.2.0",
+        "2023.1.0",
+        "2023.0.0",
+        "2022.2.1",
+        "2022.2.0",
+        "2022.1.0",
+        "2022.0.2",
+        "2022.0.1",
+        "2021.4.0",
+        "2021.3.0",
+        "2021.2.0",
+        "2021.1.2",
+        "2021.1.1",
     ],
     [Arch.ARM64]: undefined,
 };
-// Maps a base version to its specific Intel oneAPI apt package suffix.
-// Only versions that deviate from the standard YYYY.MINOR format need to be listed here.
-const APT_PACKAGE_SUFFIX = {
-    "2023.2": "2023.2.0",
-    "2023.1": "2023.1.0",
-    "2023.0": "2023.0.0",
-    "2022.1": "2022.2.0",
-    "2022.0": "2022.1.0",
-    "2021.4": "2021.4.0",
-    "2021.3": "2021.3.0",
-    "2021.2": "2021.2.0",
-    "2021.1": "2021.1.2",
-};
-/**
- * Extracts the YYYY.MINOR part from an Intel version string.
- * e.g., "2025.1.2" -> "2025.1", "2024.2" -> "2024.2"
- */
-function extractBaseVersion(version) {
-    const parts = version.split(".");
-    if (parts.length >= 2) {
-        return `${parts[0]}.${parts[1]}`;
-    }
-    return version;
-}
 async function debian_installDebian(target) {
-    // Normalize the requested version down to its YYYY.MINOR base.
-    // This bypasses `parseMajorOrPatch` throwing an error on 2-part inputs.
-    const requestedVersion = target.version === LATEST ? LATEST : extractBaseVersion(target.version);
-    // Resolve against our clean SUPPORTED_VERSIONS array
-    const baseVersion = resolveVersion({ ...target, version: requestedVersion }, debian_SUPPORTED_VERSIONS);
-    // Get the exact package suffix (fallback to baseVersion if no special mapping exists)
-    const pkgVersion = APT_PACKAGE_SUFFIX[baseVersion] ?? baseVersion;
+    const versions = debian_SUPPORTED_VERSIONS[target.arch];
+    if (!versions) {
+        throw new Error(`No supported versions found for ifx on Linux (${target.arch}).`);
+    }
+    const version = target.version === LATEST ? versions[0] : target.version;
+    if (!versions.includes(version)) {
+        throw new Error(`ifx ${target.version} is not supported on Linux (${target.arch}). ` +
+            `Supported versions: ${versions.join(", ")}`);
+    }
     // Preserve originally requested version (if available) for better UX in logs
-    const displayVersion = target.version === LATEST ? baseVersion : target.version;
+    const displayVersion = target.version === LATEST ? version : target.version;
     lib_core.info(`Installing ifx ${displayVersion} on Linux (${target.arch})...`);
     // Add the Intel oneAPI apt repository if not already present.
     lib_core.info("Adding Intel oneAPI apt repository...");
@@ -94660,13 +94645,13 @@ async function debian_installDebian(target) {
     await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
     // We install both the Fortran and C++ compilers to provide ifx, icx, and icpx.
-    const fortranPkg = `intel-oneapi-compiler-fortran-${pkgVersion}`;
-    const cppPkgBase = pkgVersion.startsWith("2024") ||
-        pkgVersion.startsWith("2025") ||
-        pkgVersion.startsWith("2026")
+    const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
+    const cppPkgBase = version.startsWith("2024") ||
+        version.startsWith("2025") ||
+        version.startsWith("2026")
         ? "intel-oneapi-compiler-dpcpp-cpp"
         : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
-    const cppPkg = `${cppPkgBase}-${pkgVersion}`;
+    const cppPkg = `${cppPkgBase}-${version}`;
     lib_core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
     await lib_exec.exec("sudo", [
         "apt-get",
