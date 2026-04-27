@@ -95108,13 +95108,13 @@ async function flang_debian_resolveInstalledVersion() {
 //
 // LATEST is listed first so it is the default when no version is specified.
 const flang_darwin_SUPPORTED_VERSIONS = {
-    [Arch.ARM64]: [LATEST, "21", "20", "19"],
-    [Arch.X64]: [LATEST, "21", "20", "19"],
+    [Arch.X64]: [LATEST, "19", "18", "17"],
+    [Arch.ARM64]: [LATEST, "21", "20", "19", "18", "17"],
 };
 // macOS asset suffix per arch in official LLVM GitHub releases.
 const MACOS_ASSET_SUFFIX = {
-    [Arch.ARM64]: "macOS-ARM64",
     [Arch.X64]: "macOS-X64",
+    [Arch.ARM64]: "macOS-ARM64",
 };
 async function darwin_installDarwin(target) {
     const resolved = resolveVersion(target, flang_darwin_SUPPORTED_VERSIONS);

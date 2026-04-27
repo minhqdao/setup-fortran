@@ -24,14 +24,14 @@ import type { Target } from "../../types";
 //
 // LATEST is listed first so it is the default when no version is specified.
 const SUPPORTED_VERSIONS = {
-  [Arch.ARM64]: [LATEST, "21", "20", "19"],
-  [Arch.X64]: [LATEST, "21", "20", "19"],
+  [Arch.X64]: [LATEST, "19", "18", "17"],
+  [Arch.ARM64]: [LATEST, "21", "20", "19", "18", "17"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 // macOS asset suffix per arch in official LLVM GitHub releases.
 const MACOS_ASSET_SUFFIX: Record<Arch, string> = {
-  [Arch.ARM64]: "macOS-ARM64",
   [Arch.X64]: "macOS-X64",
+  [Arch.ARM64]: "macOS-ARM64",
 };
 
 export async function installDarwin(target: Target): Promise<string> {

@@ -94,15 +94,14 @@ async function run(): Promise<void> {
       );
     }
 
-    await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
-    // // OpenMP support in flang was incomplete before LLVM 16.
-    // if (ompFlag && (!isFlang || compilerVersion >= 16)) {
-    //   await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
-    // } else if (ompFlag) {
-    //   core.info(
-    //     `Skipping omp_test: not supported by flang ${compilerVersion.toString()} (requires LLVM 16+).`,
-    //   );
-    // }
+    const isDarwin = process.platform === "darwin";
+    if (ompFlag && (!isFlang || !isDarwin || compilerVersion >= 23)) {
+      await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
+    } else if (ompFlag) {
+      core.info(
+        `Skipping omp_test: not supported by flang ${compilerVersion.toString()} on ${process.platform}.`,
+      );
+    }
 
     core.info("All integration tests passed successfully!");
   } catch (error) {

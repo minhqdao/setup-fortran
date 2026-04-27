@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ macos-26, macos-26-intel, macos-15, macos-15-intel, macos-14 ]
+        image: [ macos-26, macos-26-intel, macos-15, macos-15-intel ]
           # macos-26-intel,
           # macos-15-intel,
           # macos-14-intel,
@@ -31,8 +31,8 @@ jobs:
           - { compiler: flang, version: "21" }
           - { compiler: flang, version: "20" }
           - { compiler: flang, version: "19" }
-          # - { compiler: flang, version: "18" }
-          # - { compiler: flang, version: "17" }
+          - { compiler: flang, version: "18" }
+          - { compiler: flang, version: "17" }
           # include:
           #   - image: ubuntu-22.04
           #     toolchain: { compiler: flang, version: "16" }
