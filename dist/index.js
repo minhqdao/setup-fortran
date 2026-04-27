@@ -94700,9 +94700,83 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
+// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
+var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
-async function win32_installWin32(_) {
-    return Promise.reject(new Error("Not implemented"));
+
+
+
+
+
+// Only LATEST is supported via winget — specific versions require offline
+// installers with per-version URLs, which will be added in a follow-up.
+const ifx_win32_SUPPORTED_VERSIONS = {
+    [Arch.X64]: [LATEST],
+    [Arch.ARM64]: undefined,
+};
+const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
+const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
+async function win32_installWin32(target) {
+    const version = resolveVersion(target, ifx_win32_SUPPORTED_VERSIONS);
+    lib_core.info(`Installing ifx (${version}) on Windows (${target.arch})...`);
+    const cacheKey = `ifx-winget-${target.arch}-${version}`;
+    const cachePaths = [ONEAPI_ROOT];
+    const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+    if (cacheHit) {
+        lib_core.info(`Restored ifx installation from cache (${cacheHit}).`);
+    }
+    else {
+        lib_core.info("Cache miss — installing via winget...");
+        await lib_exec.exec("winget", [
+            "install",
+            "--id",
+            "Intel.OneAPI.HPCToolkit",
+            "--accept-source-agreements",
+            "--accept-package-agreements",
+            "--silent",
+        ]);
+        lib_core.info("Saving installation to cache...");
+        await cache.saveCache(cachePaths, cacheKey);
+    }
+    // Source setvars.bat and propagate the relevant environment variables.
+    lib_core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
+    let envOutput = "";
+    await lib_exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx).trim();
+        const val = line.substring(eqIdx + 1).trimEnd();
+        if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+            lib_core.exportVariable(key, val);
+        }
+    }
+    lib_core.exportVariable("FC", "ifx");
+    lib_core.exportVariable("CC", "icx");
+    lib_core.exportVariable("CXX", "icpx");
+    lib_core.exportVariable("FORTRAN_COMPILER", "ifx");
+    const resolvedVersion = await ifx_win32_resolveInstalledVersion();
+    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", resolvedVersion);
+    lib_core.info(`ifx ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function ifx_win32_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifx.exe", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    return output.trim();
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/index.ts
@@ -94725,8 +94799,6 @@ async function installIFort(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
-// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
-var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
 
 
