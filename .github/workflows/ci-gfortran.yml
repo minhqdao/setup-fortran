@@ -1,11 +1,9 @@
 name: gfortran
 
 on:
-    # it works, disable automatic trigger for now
-    workflow_dispatch:
-        # push:
-        #     branches: [ main ]
-        # pull_request:
+    push:
+        branches: [ main ]
+    pull_request:
 
 jobs:
     build:
@@ -64,6 +62,7 @@ jobs:
               with:
                   compiler: ${{ matrix.toolchain.compiler }}
                   version: ${{ matrix.toolchain.version }}
+                  windows-env: ${{ matrix.toolchain.windowsEnv }}
 
             - name: Verify installed version
               run: "echo \"Output: ${{ steps.setup.outputs.compiler-version }}\""

@@ -91,6 +91,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          windows-env: ${{ matrix.toolchain.windowsEnv }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

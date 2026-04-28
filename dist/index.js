@@ -90648,7 +90648,22 @@ async function installDarwin(target) {
     const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
     lib_core.info(`Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`);
     const formula = `gcc@${version}`;
-    await lib_exec.exec("brew", ["install", formula]);
+    let listOutput = "";
+    await lib_exec.exec("brew", ["list", "--versions", formula], {
+        listeners: {
+            stdout: (data) => {
+                listOutput += data.toString();
+            },
+        },
+        ignoreReturnCode: true,
+    });
+    const alreadyInstalled = listOutput.trim().length > 0;
+    if (alreadyInstalled) {
+        lib_core.info(`${formula} is already installed, skipping brew install.`);
+    }
+    else {
+        await lib_exec.exec("brew", ["install", formula]);
+    }
     // Homebrew usually installs to /opt/homebrew/bin (ARM) or /usr/local/bin (x64)
     const brewPrefixOutput = await getBrewPrefix();
     const binDir = external_path_.join(brewPrefixOutput, "bin");

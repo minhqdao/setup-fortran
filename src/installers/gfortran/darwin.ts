@@ -20,7 +20,22 @@ export async function installDarwin(target: Target): Promise<string> {
 
   const formula = `gcc@${version}`;
 
-  await exec.exec("brew", ["install", formula]);
+  let listOutput = "";
+  await exec.exec("brew", ["list", "--versions", formula], {
+    listeners: {
+      stdout: (data: Buffer) => {
+        listOutput += data.toString();
+      },
+    },
+    ignoreReturnCode: true,
+  });
+  const alreadyInstalled = listOutput.trim().length > 0;
+
+  if (alreadyInstalled) {
+    core.info(`${formula} is already installed, skipping brew install.`);
+  } else {
+    await exec.exec("brew", ["install", formula]);
+  }
 
   // Homebrew usually installs to /opt/homebrew/bin (ARM) or /usr/local/bin (x64)
   const brewPrefixOutput = await getBrewPrefix();
