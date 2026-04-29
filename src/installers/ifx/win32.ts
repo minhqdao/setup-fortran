@@ -34,6 +34,31 @@ export async function installWin32(target: Target): Promise<string> {
 async function installChoco(version: string): Promise<string> {
   core.info(`Installing Intel oneAPI Base and HPC Toolkits via Chocolatey...`);
 
+  // 1. Broad search for everything containing "oneapi"
+  await exec.exec("choco", ["search", "oneapi", "--detailed"]);
+
+  // 2. Search for the specific IDs we suspect, including all historical versions
+  await exec.exec("choco", [
+    "search",
+    "intel-oneapi-base-toolkit",
+    "--all-versions",
+  ]);
+  await exec.exec("choco", ["search", "oneapi-base-toolkit", "--all-versions"]);
+
+  // 3. Search for the HPC Toolkit (which contains ifx)
+  await exec.exec("choco", [
+    "search",
+    "intel-oneapi-hpc-toolkit",
+    "--all-versions",
+  ]);
+  await exec.exec("choco", ["search", "oneapi-hpc-toolkit", "--all-versions"]);
+
+  // 4. Search for the "Fortran" specific keywords just in case
+  await exec.exec("choco", ["search", "intel-fortran", "--detailed"]);
+
+  // 5. Broad search for "Intel" to see if they renamed the vendor prefix
+  await exec.exec("choco", ["search", "intel", "--limit-output"]);
+
   // HPC Toolkit contains ifx, but requires Base Toolkit for libraries/runtimes.
   // We use '--no-progress' to keep the logs clean in CI.
   const chocoArgs = ["install", "-y", "--no-progress"];
