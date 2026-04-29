@@ -95674,13 +95674,8 @@ async function win32_installMSYS2(target) {
             `Use windowsEnv: native for ARM64 Windows.`);
     }
     lib_core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
-    // DEBUG: Check available OpenMP packages
-    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
-        "-lc",
-        "pacman -Ss omp | grep ucrt64",
-    ]);
     // The MSYS2 package for flang in the UCRT64 environment.
-    await setupMSYS2(target.windowsEnv, ["flang", "libomp"]);
+    await setupMSYS2(target.windowsEnv, ["flang", "compiler-rt"]);
     const msysBin = external_path_.join("C:\\msys64", target.windowsEnv, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");
     const clangExe = external_path_.join(msysBin, "clang.exe");
