@@ -95674,6 +95674,11 @@ async function win32_installMSYS2(target) {
             `Use windowsEnv: native for ARM64 Windows.`);
     }
     lib_core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
+    // DEBUG: Check available OpenMP packages
+    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+        "-lc",
+        "pacman -Ss omp | grep ucrt64",
+    ]);
     // The MSYS2 package for flang in the UCRT64 environment.
     await setupMSYS2(target.windowsEnv, ["flang", "libomp"]);
     const msysBin = external_path_.join("C:\\msys64", target.windowsEnv, "bin");
@@ -95681,6 +95686,7 @@ async function win32_installMSYS2(target) {
     const clangExe = external_path_.join(msysBin, "clang.exe");
     const clangPPExe = external_path_.join(msysBin, "clang++.exe");
     lib_core.addPath(msysBin);
+    // DEBUG: Find OpenMP lib
     await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
         "-lc",
         "find /ucrt64 -name 'omp_lib.mod' 2>/dev/null",

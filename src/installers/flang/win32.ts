@@ -234,6 +234,12 @@ async function installMSYS2(target: Target): Promise<string> {
 
   core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
 
+  // DEBUG: Check available OpenMP packages
+  await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+    "-lc",
+    "pacman -Ss omp | grep ucrt64",
+  ]);
+
   // The MSYS2 package for flang in the UCRT64 environment.
   await setupMSYS2(target.windowsEnv, ["flang", "libomp"]);
 
@@ -244,6 +250,7 @@ async function installMSYS2(target: Target): Promise<string> {
 
   core.addPath(msysBin);
 
+  // DEBUG: Find OpenMP lib
   await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
     "-lc",
     "find /ucrt64 -name 'omp_lib.mod' 2>/dev/null",
