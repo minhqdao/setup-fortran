@@ -18,6 +18,10 @@ async function run(): Promise<void> {
     const compiler = (process.env.FORTRAN_COMPILER ?? "") as Compiler;
     const rawVersion = process.env.FORTRAN_COMPILER_VERSION ?? "0";
     const isUCRT64 = process.env.WINDOWS_ENV === WindowsEnv.UCRT64;
+    // DEBUG:
+    core.info(
+      `DEBUG: Detected compiler: ${compiler} ${rawVersion} (UCRT64: ${isUCRT64.toString()}, WINDOWS_ENV: ${process.env.WINDOWS_ENV ?? "undefined"}, image: ${process.env.ImageOS ?? "undefined"})`,
+    );
     const isDarwin = process.platform === "darwin";
     const isLatest = rawVersion === LATEST;
     const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
