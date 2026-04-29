@@ -94715,16 +94715,11 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
-// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
-var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
 
 
 
 
-
-// Only LATEST is supported via winget — specific versions require offline
-// installers with per-version URLs, which will be added in a follow-up.
 const ifx_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [WindowsEnv.Native]: [LATEST],
@@ -94735,71 +94730,87 @@ const ifx_win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.UCRT64]: undefined,
     },
 };
-const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
-const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 async function win32_installWin32(target) {
     const version = resolveWindowsVersion(target, ifx_win32_SUPPORTED_VERSIONS);
-    lib_core.info(`Installing ifx (${version}) on Windows (${target.arch})...`);
-    const cacheKey = `ifx-winget-${target.arch}-${version}`;
-    const cachePaths = [ONEAPI_ROOT];
-    const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-    if (cacheHit) {
-        lib_core.info(`Restored ifx installation from cache (${cacheHit}).`);
+    // Intel oneAPI on Windows is currently only supported via 'Native'
+    // (Standard Windows CMD/Powershell environment) using Chocolatey.
+    if (target.windowsEnv !== WindowsEnv.Native) {
+        throw new Error(`ifx on Windows only supports Native environment via Chocolatey.`);
     }
-    else {
-        lib_core.info("Cache miss — installing via winget...");
-        await lib_exec.exec("powershell", [
-            "-Command",
-            [
-                "winget install",
-                "--id Intel.OneAPI.HPCToolkit",
-                "--accept-source-agreements",
-                "--accept-package-agreements",
-                "--silent",
-            ].join(" "),
-        ]);
-        lib_core.info("Saving installation to cache...");
-        await cache.saveCache(cachePaths, cacheKey);
+    return await installChoco(version);
+}
+async function installChoco(version) {
+    lib_core.info(`Installing Intel oneAPI Base and HPC Toolkits via Chocolatey...`);
+    // HPC Toolkit contains ifx, but requires Base Toolkit for libraries/runtimes.
+    // We use '--no-progress' to keep the logs clean in CI.
+    const chocoArgs = ["install", "-y", "--no-progress"];
+    // If a specific version was requested (not LATEST), pass it to choco.
+    if (version !== LATEST) {
+        chocoArgs.push("--version", version);
     }
-    // Source setvars.bat and propagate the relevant environment variables.
-    lib_core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
-    let envOutput = "";
-    await lib_exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
+    await lib_exec.exec("choco", [...chocoArgs, "intel-oneapi-base-toolkit"]);
+    await lib_exec.exec("choco", [...chocoArgs, "intel-oneapi-hpc-toolkit"]);
+    lib_core.info("Initializing Intel environment variables...");
+    await setupIntelEnv();
+    return await ifx_win32_resolveInstalledVersion();
+}
+/**
+ * Sources the setvars.bat file and exports the resulting environment
+ * variables to the GitHub Actions environment.
+ */
+async function setupIntelEnv() {
+    const setvarsPath = "C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat";
+    let stdout = "";
+    // Run setvars.bat and then 'set' to capture all exported variables
+    await lib_exec.exec("cmd.exe", ["/c", `call "${setvarsPath}" && set`], {
+        silent: true,
         listeners: {
-            stdout: (data) => {
-                envOutput += data.toString();
-            },
+            stdout: (data) => (stdout += data.toString()),
         },
     });
-    for (const line of envOutput.split("\n")) {
-        const eqIdx = line.indexOf("=");
-        if (eqIdx === -1)
-            continue;
-        const key = line.substring(0, eqIdx).trim();
-        const val = line.substring(eqIdx + 1).trimEnd();
-        if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-            lib_core.exportVariable(key, val);
+    const lines = stdout.split("\n");
+    for (const line of lines) {
+        const match = /^([^=]+)=(.*)$/.exec(line);
+        if (match) {
+            const [, name, value] = match;
+            const trimmedName = name.trim();
+            const trimmedValue = value.trim();
+            // Standardize to uppercase for the comparison to handle
+            // 'Path', 'PATH', 'path', etc.
+            if (trimmedName.toUpperCase() === "PATH") {
+                const paths = trimmedValue.split(";");
+                for (const p of paths) {
+                    if (p)
+                        lib_core.addPath(p);
+                }
+            }
+            else {
+                lib_core.exportVariable(trimmedName, trimmedValue);
+            }
         }
     }
-    lib_core.exportVariable("FC", "ifx");
-    lib_core.exportVariable("CC", "icx");
-    lib_core.exportVariable("CXX", "icpx");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifx");
-    const resolvedVersion = await ifx_win32_resolveInstalledVersion();
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", resolvedVersion);
-    lib_core.info(`ifx ${resolvedVersion} installed successfully.`);
-    return resolvedVersion;
 }
 async function ifx_win32_resolveInstalledVersion() {
-    let output = "";
-    await lib_exec.exec("ifx.exe", ["--version"], {
-        listeners: {
-            stdout: (data) => {
-                output += data.toString();
-            },
-        },
-    });
-    return output.trim();
+    let stdout = "";
+    try {
+        // ifx --version returns a multi-line string; we just want the version line.
+        await lib_exec.exec("ifx", ["--version"], {
+            silent: true,
+            listeners: { stdout: (data) => (stdout += data.toString()) },
+        });
+        // Example: "ifx (IFX) 2025.1.0 ..." -> we extract the version
+        const match = /\d+\.\d+\.\d+/.exec(stdout);
+        const version = match ? match[0] : LATEST;
+        lib_core.exportVariable("FC", "ifx");
+        lib_core.exportVariable("CC", "icx");
+        lib_core.exportVariable("CXX", "icpx");
+        lib_core.exportVariable("FORTRAN_COMPILER", "ifx");
+        lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+        return version;
+    }
+    catch (err) {
+        throw new Error(`Failed to verify ifx installation`, { cause: err });
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/index.ts
@@ -94822,6 +94833,8 @@ async function installIFort(_) {
     return Promise.reject(new Error("Not implemented"));
 }
 
+// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
+var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
 
 

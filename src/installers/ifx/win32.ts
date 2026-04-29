@@ -1,11 +1,8 @@
-import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import { Arch, LATEST, WindowsEnv, type Target } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 
-// Only LATEST is supported via winget — specific versions require offline
-// installers with per-version URLs, which will be added in a follow-up.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [WindowsEnv.Native]: [LATEST],
@@ -20,76 +17,100 @@ const SUPPORTED_VERSIONS = {
   Record<WindowsEnv, readonly string[] | undefined>
 >;
 
-const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
-const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
-
 export async function installWin32(target: Target): Promise<string> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
-  core.info(`Installing ifx (${version}) on Windows (${target.arch})...`);
-
-  const cacheKey = `ifx-winget-${target.arch}-${version}`;
-  const cachePaths = [ONEAPI_ROOT];
-
-  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-  if (cacheHit) {
-    core.info(`Restored ifx installation from cache (${cacheHit}).`);
-  } else {
-    core.info("Cache miss — installing via winget...");
-    await exec.exec("powershell", [
-      "-Command",
-      [
-        "winget install",
-        "--id Intel.OneAPI.HPCToolkit",
-        "--accept-source-agreements",
-        "--accept-package-agreements",
-        "--silent",
-      ].join(" "),
-    ]);
-    core.info("Saving installation to cache...");
-    await cache.saveCache(cachePaths, cacheKey);
+  // Intel oneAPI on Windows is currently only supported via 'Native'
+  // (Standard Windows CMD/Powershell environment) using Chocolatey.
+  if (target.windowsEnv !== WindowsEnv.Native) {
+    throw new Error(
+      `ifx on Windows only supports Native environment via Chocolatey.`,
+    );
   }
 
-  // Source setvars.bat and propagate the relevant environment variables.
-  core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
-  let envOutput = "";
-  await exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
+  return await installChoco(version);
+}
+
+async function installChoco(version: string): Promise<string> {
+  core.info(`Installing Intel oneAPI Base and HPC Toolkits via Chocolatey...`);
+
+  // HPC Toolkit contains ifx, but requires Base Toolkit for libraries/runtimes.
+  // We use '--no-progress' to keep the logs clean in CI.
+  const chocoArgs = ["install", "-y", "--no-progress"];
+
+  // If a specific version was requested (not LATEST), pass it to choco.
+  if (version !== LATEST) {
+    chocoArgs.push("--version", version);
+  }
+
+  await exec.exec("choco", [...chocoArgs, "intel-oneapi-base-toolkit"]);
+  await exec.exec("choco", [...chocoArgs, "intel-oneapi-hpc-toolkit"]);
+
+  core.info("Initializing Intel environment variables...");
+  await setupIntelEnv();
+
+  return await resolveInstalledVersion();
+}
+
+/**
+ * Sources the setvars.bat file and exports the resulting environment
+ * variables to the GitHub Actions environment.
+ */
+async function setupIntelEnv(): Promise<void> {
+  const setvarsPath = "C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat";
+
+  let stdout = "";
+  // Run setvars.bat and then 'set' to capture all exported variables
+  await exec.exec("cmd.exe", ["/c", `call "${setvarsPath}" && set`], {
+    silent: true,
     listeners: {
-      stdout: (data: Buffer) => {
-        envOutput += data.toString();
-      },
+      stdout: (data) => (stdout += data.toString()),
     },
   });
 
-  for (const line of envOutput.split("\n")) {
-    const eqIdx = line.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = line.substring(0, eqIdx).trim();
-    const val = line.substring(eqIdx + 1).trimEnd();
-    if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-      core.exportVariable(key, val);
+  const lines = stdout.split("\n");
+  for (const line of lines) {
+    const match = /^([^=]+)=(.*)$/.exec(line);
+    if (match) {
+      const [, name, value] = match;
+      const trimmedName = name.trim();
+      const trimmedValue = value.trim();
+
+      // Standardize to uppercase for the comparison to handle
+      // 'Path', 'PATH', 'path', etc.
+      if (trimmedName.toUpperCase() === "PATH") {
+        const paths = trimmedValue.split(";");
+        for (const p of paths) {
+          if (p) core.addPath(p);
+        }
+      } else {
+        core.exportVariable(trimmedName, trimmedValue);
+      }
     }
   }
-
-  core.exportVariable("FC", "ifx");
-  core.exportVariable("CC", "icx");
-  core.exportVariable("CXX", "icpx");
-  core.exportVariable("FORTRAN_COMPILER", "ifx");
-
-  const resolvedVersion = await resolveInstalledVersion();
-  core.exportVariable("FORTRAN_COMPILER_VERSION", resolvedVersion);
-  core.info(`ifx ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
 }
 
 async function resolveInstalledVersion(): Promise<string> {
-  let output = "";
-  await exec.exec("ifx.exe", ["--version"], {
-    listeners: {
-      stdout: (data: Buffer) => {
-        output += data.toString();
-      },
-    },
-  });
-  return output.trim();
+  let stdout = "";
+  try {
+    // ifx --version returns a multi-line string; we just want the version line.
+    await exec.exec("ifx", ["--version"], {
+      silent: true,
+      listeners: { stdout: (data) => (stdout += data.toString()) },
+    });
+
+    // Example: "ifx (IFX) 2025.1.0 ..." -> we extract the version
+    const match = /\d+\.\d+\.\d+/.exec(stdout);
+    const version = match ? match[0] : LATEST;
+
+    core.exportVariable("FC", "ifx");
+    core.exportVariable("CC", "icx");
+    core.exportVariable("CXX", "icpx");
+    core.exportVariable("FORTRAN_COMPILER", "ifx");
+    core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+
+    return version;
+  } catch (err) {
+    throw new Error(`Failed to verify ifx installation`, { cause: err });
+  }
 }
