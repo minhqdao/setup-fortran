@@ -2,7 +2,7 @@ import * as exec from "@actions/exec";
 import * as core from "@actions/core";
 import * as path from "path";
 import * as fs from "fs";
-import { Compiler, LATEST } from "./types";
+import { Compiler, LATEST, WindowsEnv } from "./types";
 
 async function run(): Promise<void> {
   const buildDir = path.join(process.cwd(), "test_build");
@@ -17,8 +17,8 @@ async function run(): Promise<void> {
 
     const compiler = (process.env.FORTRAN_COMPILER ?? "") as Compiler;
     const rawVersion = process.env.FORTRAN_COMPILER_VERSION ?? "0";
-    // const isUCRT64 = process.env.WINDOWS_ENV === WindowsEnv.UCRT64;
-    // const isDarwin = process.platform === "darwin";
+    const isUCRT64 = process.env.WINDOWS_ENV === WindowsEnv.UCRT64;
+    const isDarwin = process.platform === "darwin";
     const isLatest = rawVersion === LATEST;
     const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
     const isFlang = compiler === Compiler.Flang;
@@ -95,12 +95,15 @@ async function run(): Promise<void> {
       );
     }
 
-    if (ompFlag) {
+    const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
+    const shouldSkipOmp = isFlang && (isUnsupportedDarwin || isUCRT64);
+
+    if (ompFlag && !shouldSkipOmp) {
       await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
-      // } else if (ompFlag) {
-      //   core.info(
-      //     `Skipping omp_test: not supported by flang ${majorVersion.toString()} on ${process.platform}.`,
-      //   );
+    } else if (ompFlag) {
+      core.info(
+        `Skipping omp_test: not supported by flang ${majorVersion.toString()} on ${process.platform}.`,
+      );
     }
 
     core.info("All integration tests passed successfully!");
