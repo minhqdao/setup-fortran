@@ -235,7 +235,7 @@ async function installMSYS2(target: Target): Promise<string> {
   core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
 
   // The MSYS2 package for flang in the UCRT64 environment.
-  await setupMSYS2(target.windowsEnv, ["flang", "openmp"]);
+  await setupMSYS2(target.windowsEnv, ["flang", "libomp"]);
 
   const msysBin = path.join("C:\\msys64", target.windowsEnv, "bin");
   const flangExe = path.join(msysBin, "flang.exe");
