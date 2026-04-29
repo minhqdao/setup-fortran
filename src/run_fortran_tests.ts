@@ -84,9 +84,7 @@ async function run(): Promise<void> {
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"]);
 
-    const shouldSkipPoly =
-      isFlang &&
-      (majorVersion < 19 || (isUCRT64 && process.env.ImageOS === "win22"));
+    const shouldSkipPoly = isFlang && (majorVersion < 19 || isUCRT64);
 
     // Polymorphic types (CLASS) were not implemented in flang until LLVM 19. Currently broken on UCRT64.
     if (!shouldSkipPoly) {
