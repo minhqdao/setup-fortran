@@ -95675,7 +95675,7 @@ async function win32_installMSYS2(target) {
     }
     lib_core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
     // The MSYS2 package for flang in the UCRT64 environment.
-    await setupMSYS2(target.windowsEnv, ["mingw-w64-ucrt-x86_64-flang"]);
+    await setupMSYS2(target.windowsEnv, ["flang"]);
     const msysBin = external_path_.join("C:\\msys64", target.windowsEnv, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");
     const clangExe = external_path_.join(msysBin, "clang.exe");
