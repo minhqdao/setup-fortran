@@ -95657,6 +95657,7 @@ async function win32_installNative(target) {
     lib_core.exportVariable("CXX", clangPPExe);
     lib_core.exportVariable("FORTRAN_COMPILER", "flang");
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", major);
+    lib_core.exportVariable("WINDOWS_ENV", target.windowsEnv);
     // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
     // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
     const flangLibDir = external_path_.join(toolRoot, "lib");
@@ -95675,17 +95676,12 @@ async function win32_installMSYS2(target) {
     }
     lib_core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
     // The MSYS2 package for flang in the UCRT64 environment.
-    await setupMSYS2(target.windowsEnv, ["flang", "compiler-rt"]);
+    await setupMSYS2(target.windowsEnv, ["flang"]);
     const msysBin = external_path_.join("C:\\msys64", target.windowsEnv, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");
     const clangExe = external_path_.join(msysBin, "clang.exe");
     const clangPPExe = external_path_.join(msysBin, "clang++.exe");
     lib_core.addPath(msysBin);
-    // DEBUG: Find OpenMP lib
-    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
-        "-lc",
-        "find /ucrt64 -name 'omp_lib.mod' 2>/dev/null",
-    ]);
     lib_core.exportVariable("FC", flangExe);
     lib_core.exportVariable("CC", clangExe);
     lib_core.exportVariable("CXX", clangPPExe);

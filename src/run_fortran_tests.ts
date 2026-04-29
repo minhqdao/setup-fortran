@@ -2,7 +2,7 @@ import * as exec from "@actions/exec";
 import * as core from "@actions/core";
 import * as path from "path";
 import * as fs from "fs";
-import { Compiler } from "./types";
+import { Compiler, LATEST } from "./types";
 
 async function run(): Promise<void> {
   const buildDir = path.join(process.cwd(), "test_build");
@@ -16,10 +16,11 @@ async function run(): Promise<void> {
     }
 
     const compiler = (process.env.FORTRAN_COMPILER ?? "") as Compiler;
-    const compilerVersion = parseInt(
-      process.env.FORTRAN_COMPILER_VERSION ?? "0",
-      10,
-    );
+    const rawVersion = process.env.FORTRAN_COMPILER_VERSION ?? "0";
+    // const isUCRT64 = process.env.WINDOWS_ENV === WindowsEnv.UCRT64;
+    // const isDarwin = process.platform === "darwin";
+    const isLatest = rawVersion === LATEST;
+    const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
     const isFlang = compiler === Compiler.Flang;
 
     const testDir = path.join(process.cwd(), "fortran_tests");
@@ -71,11 +72,11 @@ async function run(): Promise<void> {
       core.endGroup();
     };
 
-    if (!isFlang || compilerVersion >= 16) {
+    if (!isFlang || isLatest || majorVersion >= 16) {
       await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
     } else {
       core.info(
-        `Skipping iso_fortran_env_test: not supported by flang ${compilerVersion.toString()} (requires LLVM 16+).`,
+        `Skipping iso_fortran_env_test: not supported by flang ${majorVersion.toString()} (requires LLVM 16+).`,
       );
     }
 
@@ -83,24 +84,23 @@ async function run(): Promise<void> {
     await execTest("c_interop_test", ["c_interop_test.F90"]);
 
     // Polymorphic types (CLASS) were not implemented in flang until LLVM 19.
-    if (!isFlang || compilerVersion >= 19) {
+    if (!isFlang || isLatest || majorVersion >= 19) {
       await execTest("polymorphism_test", [
         "polymorphism_mod_test.f90",
         "polymorphism_test.f90",
       ]);
     } else {
       core.info(
-        `Skipping polymorphism_test: not supported by flang ${compilerVersion.toString()} (requires LLVM 19+).`,
+        `Skipping polymorphism_test: not supported by flang ${majorVersion.toString()} (requires LLVM 19+).`,
       );
     }
 
-    const isDarwin = process.platform === "darwin";
-    if (ompFlag && (!isFlang || !isDarwin || compilerVersion >= 23)) {
+    if (ompFlag) {
       await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
-    } else if (ompFlag) {
-      core.info(
-        `Skipping omp_test: not supported by flang ${compilerVersion.toString()} on ${process.platform}.`,
-      );
+      // } else if (ompFlag) {
+      //   core.info(
+      //     `Skipping omp_test: not supported by flang ${majorVersion.toString()} on ${process.platform}.`,
+      //   );
     }
 
     core.info("All integration tests passed successfully!");

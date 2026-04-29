@@ -206,6 +206,7 @@ async function installNative(target: Target): Promise<string> {
   core.exportVariable("CXX", clangPPExe);
   core.exportVariable("FORTRAN_COMPILER", "flang");
   core.exportVariable("FORTRAN_COMPILER_VERSION", major);
+  core.exportVariable("WINDOWS_ENV", target.windowsEnv);
 
   // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
   // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
@@ -235,7 +236,7 @@ async function installMSYS2(target: Target): Promise<string> {
   core.info(`Installing Flang on Windows (MSYS2/UCRT64, rolling release)...`);
 
   // The MSYS2 package for flang in the UCRT64 environment.
-  await setupMSYS2(target.windowsEnv, ["flang", "compiler-rt"]);
+  await setupMSYS2(target.windowsEnv, ["flang"]);
 
   const msysBin = path.join("C:\\msys64", target.windowsEnv, "bin");
   const flangExe = path.join(msysBin, "flang.exe");
@@ -243,12 +244,6 @@ async function installMSYS2(target: Target): Promise<string> {
   const clangPPExe = path.join(msysBin, "clang++.exe");
 
   core.addPath(msysBin);
-
-  // DEBUG: Find OpenMP lib
-  await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
-    "-lc",
-    "find /ucrt64 -name 'omp_lib.mod' 2>/dev/null",
-  ]);
 
   core.exportVariable("FC", flangExe);
   core.exportVariable("CC", clangExe);
