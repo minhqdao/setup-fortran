@@ -71,9 +71,11 @@ async function run(): Promise<void> {
       const outputPath = path.join(buildDir, binaryName);
       const sourcePaths = sources.map((s) => path.join(testDir, s));
 
+      const fflags = (process.env.FFLAGS ?? "").split(" ").filter(Boolean);
       core.startGroup(`Test: ${name}`);
       await exec.exec(fc, [
         ...flags,
+        ...fflags,
         ...extraFlags,
         ...sourcePaths,
         "-o",

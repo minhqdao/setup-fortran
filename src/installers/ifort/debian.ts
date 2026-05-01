@@ -93,12 +93,24 @@ export async function installDebian(target: Target): Promise<string> {
     const val = line.substring(eqIdx + 1);
     // Only export oneAPI/Intel/PATH-related variables.
     if (
-      /^(PATH|LD_LIBRARY_PATH|LIBRARY_PATH|CPATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(
+      /^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(
         key,
       )
     ) {
       core.exportVariable(key, val);
     }
+  }
+
+  // Workaround: Intel 2024.1 moved omp_lib.mod to intel64 subdirectory
+  // without updating implicit include paths (Intel regression).
+  if (bundle === "2024.1") {
+    const ompIncDir =
+      "/opt/intel/oneapi/compiler/2024.1/opt/compiler/include/intel64";
+    const existingFflags = process.env.FFLAGS ?? "";
+    core.exportVariable(
+      "FFLAGS",
+      existingFflags ? `${existingFflags} -I${ompIncDir}` : `-I${ompIncDir}`,
+    );
   }
 
   core.exportVariable("FC", "ifort");
