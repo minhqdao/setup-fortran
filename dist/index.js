@@ -94799,7 +94799,10 @@ const INSTALLER_URLS = {
     "2025.0.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fc495846-44b3-4a47-a2a5-17b404dc207a/intel-fortran-compiler-2025.0.1.40_offline.exe",
     "2025.0.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/90dfd1ee-cbde-4461-89fc-3d4a4587844c/intel-fortran-compiler-2025.0.0.712_offline.exe",
     // 2024.2
-    "2024.2.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
+    "2024.2.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/89a381f6-f85d-4dda-ae62-30d51470f53c/l_onemkl_p_2024.2.2.17_offline.exe",
+    "2024.2.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6e00e368-b61d-4f87-a409-9b510c022a37/l_onemkl_p_2024.2.1.105_offline.exe",
+    // "2024.2.1":
+    //   "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
     "2024.2.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7feb5647-59dd-420d-8753-345d31e177dc/w_fortran-compiler_p_2024.2.0.424_offline.exe",
     // 2024.1
     "2024.1.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/f6a44238-5cb6-4787-be83-2ef48bc70cba/w_fortran-compiler_p_2024.1.0.466_offline.exe",
