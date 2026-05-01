@@ -43,7 +43,11 @@ async function run(): Promise<void> {
 
     const flags: string[] = ["-O2"];
     if (compiler === Compiler.IFX || compiler === Compiler.IFort) {
-      flags.push("-module:test_build", "-fpp");
+      if (isWindows) {
+        flags.push("-module:test_build", "-fpp");
+      } else {
+        flags.push("-module", "test_build");
+      }
     } else {
       flags.push("-J", "test_build");
     }
