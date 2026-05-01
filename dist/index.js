@@ -95069,7 +95069,7 @@ const IFORT_RELEASES = [
     },
     {
         version: "2021.7",
-        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18850/m_HPCKit_p_2022.2.0.9553.dmg",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18861/m_HPCKit_p_2022.3.0.8751_offline.dmg",
     },
     {
         version: "2021.6",
@@ -95081,7 +95081,7 @@ const IFORT_RELEASES = [
     },
     {
         version: "2021.4",
-        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18213/m_HPCKit_p_2021.4.0.3556.dmg",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18233/m_HPCKit_p_2021.4.0.3385_offline.dmg",
     },
     {
         version: "2021.3",
