@@ -23,131 +23,119 @@ jobs:
         image: [ ubuntu-24.04, ubuntu-22.04 ]
         toolchain:
           - { compiler: ifx, version: "2026.0" }
-          # - { compiler: ifx, version: "2025.3" }
-          # - { compiler: ifx, version: "2025.2" }
-          # - { compiler: ifx, version: "2025.1" }
-          # - { compiler: ifx, version: "2025.0" }
-          # - { compiler: ifx, version: "2024.2" }
-          # - { compiler: ifx, version: "2024.1" }
-          # - { compiler: ifx, version: "2024.0" }
-          # - { compiler: ifx, version: "2023.2.4" }
-          # - { compiler: ifx, version: "2023.2.3" }
-          # - { compiler: ifx, version: "2023.2.2" }
-          # - { compiler: ifx, version: "2023.2.1" }
-          # - { compiler: ifx, version: "2023.2.0" }
-          # - { compiler: ifx, version: "2023.1.0" }
-          # - { compiler: ifx, version: "2023.0.0" }
-          # - { compiler: ifx, version: "2022.2.1" }
-          # - { compiler: ifx, version: "2022.2.0" }
-          # - { compiler: ifx, version: "2022.1.0" }
-          # - { compiler: ifx, version: "2022.0.2" }
-          # - { compiler: ifx, version: "2022.0.1" }
-          # - { compiler: ifx, version: "2021.4.0" }
-          # - { compiler: ifx, version: "2021.3.0" }
-          # - { compiler: ifx, version: "2021.2.0" }
-          # - { compiler: ifx, version: "2021.1.2" }
-          # - { compiler: ifx, version: "2021.1.1" }
+          - { compiler: ifx, version: "2025.3" }
+          - { compiler: ifx, version: "2025.2" }
+          - { compiler: ifx, version: "2025.1" }
+          - { compiler: ifx, version: "2025.0" }
+          - { compiler: ifx, version: "2024.2" }
+          - { compiler: ifx, version: "2024.1" }
+          - { compiler: ifx, version: "2024.0" }
+          - { compiler: ifx, version: "2023.2.4" }
+          - { compiler: ifx, version: "2023.2.3" }
+          - { compiler: ifx, version: "2023.2.2" }
+          - { compiler: ifx, version: "2023.2.1" }
+          - { compiler: ifx, version: "2023.2.0" }
+          - { compiler: ifx, version: "2023.1.0" }
+          - { compiler: ifx, version: "2023.0.0" }
+          - { compiler: ifx, version: "2022.2.1" }
+          - { compiler: ifx, version: "2022.2.0" }
+          - { compiler: ifx, version: "2022.1.0" }
+          - { compiler: ifx, version: "2022.0.2" }
+          - { compiler: ifx, version: "2022.0.1" }
+          - { compiler: ifx, version: "2021.4.0" }
+          - { compiler: ifx, version: "2021.3.0" }
+          - { compiler: ifx, version: "2021.2.0" }
+          - { compiler: ifx, version: "2021.1.2" }
+          - { compiler: ifx, version: "2021.1.1" }
         include:
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2026.0.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2026.0.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.3.3" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.3.3" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.3.2" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.3.2" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.3.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.3.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.3.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.3.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.2.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.2.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.2.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.2.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.1.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.1.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.0.4" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.0.4" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.0.3" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.0.3" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.0.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.0.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2025.0.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2025.0.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2024.2.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2024.2.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2024.2.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2024.2.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2024.1.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2024.1.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2024.0.2" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2024.0.2" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2024.0.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2024.0.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2023.2.1" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2023.2.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2023.2.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2023.2.0" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2023.1.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2023.1.0" }
           - image: "windows-2025"
-            toolchain: { compiler: ifort, version: "2023.0.0" }
+            toolchain: { compiler: ifx, version: "2026.0.0" }
           - image: "windows-2022"
-            toolchain: { compiler: ifort, version: "2023.0.0" }
+            toolchain: { compiler: ifx, version: "2026.0.0" }
           - image: "windows-2025"
-            toolchain: { compiler: ifx, version: "2022.3.1" }
+            toolchain: { compiler: ifx, version: "2025.3.3" }
           - image: "windows-2022"
-            toolchain: { compiler: ifx, version: "2022.3.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2022.3.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2022.3.0" }
+            toolchain: { compiler: ifx, version: "2025.3.3" }
           - image: "windows-2025"
-            toolchain: { compiler: ifx, version: "2022.2.1" }
+            toolchain: { compiler: ifx, version: "2025.3.2" }
           - image: "windows-2022"
-            toolchain: { compiler: ifx, version: "2022.2.1" }
-          # - image: "windows-2025"
-          #   toolchain: { compiler: ifx, version: "2022.2.0" }
-          # - image: "windows-2022"
-          #   toolchain: { compiler: ifx, version: "2022.2.0" }
+            toolchain: { compiler: ifx, version: "2025.3.2" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.3.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.3.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.3.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.3.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.2.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.2.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.2.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.2.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.1.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.1.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.0.4" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.0.4" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.0.3" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.0.3" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.0.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.0.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2025.0.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2025.0.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2024.2.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2024.2.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2024.2.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2024.2.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2024.1.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2024.1.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2024.0.2" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2024.0.2" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2024.0.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2024.0.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2023.2.1" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2023.2.1" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2023.2.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2023.2.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2023.1.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2023.1.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2022.3.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2022.3.0" }
+          - image: "windows-2025"
+            toolchain: { compiler: ifx, version: "2022.2.0" }
+          - image: "windows-2022"
+            toolchain: { compiler: ifx, version: "2022.2.0" }
 
     steps:
       - uses: actions/checkout@v6
