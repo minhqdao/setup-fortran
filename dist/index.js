@@ -94848,7 +94848,7 @@ async function win32_installWin32(target) {
     // Source setvars.bat and propagate the relevant environment variables.
     lib_core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
     let envOutput = "";
-    await lib_exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
+    await lib_exec.exec("cmd", ["/S", "/C", `call "${SETVARS_BAT}" --force && set`], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();

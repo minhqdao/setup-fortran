@@ -152,7 +152,7 @@ export async function installWin32(target: Target): Promise<string> {
   // Source setvars.bat and propagate the relevant environment variables.
   core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
   let envOutput = "";
-  await exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
+  await exec.exec("cmd", ["/S", "/C", `call "${SETVARS_BAT}" --force && set`], {
     listeners: {
       stdout: (data: Buffer) => {
         envOutput += data.toString();
