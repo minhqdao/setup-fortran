@@ -22,7 +22,7 @@ jobs:
                     # ubuntu-24.04,
                     # ubuntu-22.04 
                 toolchain:
-                    - { compiler: ifx }
+                    - { compiler: ifx, version: "2026.0.0" }
                     # - { compiler: ifx, version: "2026.0" }
                     # - { compiler: ifx, version: "2025.3" }
                     # - { compiler: ifx, version: "2025.2" }

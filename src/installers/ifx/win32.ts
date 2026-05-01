@@ -1,142 +1,190 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import { Arch, LATEST, WindowsEnv, type Target } from "../../types";
-import { resolveWindowsVersion } from "../../resolve_version";
+import * as cache from "@actions/cache";
+import * as tc from "@actions/tool-cache";
+import { Arch, type Target } from "../../types";
+import { resolveVersion } from "../../resolve_version";
 
+// Only versions with a known installer URL are listed. LATEST resolves to the
+// first entry. ARM64 is not supported: Intel oneAPI does not provide Windows
+// ARM64 packages.
+//
+// LATEST will resolve to the first list entry.
 const SUPPORTED_VERSIONS = {
-  [Arch.X64]: {
-    [WindowsEnv.Native]: [LATEST],
-    [WindowsEnv.UCRT64]: undefined,
-  },
-  [Arch.ARM64]: {
-    [WindowsEnv.Native]: undefined,
-    [WindowsEnv.UCRT64]: undefined,
-  },
-} as const satisfies Record<
-  Arch,
-  Record<WindowsEnv, readonly string[] | undefined>
->;
+  [Arch.X64]: [
+    "2026.0.0",
+    "2025.3.3",
+    "2025.3.2",
+    "2025.3.1",
+    "2025.3.0",
+    "2025.2.1",
+    "2025.2.0",
+    "2025.1.0",
+    "2025.0.4",
+    "2025.0.3",
+    "2025.0.1",
+    "2025.0.0",
+    "2024.2.1",
+    "2024.2.0",
+    "2024.1.0",
+    "2024.0.2",
+    "2023.2.1",
+    "2022.3.1",
+    "2021.4.0",
+    "2021.3.0",
+    "2021.2.0",
+    "2021.1.0",
+  ],
+  [Arch.ARM64]: undefined,
+} as const satisfies Record<Arch, readonly string[] | undefined>;
+
+// Maps each full patch version to its Windows offline installer URL.
+// URLs contain opaque UUIDs and cannot be derived programmatically —
+// they must be maintained manually. The latest patch for each YYYY.MINOR
+// base is listed first; earlier patches are kept for reference.
+//
+// Sources:
+//   https://www.wingetgui.com/apps/Intel-FortranCompiler
+//   https://github.com/equipez/github_actions_scripts/blob/main/install_oneapi_windows.bat
+const INSTALLER_URLS: Record<string, string> = {
+  // 2026.0
+  "2026.0.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/9af38d13-867b-45af-a950-0b42d9bac1ae/intel-fortran-compiler-2026.0.0.566_offline.exe",
+  // 2025.3
+  "2025.3.3":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/11a7fdc4-e14d-42b0-a48b-9a4777932c31/intel-fortran-compiler-2025.3.3.16_offline.exe",
+  "2025.3.2":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/039121f2-d488-4bc1-a5bb-97528e3a4b86/intel-fortran-compiler-2025.3.2.26_offline.exe",
+  "2025.3.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/79e069e4-f844-43df-8d73-3674c024b043/intel-fortran-compiler-2025.3.1.15_offline.exe",
+  "2025.3.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/cb54db79-1d73-4443-8274-d712fdc2d156/intel-fortran-compiler-2025.3.0.324_offline.exe",
+  // 2025.2
+  "2025.2.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0dc56e76-d2c0-4bb8-9c83-c2ee3952b855/intel-fortran-compiler-2025.2.1.11_offline.exe",
+  "2025.2.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/d500a63b-e481-465d-b1a3-64a6981d25f1/intel-fortran-compiler-2025.2.0.535_offline.exe",
+  // 2025.1
+  "2025.1.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/9962ffec-17a2-4135-94e5-acc3995e0c49/intel-fortran-compiler-2025.1.0.602_offline.exe",
+  // 2025.0
+  "2025.0.4":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1269b58a-590e-49b1-9f53-beebe171ac56/intel-fortran-compiler-2025.0.4.19_offline.exe",
+  "2025.0.3":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ead426f0-5403-412f-9652-106156965748/intel-fortran-compiler-2025.0.3.11_offline.exe",
+  "2025.0.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fc495846-44b3-4a47-a2a5-17b404dc207a/intel-fortran-compiler-2025.0.1.40_offline.exe",
+  "2025.0.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/90dfd1ee-cbde-4461-89fc-3d4a4587844c/intel-fortran-compiler-2025.0.0.712_offline.exe",
+  // 2024.2
+  "2024.2.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
+  "2024.2.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7feb5647-59dd-420d-8753-345d31e177dc/w_fortran-compiler_p_2024.2.0.424_offline.exe",
+  // 2024.1
+  "2024.1.0":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/f6a44238-5cb6-4787-be83-2ef48bc70cba/w_fortran-compiler_p_2024.1.0.466_offline.exe",
+  // 2024.0
+  "2024.0.2":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe",
+  // 2023.2
+  "2023.2.1":
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
+  // 2022
+  "2022.3.1":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/18976/w_HPCKit_p_2022.3.1.19755_offline.exe",
+  // 2021
+  "2021.4.0":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/18247/w_HPCKit_p_2021.4.0.3340_offline.exe",
+  "2021.3.0":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/17940/w_HPCKit_p_2021.3.0.3227_offline.exe",
+  "2021.2.0":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/17762/w_HPCKit_p_2021.2.0.2901_offline.exe",
+  "2021.1.0":
+    "https://registrationcenter-download.intel.com/akdlm/irc_nas/17392/w_HPCKit_p_2021.1.0.2682_offline.exe",
+};
+
+const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
+const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
 export async function installWin32(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(target, SUPPORTED_VERSIONS);
 
-  // Intel oneAPI on Windows is currently only supported via 'Native'
-  // (Standard Windows CMD/Powershell environment) using Chocolatey.
-  if (target.windowsEnv !== WindowsEnv.Native) {
+  const installerUrl = INSTALLER_URLS[version];
+  if (!installerUrl) {
     throw new Error(
-      `ifx on Windows only supports Native environment via Chocolatey.`,
+      `No installer URL found for ifx ${version} on Windows. ` +
+        `This is a bug — please open an issue.`,
     );
   }
 
-  return await installChoco(version);
-}
+  core.info(`Installing ifx ${version} on Windows (${target.arch})...`);
 
-async function installChoco(version: string): Promise<string> {
-  core.info(`Installing Intel oneAPI Base and HPC Toolkits via Chocolatey...`);
+  const cacheKey = `ifx-win32-${target.arch}-${version}`;
+  const cachePaths = [ONEAPI_ROOT];
 
-  // 1. Broad search for everything containing "oneapi"
-  await exec.exec("choco", ["search", "oneapi", "--detailed"]);
+  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  if (cacheHit) {
+    core.info(`Restored ifx installation from cache (${cacheHit}).`);
+  } else {
+    core.info(`Downloading installer...`);
+    const installerPath = await tc.downloadTool(installerUrl);
 
-  // 2. Search for the specific IDs we suspect, including all historical versions
-  await exec.exec("choco", [
-    "search",
-    "intel-oneapi-base-toolkit",
-    "--all-versions",
-  ]);
-  await exec.exec("choco", ["search", "oneapi-base-toolkit", "--all-versions"]);
+    core.info("Running silent install...");
+    await exec.exec(`"${installerPath}"`, [
+      "-s",
+      "-a",
+      "--silent",
+      "--eula",
+      "accept",
+      "-p=NEED_VS2019_INTEGRATION=0",
+      "-p=NEED_VS2022_INTEGRATION=0",
+    ]);
 
-  // 3. Search for the HPC Toolkit (which contains ifx)
-  await exec.exec("choco", [
-    "search",
-    "intel-oneapi-hpc-toolkit",
-    "--all-versions",
-  ]);
-  await exec.exec("choco", ["search", "oneapi-hpc-toolkit", "--all-versions"]);
-
-  // 4. Search for the "Fortran" specific keywords just in case
-  await exec.exec("choco", ["search", "intel-fortran", "--detailed"]);
-
-  // 5. Broad search for "Intel" to see if they renamed the vendor prefix
-  await exec.exec("choco", ["search", "intel", "--limit-output"]);
-
-  // HPC Toolkit contains ifx, but requires Base Toolkit for libraries/runtimes.
-  // We use '--no-progress' to keep the logs clean in CI.
-  const chocoArgs = ["install", "-y", "--no-progress"];
-
-  // If a specific version was requested (not LATEST), pass it to choco.
-  if (version !== LATEST) {
-    chocoArgs.push("--version", version);
+    core.info("Saving installation to cache...");
+    await cache.saveCache(cachePaths, cacheKey);
   }
 
-  // Update these IDs in your installChoco function
-  await exec.exec("choco", [...chocoArgs, "oneapi-base-toolkit"]);
-  await exec.exec("choco", [...chocoArgs, "oneapi-hpc-toolkit"]);
-
-  core.info("Initializing Intel environment variables...");
-  await setupIntelEnv();
-
-  return await resolveInstalledVersion();
-}
-
-/**
- * Sources the setvars.bat file and exports the resulting environment
- * variables to the GitHub Actions environment.
- */
-async function setupIntelEnv(): Promise<void> {
-  const setvarsPath = "C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat";
-
-  let stdout = "";
-  // Run setvars.bat and then 'set' to capture all exported variables
-  await exec.exec("cmd.exe", ["/c", `call "${setvarsPath}" && set`], {
-    silent: true,
+  // Source setvars.bat and propagate the relevant environment variables.
+  core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
+  let envOutput = "";
+  await exec.exec("cmd", ["/C", `call "${SETVARS_BAT}" --force && set`], {
     listeners: {
-      stdout: (data) => (stdout += data.toString()),
+      stdout: (data: Buffer) => {
+        envOutput += data.toString();
+      },
     },
   });
 
-  const lines = stdout.split("\n");
-  for (const line of lines) {
-    const match = /^([^=]+)=(.*)$/.exec(line);
-    if (match) {
-      const [, name, value] = match;
-      const trimmedName = name.trim();
-      const trimmedValue = value.trim();
-
-      // Standardize to uppercase for the comparison to handle
-      // 'Path', 'PATH', 'path', etc.
-      if (trimmedName.toUpperCase() === "PATH") {
-        const paths = trimmedValue.split(";");
-        for (const p of paths) {
-          if (p) core.addPath(p);
-        }
-      } else {
-        core.exportVariable(trimmedName, trimmedValue);
-      }
+  for (const line of envOutput.split("\n")) {
+    const eqIdx = line.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = line.substring(0, eqIdx).trim();
+    const val = line.substring(eqIdx + 1).trimEnd();
+    if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+      core.exportVariable(key, val);
     }
   }
+
+  core.exportVariable("FC", "ifx");
+  core.exportVariable("CC", "icx");
+  core.exportVariable("CXX", "icpx");
+  core.exportVariable("FORTRAN_COMPILER", "ifx");
+  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+
+  const resolvedVersion = await resolveInstalledVersion();
+  core.info(`ifx ${resolvedVersion} installed successfully.`);
+  return resolvedVersion;
 }
 
 async function resolveInstalledVersion(): Promise<string> {
-  let stdout = "";
-  try {
-    // ifx --version returns a multi-line string; we just want the version line.
-    await exec.exec("ifx", ["--version"], {
-      silent: true,
-      listeners: { stdout: (data) => (stdout += data.toString()) },
-    });
-
-    // Example: "ifx (IFX) 2025.1.0 ..." -> we extract the version
-    const match = /\d+\.\d+\.\d+/.exec(stdout);
-    const version = match ? match[0] : LATEST;
-
-    core.exportVariable("FC", "ifx");
-    core.exportVariable("CC", "icx");
-    core.exportVariable("CXX", "icpx");
-    core.exportVariable("FORTRAN_COMPILER", "ifx");
-    core.exportVariable("FORTRAN_COMPILER_VERSION", version);
-
-    return version;
-  } catch (err) {
-    throw new Error(`Failed to verify ifx installation`, { cause: err });
-  }
+  let output = "";
+  await exec.exec("ifx", ["--version"], {
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  return output.trim();
 }
