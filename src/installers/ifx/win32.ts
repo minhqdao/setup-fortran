@@ -194,22 +194,10 @@ export async function installWin32(target: Target): Promise<string> {
 }
 
 async function resolveInstalledVersion(): Promise<string> {
-  const versionCommand = process.platform === OS.Windows ? "-V" : "--version";
+  const versionCommand =
+    process.platform === OS.Windows ? "/what" : "--version";
 
   let output = "";
-
-  await exec.exec("ifx", ["/help"], {
-    listeners: {
-      stdout: (data: Buffer) => {
-        output += data.toString();
-      },
-      stderr: (data: Buffer) => {
-        output += data.toString();
-      },
-    },
-    ignoreReturnCode: true,
-  });
-
   await exec.exec("ifx", [versionCommand], {
     listeners: {
       stdout: (data: Buffer) => {

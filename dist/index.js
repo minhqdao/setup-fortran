@@ -94880,19 +94880,8 @@ async function win32_installWin32(target) {
     return resolvedVersion;
 }
 async function ifx_win32_resolveInstalledVersion() {
-    const versionCommand = process.platform === OS.Windows ? "-V" : "--version";
+    const versionCommand = process.platform === OS.Windows ? "/what" : "--version";
     let output = "";
-    await lib_exec.exec("ifx", ["/help"], {
-        listeners: {
-            stdout: (data) => {
-                output += data.toString();
-            },
-            stderr: (data) => {
-                output += data.toString();
-            },
-        },
-        ignoreReturnCode: true,
-    });
     await lib_exec.exec("ifx", [versionCommand], {
         listeners: {
             stdout: (data) => {
