@@ -27,7 +27,7 @@ const IFORT_RELEASES = [
   },
   {
     version: "2021.7",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.dmg",
   },
   {
     version: "2021.6",

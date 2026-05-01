@@ -13,23 +13,35 @@ import path from "path";
 // LATEST resolves to the first entry (2023.2.1).
 const IFORT_RELEASES = [
   {
-    version: "2023.2.1",
+    version: "2021.13",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
+  },
+  {
+    version: "2021.12",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe",
+  },
+  {
+    version: "2021.11",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe",
+  },
+  {
+    version: "2021.10",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
   },
   {
-    version: "2023.2.0",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/438527fc-7140-422c-a851-389f2791816b/w_HPCKit_p_2023.2.0.49441_offline.exe",
-  },
-  {
-    version: "2023.1.0",
+    version: "2021.9",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
   },
   {
-    version: "2022.3.0",
+    version: "2021.8",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_HPCKit_p_2023.0.0.25440_offline.exe",
+  },
+  {
+    version: "2021.7",
     url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
   },
   {
-    version: "2022.2.0",
+    version: "2021.6",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe",
   },
 ] as const;
