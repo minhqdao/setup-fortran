@@ -95082,7 +95082,7 @@ const IFORT_RELEASES = [
     },
     {
         version: "2021.7",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18866/m_HPCKit_p_2022.3.0.8685.dmg",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18977/m_HPCKit_p_2022.3.1.15344.dmg",
     },
     {
         version: "2021.6",
