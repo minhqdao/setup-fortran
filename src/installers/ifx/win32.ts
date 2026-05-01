@@ -196,6 +196,8 @@ export async function installWin32(target: Target): Promise<string> {
 async function resolveInstalledVersion(): Promise<string> {
   const versionCommand = process.platform === OS.Windows ? "-V" : "--version";
 
+  let output = "";
+
   await exec.exec("ifx", ["/help"], {
     listeners: {
       stdout: (data: Buffer) => {
@@ -208,7 +210,6 @@ async function resolveInstalledVersion(): Promise<string> {
     ignoreReturnCode: true,
   });
 
-  let output = "";
   await exec.exec("ifx", [versionCommand], {
     listeners: {
       stdout: (data: Buffer) => {
