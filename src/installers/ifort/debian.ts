@@ -36,7 +36,7 @@ export async function installDebian(target: Target): Promise<string> {
     throw new Error(`Unsupported ifort version: ${version}`);
   }
 
-  const bundleVersion = entry.bundle;
+  const bundle = entry.bundle;
 
   core.info(`Installing ifort ${version} on Linux (${target.arch})...`);
 
@@ -58,13 +58,10 @@ export async function installDebian(target: Target): Promise<string> {
 
   // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
   // Because ifort only exists in <=2023, the C++ package is always the classic variant.
-  const fortranPkg = `intel-oneapi-compiler-fortran-${bundleVersion}`;
-  const cppPkgBase =
-    version.startsWith("2024") ||
-    version.startsWith("2025") ||
-    version.startsWith("2026")
-      ? "intel-oneapi-compiler-dpcpp-cpp"
-      : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
+  const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
+  const cppPkgBase = bundle.startsWith("2024")
+    ? "intel-oneapi-compiler-dpcpp-cpp"
+    : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
   const cppPkg = `${cppPkgBase}-${version}`;
 
   core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);

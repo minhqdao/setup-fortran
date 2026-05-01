@@ -33,7 +33,7 @@ jobs:
           # - { compiler: ifort, version: "2021.3" }
           # - { compiler: ifort, version: "2021.2" }
           # - { compiler: ifort, version: "2021.1" }
-        include:
+          # include:
           # - image: macos-26-intel
           #   toolchain: { compiler: ifort, version: "2021.10" }
           # - image: macos-15-intel
@@ -46,10 +46,6 @@ jobs:
           #   toolchain: { compiler: ifort, version: "2021.8" }
           # - image: macos-15-intel
           #   toolchain: { compiler: ifort, version: "2021.8" }
-          - image: macos-26-intel
-            toolchain: { compiler: ifort, version: "2021.7" }
-          - image: macos-15-intel
-            toolchain: { compiler: ifort, version: "2021.7" }
           # - image: macos-26-intel
           #   toolchain: { compiler: ifort, version: "2021.6" }
           # - image: macos-15-intel

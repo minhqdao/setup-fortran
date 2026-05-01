@@ -94970,7 +94970,7 @@ async function ifort_debian_installDebian(target) {
     if (!entry) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
-    const bundleVersion = entry.bundle;
+    const bundle = entry.bundle;
     lib_core.info(`Installing ifort ${version} on Linux (${target.arch})...`);
     lib_core.info("Adding Intel oneAPI apt repository...");
     await lib_exec.exec("bash", [
@@ -94988,10 +94988,8 @@ async function ifort_debian_installDebian(target) {
     await lib_exec.exec("sudo", ["apt-get", "update", "-y"]);
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
     // Because ifort only exists in <=2023, the C++ package is always the classic variant.
-    const fortranPkg = `intel-oneapi-compiler-fortran-${bundleVersion}`;
-    const cppPkgBase = version.startsWith("2024") ||
-        version.startsWith("2025") ||
-        version.startsWith("2026")
+    const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
+    const cppPkgBase = bundle.startsWith("2024")
         ? "intel-oneapi-compiler-dpcpp-cpp"
         : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
     const cppPkg = `${cppPkgBase}-${version}`;
@@ -95074,10 +95072,6 @@ const IFORT_RELEASES = [
     {
         version: "2021.8",
         url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_HPCKit_p_2023.0.0.25440.dmg",
-    },
-    {
-        version: "2021.7",
-        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18922/m_fortran-compiler_p_2022.2.0.8682_offline.dmg",
     },
     {
         version: "2021.6",
