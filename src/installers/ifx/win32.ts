@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
-import { Arch, type Target } from "../../types";
+import { Arch, OS, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
@@ -194,10 +194,16 @@ export async function installWin32(target: Target): Promise<string> {
 }
 
 async function resolveInstalledVersion(): Promise<string> {
+  const versionCommand =
+    process.platform === OS.Windows ? "/version" : "--version";
+
   let output = "";
-  await exec.exec("ifx", ["--version"], {
+  await exec.exec("ifx", [versionCommand], {
     listeners: {
       stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+      stderr: (data: Buffer) => {
         output += data.toString();
       },
     },
