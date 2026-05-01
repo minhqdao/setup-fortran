@@ -12,24 +12,8 @@ import path from "path";
 // known releases, but if you hit a 403, the GUID in the URL needs updating.
 const IFORT_RELEASES = [
   {
-    version: "2023.2.1",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.dmg",
-  },
-  {
     version: "2023.2.0",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/438527fc-7140-422c-a851-389f2791816b/w_HPCKit_p_2023.2.0.49441_offline.dmg",
-  },
-  {
-    version: "2023.1.0",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.dmg",
-  },
-  {
-    version: "2022.3.0",
-    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.dmg",
-  },
-  {
-    version: "2022.2.0",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443.dmg",
   },
 ] as const;
 
