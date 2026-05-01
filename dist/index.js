@@ -94760,16 +94760,19 @@ const ifx_win32_SUPPORTED_VERSIONS = {
             "2025.0.3",
             "2025.0.1",
             "2025.0.0",
+            "2024.2.2",
             "2024.2.1",
             "2024.2.0",
             "2024.1.0",
             "2024.0.2",
+            "2024.0.1",
             "2023.2.1",
+            "2023.2.0",
+            "2023.1.0",
+            "2023.0.0",
             "2022.3.1",
-            "2021.4.0",
-            "2021.3.0",
-            "2021.2.0",
-            "2021.1.0",
+            "2022.3.0",
+            "2022.2.0",
         ],
         [WindowsEnv.UCRT64]: undefined,
     },
@@ -94802,25 +94805,26 @@ const INSTALLER_URLS = {
     // 2025.0
     "2025.0.4": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1269b58a-590e-49b1-9f53-beebe171ac56/intel-fortran-compiler-2025.0.4.19_offline.exe",
     "2025.0.3": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ead426f0-5403-412f-9652-106156965748/intel-fortran-compiler-2025.0.3.11_offline.exe",
-    "2025.0.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fc495846-44b3-4a47-a2a5-17b404dc207a/intel-fortran-compiler-2025.0.1.40_offline.exe",
+    "2025.0.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a37c30c3-a846-4371-a85d-603e9a9eb94c/intel-oneapi-hpc-toolkit-2025.0.1.48_offline.exe",
     "2025.0.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/90dfd1ee-cbde-4461-89fc-3d4a4587844c/intel-fortran-compiler-2025.0.0.712_offline.exe",
     // 2024.2
     "2024.2.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/89a381f6-f85d-4dda-ae62-30d51470f53c/l_onemkl_p_2024.2.2.17_offline.exe",
     "2024.2.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
     "2024.2.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7feb5647-59dd-420d-8753-345d31e177dc/w_fortran-compiler_p_2024.2.0.424_offline.exe",
     // 2024.1
-    "2024.1.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/f6a44238-5cb6-4787-be83-2ef48bc70cba/w_fortran-compiler_p_2024.1.0.466_offline.exe",
+    "2024.1.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe",
     // 2024.0
     "2024.0.2": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe",
-    // 2023.2
+    "2024.0.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7a6db8a1-a8b9-4043-8e8e-ca54b56c34e4/w_HPCKit_p_2024.0.1.35_offline.exe",
+    // 2023
     "2023.2.1": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
+    "2023.2.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/438527fc-7140-422c-a851-389f2791816b/w_HPCKit_p_2023.2.0.49441_offline.exe",
+    "2023.1.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
+    "2023.0.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/19085/w_HPCKit_p_2023.0.0.25931_offline.exe",
     // 2022
     "2022.3.1": "https://registrationcenter-download.intel.com/akdlm/irc_nas/18976/w_HPCKit_p_2022.3.1.19755_offline.exe",
-    // 2021
-    "2021.4.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/18247/w_HPCKit_p_2021.4.0.3340_offline.exe",
-    "2021.3.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/17940/w_HPCKit_p_2021.3.0.3227_offline.exe",
-    "2021.2.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/17762/w_HPCKit_p_2021.2.0.2901_offline.exe",
-    "2021.1.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/17392/w_HPCKit_p_2021.1.0.2682_offline.exe",
+    "2022.3.0": "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
+    "2022.2.0": "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe",
 };
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
