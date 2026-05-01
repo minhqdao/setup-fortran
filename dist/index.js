@@ -94738,6 +94738,8 @@ var cache = __nccwpck_require__(5116);
 
 
 
+
+
 // Only versions with a known installer URL are listed. LATEST resolves to the
 // first entry. ARM64 is not supported: Intel oneAPI does not provide Windows
 // ARM64 packages.
@@ -94845,10 +94847,10 @@ async function win32_installWin32(target) {
         lib_core.info("Saving installation to cache...");
         await cache.saveCache(cachePaths, cacheKey);
     }
-    // Source setvars.bat and propagate the relevant environment variables.
-    lib_core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
+    const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_and_dump.bat");
+    external_fs_.writeFileSync(batFile, `@echo off\r\ncall "${SETVARS_BAT}" --force\r\nset\r\n`);
     let envOutput = "";
-    await lib_exec.exec("cmd", ["/S", "/C", `call "${SETVARS_BAT}" --force && set`], {
+    await lib_exec.exec("cmd", ["/C", batFile], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();

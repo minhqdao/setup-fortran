@@ -4,6 +4,8 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import * as fs from "fs";
+import * as os from "os";
 import path from "path";
 
 // Only versions with a known installer URL are listed. LATEST resolves to the
@@ -149,10 +151,14 @@ export async function installWin32(target: Target): Promise<string> {
     await cache.saveCache(cachePaths, cacheKey);
   }
 
-  // Source setvars.bat and propagate the relevant environment variables.
-  core.info(`Sourcing ${SETVARS_BAT} and exporting environment...`);
+  const batFile = path.join(os.tmpdir(), "setvars_and_dump.bat");
+  fs.writeFileSync(
+    batFile,
+    `@echo off\r\ncall "${SETVARS_BAT}" --force\r\nset\r\n`,
+  );
+
   let envOutput = "";
-  await exec.exec("cmd", ["/S", "/C", `call "${SETVARS_BAT}" --force && set`], {
+  await exec.exec("cmd", ["/C", batFile], {
     listeners: {
       stdout: (data: Buffer) => {
         envOutput += data.toString();
