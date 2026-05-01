@@ -2,7 +2,7 @@ import * as exec from "@actions/exec";
 import * as core from "@actions/core";
 import * as path from "path";
 import * as fs from "fs";
-import { Compiler, LATEST, WindowsEnv } from "./types";
+import { Compiler, LATEST, OS, WindowsEnv } from "./types";
 
 async function run(): Promise<void> {
   const buildDir = path.join(process.cwd(), "test_build");
@@ -19,7 +19,16 @@ async function run(): Promise<void> {
     const rawVersion = process.env.FORTRAN_COMPILER_VERSION ?? "0";
     const isUCRT64 = process.env.WINDOWS_ENV === WindowsEnv.UCRT64;
 
-    const isDarwin = process.platform === "darwin";
+    const rawPlatform = process.platform;
+    const isSupportedOS = Object.values(OS).includes(rawPlatform as OS);
+
+    if (!isSupportedOS) {
+      throw new Error(`Unsupported or missing platform: ${rawPlatform}`);
+    }
+
+    const platform = rawPlatform as OS;
+    const isDarwin = platform === OS.MacOS;
+    const isWindows = platform === OS.Windows;
     const isLatest = rawVersion === LATEST;
     const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
     const isFlang = compiler === Compiler.Flang;
@@ -44,9 +53,8 @@ async function run(): Promise<void> {
     if (compiler === Compiler.NVFortran) {
       ompFlag = "-mp";
     } else if (compiler === Compiler.IFX || compiler === Compiler.IFort) {
-      ompFlag = "-qopenmp";
+      ompFlag = isWindows ? "-Qopenmp" : "-qopenmp";
     } else {
-      // gfortran, aocc, flang
       ompFlag = "-fopenmp";
     }
 
@@ -55,7 +63,7 @@ async function run(): Promise<void> {
       sources: string[],
       extraFlags: string[] = [],
     ): Promise<void> => {
-      const binaryName = process.platform === "win32" ? `${name}.exe` : name;
+      const binaryName = isWindows ? `${name}.exe` : name;
       const outputPath = path.join(buildDir, binaryName);
       const sourcePaths = sources.map((s) => path.join(testDir, s));
 
