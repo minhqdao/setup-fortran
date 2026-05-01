@@ -95041,8 +95041,139 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
-async function darwin_installDarwin(_) {
-    return Promise.reject(new Error("Not implemented"));
+
+
+
+
+
+
+
+
+// Intel dropped ifort support starting with the 2024 oneAPI release.
+// NOTE: Intel's macOS download GUIDs change frequently. These are the standard
+// known releases, but if you hit a 403, the GUID in the URL needs updating.
+const IFORT_RELEASES = [
+    {
+        version: "2023.2.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b0f5cd3e-4dce-4122-aa59-dcfb87b74f32/m_HPCKit_p_2023.2.0.49443_offline.dmg",
+    },
+    {
+        version: "2023.1.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1fba0fc3-1090-4886-8b01-5221972b9a7c/m_HPCKit_p_2023.1.0.46346_offline.dmg",
+    },
+    {
+        version: "2022.3.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18861/m_HPCKit_p_2022.3.0.8751_offline.dmg",
+    },
+    {
+        version: "2022.2.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18683/m_HPCKit_p_2022.2.0.158_offline.dmg",
+    },
+    {
+        version: "2022.1.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18485/m_HPCKit_p_2022.1.0.84_offline.dmg",
+    },
+    {
+        version: "2021.4.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18233/m_HPCKit_p_2021.4.0.3385_offline.dmg",
+    },
+];
+const ifort_darwin_SUPPORTED_VERSIONS = {
+    [Arch.X64]: IFORT_RELEASES.map((r) => r.version),
+    [Arch.ARM64]: undefined, // GitHub's macos-14+ runners are ARM64 and cannot run ifort
+};
+const darwin_ONEAPI_ROOT = "/opt/intel/oneapi";
+const SETVARS_SH = `${darwin_ONEAPI_ROOT}/setvars.sh`;
+async function darwin_installDarwin(target) {
+    const version = resolveVersion(target, ifort_darwin_SUPPORTED_VERSIONS);
+    const release = IFORT_RELEASES.find((r) => r.version === version);
+    if (!release) {
+        throw new Error(`No installer URL found for ifort ${version} on macOS.`);
+    }
+    lib_core.info(`Installing ifort ${version} on macOS (${target.arch})...`);
+    if (target.arch === Arch.ARM64) {
+        throw new Error("Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
+            "Please ensure your workflow uses the 'macos-13' runner.");
+    }
+    const cacheKey = `ifort-darwin-${target.arch}-${version}`;
+    const cachePaths = [darwin_ONEAPI_ROOT];
+    const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+    if (cacheHit) {
+        lib_core.info(`Restored ifort installation from cache (${cacheHit}).`);
+    }
+    else {
+        lib_core.info(`Downloading ifort DMG installer...`);
+        const dmgPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`));
+        const mountPoint = "/Volumes/Intel_oneAPI_Installer";
+        try {
+            lib_core.info("Mounting DMG...");
+            await lib_exec.exec("hdiutil", [
+                "attach",
+                dmgPath,
+                "-mountpoint",
+                mountPoint,
+                "-quiet",
+                "-nobrowse",
+            ]);
+            // Intel's silent installer script moves around depending on the release year.
+            // We search for the standard locations.
+            let installScript = external_path_default().join(mountPoint, "install.sh");
+            if (!external_fs_.existsSync(installScript)) {
+                installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "install.sh");
+            }
+            if (!external_fs_.existsSync(installScript)) {
+                installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "bootstrapper");
+            }
+            lib_core.info(`Running silent install via ${installScript}...`);
+            await lib_exec.exec("sudo", [installScript, "--silent", "--eula", "accept"]);
+            lib_core.info("Saving installation to cache...");
+            await cache.saveCache(cachePaths, cacheKey);
+        }
+        finally {
+            // Always ensure the DMG is unmounted, even if the installation fails
+            lib_core.info("Unmounting DMG...");
+            await lib_exec.exec("hdiutil", ["detach", mountPoint, "-force"]);
+        }
+    }
+    lib_core.info(`Sourcing ${SETVARS_SH} and exporting environment...`);
+    let envOutput = "";
+    await lib_exec.exec("bash", ["-c", `source "${SETVARS_SH}" --force && env`], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx);
+        const val = line.substring(eqIdx + 1);
+        if (/^(PATH|DYLD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+            lib_core.exportVariable(key, val);
+        }
+    }
+    lib_core.exportVariable("FC", "ifort");
+    lib_core.exportVariable("CC", "icc");
+    lib_core.exportVariable("CXX", "icpc");
+    lib_core.exportVariable("FORTRAN_COMPILER", "ifort");
+    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+    const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
+    lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
+    return resolvedVersion;
+}
+async function ifort_darwin_resolveInstalledVersion() {
+    let output = "";
+    await lib_exec.exec("ifort", ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    // Return the first line which contains the version string
+    return output.trim().split("\n")[0];
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
@@ -95058,7 +95189,7 @@ async function darwin_installDarwin(_) {
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry (2023.2.1).
-const IFORT_RELEASES = [
+const win32_IFORT_RELEASES = [
     {
         version: "2023.2.1",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
@@ -95082,7 +95213,7 @@ const IFORT_RELEASES = [
 ];
 const ifort_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
-        [WindowsEnv.Native]: IFORT_RELEASES.map((r) => r.version),
+        [WindowsEnv.Native]: win32_IFORT_RELEASES.map((r) => r.version),
         [WindowsEnv.UCRT64]: undefined, // ifort does not support MSYS2/UCRT64
     },
     [Arch.ARM64]: {
@@ -95094,7 +95225,7 @@ const win32_ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const win32_SETVARS_BAT = `${win32_ONEAPI_ROOT}\\setvars.bat`;
 async function ifort_win32_installWin32(target) {
     const version = resolveWindowsVersion(target, ifort_win32_SUPPORTED_VERSIONS);
-    const release = IFORT_RELEASES.find((r) => r.version === version);
+    const release = win32_IFORT_RELEASES.find((r) => r.version === version);
     if (!release) {
         throw new Error(`No installer URL found for ifort ${version} on Windows. ` +
             `This is likely a legacy version issue — please check release compatibility.`);
