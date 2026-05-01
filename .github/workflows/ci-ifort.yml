@@ -20,8 +20,8 @@ jobs:
       matrix:
         image: [ ubuntu-24.04, ubuntu-22.04 ]
         toolchain:
-          # - { compiler: ifort, version: "2021.13" }
-          - { compiler: ifort, version: "2021.12" }
+          - { compiler: ifort, version: "2021.13" }
+          # - { compiler: ifort, version: "2021.12" }
           # - { compiler: ifort, version: "2021.11" }
           # - { compiler: ifort, version: "2021.10" }
           # - { compiler: ifort, version: "2021.9" }
@@ -46,6 +46,10 @@ jobs:
           #   toolchain: { compiler: ifort, version: "2021.8" }
           # - image: macos-15-intel
           #   toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.7" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.7" }
           # - image: macos-26-intel
           #   toolchain: { compiler: ifort, version: "2021.6" }
           # - image: macos-15-intel
