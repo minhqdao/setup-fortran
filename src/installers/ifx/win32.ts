@@ -171,7 +171,9 @@ export async function installWin32(target: Target): Promise<string> {
     if (eqIdx === -1) continue;
     const key = line.substring(0, eqIdx).trim();
     const val = line.substring(eqIdx + 1).trimEnd();
-    if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+    if (
+      /^(PATH|LIB|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)
+    ) {
       core.exportVariable(key, val);
     }
   }

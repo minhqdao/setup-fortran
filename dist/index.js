@@ -94863,7 +94863,7 @@ async function win32_installWin32(target) {
             continue;
         const key = line.substring(0, eqIdx).trim();
         const val = line.substring(eqIdx + 1).trimEnd();
-        if (/^(PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+        if (/^(PATH|LIB|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
             lib_core.exportVariable(key, val);
         }
     }
