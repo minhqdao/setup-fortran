@@ -95245,22 +95245,6 @@ const win32_IFORT_RELEASES = [
         version: "2021.6",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe",
     },
-    {
-        version: "2021.5",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18341/m_HPCKit_p_2022.1.0.86.exe",
-    },
-    {
-        version: "2021.3",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17890/m_HPCKit_p_2021.3.0.3226.exe",
-    },
-    {
-        version: "2021.2",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17643/m_HPCKit_p_2021.2.0.2903.exe",
-    },
-    {
-        version: "2021.1",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17643/m_HPCKit_p_2021.2.0.2903.exe",
-    },
 ];
 const ifort_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
