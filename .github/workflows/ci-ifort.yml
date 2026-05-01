@@ -59,9 +59,25 @@ jobs:
           - image: macos-15-intel
             toolchain: { compiler: ifort, version: "2021.6" }
           - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-26-intel
             toolchain: { compiler: ifort, version: "2021.4" }
           - image: macos-15-intel
             toolchain: { compiler: ifort, version: "2021.4" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.1" }
           # - image:windows-2025
           #   toolchain: { compiler: ifort, version: "2023.2.1" }
           # - image: windows-2022

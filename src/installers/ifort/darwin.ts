@@ -11,31 +11,47 @@ import path from "path";
 // NOTE: Intel's macOS download GUIDs change frequently. These are the standard
 // known releases, but if you hit a 403, the GUID in the URL needs updating.
 //
-// Source: https://www.intel.com/content/www/us/en/developer/articles/tool/compilers-redistributable-libraries-by-version.html
+// Mapping: https://www.intel.com/content/www/us/en/developer/articles/tool/compilers-redistributable-libraries-by-version.html
 const IFORT_RELEASES = [
   {
     version: "2021.10",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/intel-oneapi-ifort-runtime-2023.2.0.49501.dmg", // packs the "latest" ifort for macOS, which is 2021.10
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443.dmg",
   },
   {
     version: "2021.9",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/02b1acb2-e9b2-43ac-b995-ca3d9de9b84f/intel-oneapi-ifort-runtime-2023.1.0.43547.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543.dmg",
   },
   {
     version: "2021.8",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/19106/intel-oneapi-ifort-runtime-2023.0.0.25369.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_HPCKit_p_2023.0.0.25440.dmg",
   },
   {
     version: "2021.7",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18922/intel-oneapi-ifort-runtime-2022.2.0.8682.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18850/m_HPCKit_p_2022.2.0.9553.dmg",
   },
   {
     version: "2021.6",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18695/intel-oneapi-ifort-runtime-2022.1.0.3718.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18681/m_HPCKit_p_2022.2.0.158_offline.dmg",
+  },
+  {
+    version: "2021.5",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18341/m_HPCKit_p_2022.1.0.86.dmg",
   },
   {
     version: "2021.4",
-    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18214/intel-oneapi-ifort-runtime-2021.4.0.3538.dmg",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18213/m_HPCKit_p_2021.4.0.3556.dmg",
+  },
+  {
+    version: "2021.3",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17890/m_HPCKit_p_2021.3.0.3226.dmg",
+  },
+  {
+    version: "2021.2",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17643/m_HPCKit_p_2021.2.0.2903.dmg",
+  },
+  {
+    version: "2021.1",
+    url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/17398/m_HPCKit_p_2021.1.0.2681.dmg",
   },
 ] as const;
 
