@@ -62,7 +62,7 @@ export async function installDebian(target: Target): Promise<string> {
   const cppPkgBase = bundle.startsWith("2024")
     ? "intel-oneapi-compiler-dpcpp-cpp"
     : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
-  const cppPkg = `${cppPkgBase}-${version}`;
+  const cppPkg = `${cppPkgBase}-${bundle}`;
 
   core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
   await exec.exec("sudo", [

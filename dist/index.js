@@ -94992,7 +94992,7 @@ async function ifort_debian_installDebian(target) {
     const cppPkgBase = bundle.startsWith("2024")
         ? "intel-oneapi-compiler-dpcpp-cpp"
         : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
-    const cppPkg = `${cppPkgBase}-${version}`;
+    const cppPkg = `${cppPkgBase}-${bundle}`;
     lib_core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
     await lib_exec.exec("sudo", [
         "apt-get",
