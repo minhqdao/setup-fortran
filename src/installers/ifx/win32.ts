@@ -2,8 +2,8 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
-import { Arch, OS, type Target } from "../../types";
-import { resolveVersion } from "../../resolve_version";
+import { Arch, OS, WindowsEnv, type Target } from "../../types";
+import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
@@ -13,33 +13,43 @@ import path from "path";
 // ARM64 packages.
 //
 // LATEST will resolve to the first list entry.
+
 const SUPPORTED_VERSIONS = {
-  [Arch.X64]: [
-    "2026.0.0",
-    "2025.3.3",
-    "2025.3.2",
-    "2025.3.1",
-    "2025.3.0",
-    "2025.2.1",
-    "2025.2.0",
-    "2025.1.0",
-    "2025.0.4",
-    "2025.0.3",
-    "2025.0.1",
-    "2025.0.0",
-    "2024.2.1",
-    "2024.2.0",
-    "2024.1.0",
-    "2024.0.2",
-    "2023.2.1",
-    "2022.3.1",
-    "2021.4.0",
-    "2021.3.0",
-    "2021.2.0",
-    "2021.1.0",
-  ],
-  [Arch.ARM64]: undefined,
-} as const satisfies Record<Arch, readonly string[] | undefined>;
+  [Arch.X64]: {
+    [WindowsEnv.Native]: [
+      "2026.0.0",
+      "2025.3.3",
+      "2025.3.2",
+      "2025.3.1",
+      "2025.3.0",
+      "2025.2.1",
+      "2025.2.0",
+      "2025.1.0",
+      "2025.0.4",
+      "2025.0.3",
+      "2025.0.1",
+      "2025.0.0",
+      "2024.2.1",
+      "2024.2.0",
+      "2024.1.0",
+      "2024.0.2",
+      "2023.2.1",
+      "2022.3.1",
+      "2021.4.0",
+      "2021.3.0",
+      "2021.2.0",
+      "2021.1.0",
+    ],
+    [WindowsEnv.UCRT64]: undefined,
+  },
+  [Arch.ARM64]: {
+    [WindowsEnv.Native]: undefined,
+    [WindowsEnv.UCRT64]: undefined,
+  },
+} as const satisfies Record<
+  Arch,
+  Record<WindowsEnv, readonly string[] | undefined>
+>;
 
 // Maps each full patch version to its Windows offline installer URL.
 // URLs contain opaque UUIDs and cannot be derived programmatically —
@@ -83,7 +93,7 @@ const INSTALLER_URLS: Record<string, string> = {
   "2024.2.2":
     "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/89a381f6-f85d-4dda-ae62-30d51470f53c/l_onemkl_p_2024.2.2.17_offline.exe",
   "2024.2.1":
-    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6e00e368-b61d-4f87-a409-9b510c022a37/l_onemkl_p_2024.2.1.105_offline.exe",
+    "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
   "2024.2.0":
     "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7feb5647-59dd-420d-8753-345d31e177dc/w_fortran-compiler_p_2024.2.0.424_offline.exe",
   // 2024.1
@@ -113,7 +123,7 @@ const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
 export async function installWin32(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
   const installerUrl = INSTALLER_URLS[version];
   if (!installerUrl) {
