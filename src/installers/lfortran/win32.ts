@@ -74,25 +74,21 @@ async function installConda(target: Target): Promise<string> {
 
   const condaExe = path.join(condaPrefix, "Scripts", "conda.exe");
 
-  await exec.exec(`"${condaExe}"`, [
-    "config",
-    "--set",
-    "channel_priority",
-    "flexible",
-  ]);
-  await exec.exec(`"${condaExe}"`, ["config", "--set", "solver", "classic"]);
-
   core.info(`Installing lfortran==${version} from conda-forge...`);
   await exec.exec(`"${condaExe}"`, [
-    "install",
+    "create",
     "-y",
+    "-n",
+    "lfortran",
     "-c",
     "conda-forge",
+    "--solver=classic",
     `lfortran==${version}`,
   ]);
 
-  // On Windows, conda installs executables into the prefix root, not bin\.
-  const lfortranExe = path.join(condaPrefix, "lfortran.exe");
+  // In a named env, the binary lives in envs\lfortran\ not the prefix root.
+  const envPrefix = path.join(condaPrefix, "envs", "lfortran");
+  const lfortranExe = path.join(envPrefix, "lfortran.exe");
 
   if (!fs.existsSync(lfortranExe)) {
     throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
@@ -100,16 +96,16 @@ async function installConda(target: Target): Promise<string> {
 
   core.info(`Found lfortran binary at: ${lfortranExe}`);
 
-  core.addPath(condaPrefix);
-  core.addPath(path.join(condaPrefix, "Scripts"));
-  core.addPath(path.join(condaPrefix, "Library", "bin"));
+  core.addPath(envPrefix);
+  core.addPath(path.join(envPrefix, "Scripts"));
+  core.addPath(path.join(envPrefix, "Library", "bin"));
 
   core.exportVariable("FC", lfortranExe);
   core.exportVariable("FORTRAN_COMPILER", "lfortran");
   core.exportVariable("FORTRAN_COMPILER_VERSION", version);
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join(condaPrefix, "Library", "lib"),
+    path.join(envPrefix, "Library", "lib"),
   );
 
   const resolvedVersion = await resolveInstalledVersion(lfortranExe);

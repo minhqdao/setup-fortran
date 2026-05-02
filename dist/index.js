@@ -96506,34 +96506,31 @@ async function installConda(target) {
     lib_core.info(`Installing Miniforge to ${condaPrefix}...`);
     await lib_exec.exec(miniforgeInstaller, ["/S", `/D=${condaPrefix}`]);
     const condaExe = external_path_.join(condaPrefix, "Scripts", "conda.exe");
-    await lib_exec.exec(`"${condaExe}"`, [
-        "config",
-        "--set",
-        "channel_priority",
-        "flexible",
-    ]);
-    await lib_exec.exec(`"${condaExe}"`, ["config", "--set", "solver", "classic"]);
     lib_core.info(`Installing lfortran==${version} from conda-forge...`);
     await lib_exec.exec(`"${condaExe}"`, [
-        "install",
+        "create",
         "-y",
+        "-n",
+        "lfortran",
         "-c",
         "conda-forge",
+        "--solver=classic",
         `lfortran==${version}`,
     ]);
-    // On Windows, conda installs executables into the prefix root, not bin\.
-    const lfortranExe = external_path_.join(condaPrefix, "lfortran.exe");
+    // In a named env, the binary lives in envs\lfortran\ not the prefix root.
+    const envPrefix = external_path_.join(condaPrefix, "envs", "lfortran");
+    const lfortranExe = external_path_.join(envPrefix, "lfortran.exe");
     if (!external_fs_.existsSync(lfortranExe)) {
         throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
     }
     lib_core.info(`Found lfortran binary at: ${lfortranExe}`);
-    lib_core.addPath(condaPrefix);
-    lib_core.addPath(external_path_.join(condaPrefix, "Scripts"));
-    lib_core.addPath(external_path_.join(condaPrefix, "Library", "bin"));
+    lib_core.addPath(envPrefix);
+    lib_core.addPath(external_path_.join(envPrefix, "Scripts"));
+    lib_core.addPath(external_path_.join(envPrefix, "Library", "bin"));
     lib_core.exportVariable("FC", lfortranExe);
     lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
-    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "Library", "lib"));
+    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
     return resolvedVersion;
