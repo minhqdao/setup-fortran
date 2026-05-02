@@ -1,9 +1,11 @@
 name: lfortran
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+    # it works, disable automatic trigger for now
+    workflow_dispatch:
+        # push:
+        #     branches: [ main ]
+        # pull_request:
 
 jobs:
     build:
@@ -20,24 +22,24 @@ jobs:
             matrix:
                 image:
                     [
-                        # ubuntu-24.04,
-                    # ubuntu-22.04,
-                    # macos-26,
-                    # macos-26-intel,
-                    # macos-15,
-                    # macos-15-intel,
-                    # macos-14,
+                        ubuntu-24.04,
+                        ubuntu-22.04,
+                        macos-26,
+                        macos-26-intel,
+                        macos-15,
+                        macos-15-intel,
+                        macos-14,
                         windows-2025,
                         windows-2022,
                     ]
                 toolchain:
                     - { compiler: lfortran, version: "0.63.0" }
-                    # - { compiler: lfortran, version: "0.62.0" }
-                    # - { compiler: lfortran, version: "0.61.0" }
-                    # - { compiler: lfortran, version: "0.60.0" }
-                    # - { compiler: lfortran, version: "0.59.0" }
-                    # - { compiler: lfortran, version: "0.58.0" }
-                    # - { compiler: lfortran, version: "0.57.0" }
+                    - { compiler: lfortran, version: "0.62.0" }
+                    - { compiler: lfortran, version: "0.61.0" }
+                    - { compiler: lfortran, version: "0.60.0" }
+                    - { compiler: lfortran, version: "0.59.0" }
+                    - { compiler: lfortran, version: "0.58.0" }
+                    - { compiler: lfortran, version: "0.57.0" }
                 include:
                     - image: windows-2025
                       toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman

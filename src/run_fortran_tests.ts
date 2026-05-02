@@ -82,8 +82,8 @@ async function run(): Promise<void> {
     const platform = rawPlatform as OS;
     const isWindows = platform === OS.Windows;
     const isDarwin = platform === OS.MacOS;
-    const isLatest = rawVersion === LATEST;
-    const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
+    const majorVersion =
+      rawVersion === LATEST ? LATEST : parseInt(rawVersion, 10);
     const isFlang = compiler === Compiler.Flang;
     const isLFortran = compiler === Compiler.LFortran;
 
@@ -131,7 +131,7 @@ async function run(): Promise<void> {
     };
 
     // iso_fortran_env: requires flang/LLVM 16+
-    if (!isFlang || isLatest || majorVersion >= 16) {
+    if (!isFlang || majorVersion === LATEST || majorVersion >= 16) {
       await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
     } else {
       skipTest(
@@ -143,7 +143,8 @@ async function run(): Promise<void> {
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
 
-    const skipPoly = isFlang && (majorVersion < 19 || isUCRT64);
+    const skipPoly =
+      isFlang && ((majorVersion !== LATEST && majorVersion < 19) || isUCRT64);
     // Polymorphic types (CLASS): requires flang/LLVM 19+; currently broken on UCRT64.
     if (!skipPoly) {
       await execTest("polymorphism_test", [
@@ -153,18 +154,19 @@ async function run(): Promise<void> {
     } else {
       skipTest(
         "polymorphism_test",
-        `not supported by flang ${majorVersion.toString()} (requires LLVM 19+)`,
+        `not supported by ${compiler} ${majorVersion.toString()} on ${process.platform}`,
       );
     }
 
-    const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
+    const isUnsupportedDarwin =
+      isDarwin && majorVersion !== LATEST && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
     const skipOmp = isLFortran || (isFlang && (isUnsupportedDarwin || isMSYS2));
     if (!skipOmp) {
       await execTest("omp_test", ["omp_test.f90"], ompFlag);
     } else {
       skipTest(
         "omp_test",
-        `not supported by flang ${majorVersion.toString()} on ${process.platform}`,
+        `not supported by ${compiler} ${majorVersion.toString()} on ${process.platform}`,
       );
     }
 
