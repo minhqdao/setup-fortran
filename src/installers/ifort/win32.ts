@@ -49,7 +49,7 @@ const IFORT_RELEASES = [
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [WindowsEnv.Native]: IFORT_RELEASES.map((r) => r.version),
-    [WindowsEnv.UCRT64]: undefined, // ifort does not support MSYS2/UCRT64
+    [WindowsEnv.UCRT64]: undefined,
   },
   [Arch.ARM64]: {
     [WindowsEnv.Native]: undefined,

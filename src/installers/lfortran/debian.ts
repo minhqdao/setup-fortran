@@ -1,0 +1,113 @@
+import * as core from "@actions/core";
+import * as exec from "@actions/exec";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { Arch } from "../../types";
+import { resolveVersion } from "../../resolve_version";
+import type { Target } from "../../types";
+
+// Make sure the versions are always in descending order. The first one will be
+// used as the default if no version was specified by the user.
+//
+// Notes:
+//   - lfortran is installed via conda-forge, so the version here is the conda
+//     package version (e.g. "0.63.0").
+//   - Both x64 and ARM64 are supported via conda-forge.
+//   - The binary is always named `lfortran` regardless of the version.
+const SUPPORTED_VERSIONS = {
+  [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+  [Arch.ARM64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+} as const satisfies Record<Arch, readonly string[]>;
+
+// Returns the conda arch string for a given runner arch.
+function condaArch(arch: Arch): string {
+  switch (arch) {
+    case Arch.X64:
+      return "x86_64";
+    case Arch.ARM64:
+      return "aarch64";
+  }
+}
+
+// Downloads and installs a self-contained Miniforge installer into a temporary
+// prefix, then uses it to create a conda env with lfortran from conda-forge.
+//
+// We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
+// to prevent interference with other runner toolchains.
+export async function installDebian(target: Target): Promise<string> {
+  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+
+  core.info(`Installing LFortran ${version} on Linux (${target.arch})...`);
+
+  // Install Miniforge into a dedicated prefix under the runner's temp dir.
+  // Using a fixed path makes it easy to add to PATH later.
+  const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
+  const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
+  const arch = condaArch(target.arch);
+
+  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh`;
+
+  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
+  await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+
+  core.info(`Installing Miniforge to ${condaPrefix}...`);
+  await exec.exec("bash", [
+    miniforgeInstaller,
+    "-b", // batch mode, no interactive prompts
+    "-p",
+    condaPrefix,
+  ]);
+
+  // Point conda at conda-forge only, to avoid the default channel.
+  const condaBin = path.join(condaPrefix, "bin", "conda");
+  await exec.exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
+
+  core.info(`Installing lfortran==${version} from conda-forge...`);
+  await exec.exec(condaBin, [
+    "install",
+    "-y",
+    "-c",
+    "conda-forge",
+    `lfortran==${version}`,
+  ]);
+
+  // The lfortran binary lives in the conda prefix's bin directory.
+  const lfortranBinDir = path.join(condaPrefix, "bin");
+  const lfortranBin = path.join(lfortranBinDir, "lfortran");
+
+  if (!fs.existsSync(lfortranBin)) {
+    throw new Error(
+      `lfortran binary not found at expected path: ${lfortranBin}`,
+    );
+  }
+
+  core.info(`Found lfortran binary at: ${lfortranBin}`);
+
+  // Add the conda env's bin dir to PATH so `lfortran` (and gcc, g++, etc.
+  // bundled by conda) are available in subsequent steps.
+  core.addPath(lfortranBinDir);
+
+  // lfortran does not ship a paired clang; use whatever GCC/clang the runner
+  // provides as the C/C++ companion.  We leave CC/CXX unset so downstream
+  // steps can choose their own C toolchain without surprising overrides.
+  core.exportVariable("FC", "lfortran");
+  core.exportVariable("FORTRAN_COMPILER", "lfortran");
+  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+
+  const resolvedVersion = await resolveInstalledVersion(lfortranBin);
+  core.info(`LFortran ${resolvedVersion} installed successfully.`);
+  return resolvedVersion;
+}
+
+async function resolveInstalledVersion(binaryPath: string): Promise<string> {
+  let output = "";
+  await exec.exec(binaryPath, ["--version"], {
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  return output.trim();
+}
