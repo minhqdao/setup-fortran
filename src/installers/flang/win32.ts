@@ -146,10 +146,8 @@ export async function installWin32(target: Target): Promise<string> {
       return await installNative(target);
     case WindowsEnv.UCRT64:
     case WindowsEnv.Clang64:
+    case WindowsEnv.ClangArm64:
       return await installMSYS2(target);
-    case WindowsEnv.ClangArm64: {
-      throw new Error('Not implemented yet: "clangarm64" case');
-    }
   }
 }
 
@@ -240,7 +238,8 @@ async function installMSYS2(target: Target): Promise<string> {
   // The MSYS2 package for flang in the UCRT64 environment.
   await setupMSYS2(target.windowsEnv, ["flang"]);
 
-  const msysBin = path.join("C:\\msys64", target.windowsEnv, "bin");
+  const msysRoot = path.join("C:\\msys64", target.windowsEnv);
+  const msysBin = path.join(msysRoot, "bin");
   const flangExe = path.join(msysBin, "flang.exe");
   const clangExe = path.join(msysBin, "clang.exe");
   const clangPPExe = path.join(msysBin, "clang++.exe");
@@ -254,6 +253,7 @@ async function installMSYS2(target: Target): Promise<string> {
   // MSYS2 rolling release has no meaningful version to export; use LATEST.
   core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
   core.exportVariable("WINDOWS_ENV", target.windowsEnv);
+  core.exportVariable("MSYS2_ROOT_ENV", msysRoot);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);

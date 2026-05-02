@@ -96168,10 +96168,8 @@ async function flang_win32_installWin32(target) {
             return await win32_installNative(target);
         case WindowsEnv.UCRT64:
         case WindowsEnv.Clang64:
+        case WindowsEnv.ClangArm64:
             return await win32_installMSYS2(target);
-        case WindowsEnv.ClangArm64: {
-            throw new Error('Not implemented yet: "clangarm64" case');
-        }
     }
 }
 async function win32_installNative(target) {
@@ -96233,7 +96231,8 @@ async function win32_installMSYS2(target) {
     lib_core.info(`Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`);
     // The MSYS2 package for flang in the UCRT64 environment.
     await setupMSYS2(target.windowsEnv, ["flang"]);
-    const msysBin = external_path_.join("C:\\msys64", target.windowsEnv, "bin");
+    const msysRoot = external_path_.join("C:\\msys64", target.windowsEnv);
+    const msysBin = external_path_.join(msysRoot, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");
     const clangExe = external_path_.join(msysBin, "clang.exe");
     const clangPPExe = external_path_.join(msysBin, "clang++.exe");
@@ -96245,6 +96244,7 @@ async function win32_installMSYS2(target) {
     // MSYS2 rolling release has no meaningful version to export; use LATEST.
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
     lib_core.exportVariable("WINDOWS_ENV", target.windowsEnv);
+    lib_core.exportVariable("MSYS2_ROOT_ENV", msysRoot);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
     lib_core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
     return resolvedVersion;
