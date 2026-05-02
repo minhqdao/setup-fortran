@@ -1,7 +1,4 @@
-import {
-  resolveVersion,
-  resolveWindowsVersion,
-} from "../src/resolve_version";
+import { resolveVersion, resolveWindowsVersion } from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, WindowsEnv } from "../src/types";
 import type { Target } from "../src/types";
 
@@ -115,13 +112,11 @@ describe("resolveWindowsVersion", () => {
       [WindowsEnv.Native]: ["15", "14"],
       [WindowsEnv.UCRT64]: ["14", "13"],
       [WindowsEnv.Clang64]: undefined,
-      [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
       [WindowsEnv.Native]: ["14"],
       [WindowsEnv.UCRT64]: undefined,
       [WindowsEnv.Clang64]: undefined,
-      [WindowsEnv.ClangArm64]: undefined,
     },
   };
 

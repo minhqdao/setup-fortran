@@ -13,13 +13,11 @@ const SUPPORTED_VERSIONS = {
     [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
     [WindowsEnv.UCRT64]: [LATEST],
     [WindowsEnv.Clang64]: undefined,
-    [WindowsEnv.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [WindowsEnv.Native]: undefined,
     [WindowsEnv.UCRT64]: undefined,
     [WindowsEnv.Clang64]: undefined,
-    [WindowsEnv.ClangArm64]: undefined,
   },
 } as const satisfies Record<
   Arch,
@@ -43,7 +41,6 @@ export async function installWin32(target: Target): Promise<string> {
     case WindowsEnv.UCRT64:
       return await installMSYS2(target);
     case WindowsEnv.Clang64:
-    case WindowsEnv.ClangArm64:
       throw new Error(
         `Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
           `Please use the "native" WindowsEnv to install the latest gfortran via conda-forge, or ` +

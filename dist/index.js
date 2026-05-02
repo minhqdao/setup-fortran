@@ -90358,7 +90358,6 @@ const WindowsEnv = {
     Native: "native",
     UCRT64: "ucrt64",
     Clang64: "clang64",
-    ClangArm64: "clangarm64",
 };
 const LATEST = "latest";
 
@@ -94483,7 +94482,6 @@ const MSYS2_ROOT = "C:\\msys64";
 const PKG_PREFIX = {
     [WindowsEnv.UCRT64]: "mingw-w64-ucrt-x86_64",
     [WindowsEnv.Clang64]: "mingw-w64-clang-x86_64",
-    [WindowsEnv.ClangArm64]: "mingw-w64-clang-aarch64",
     [WindowsEnv.Native]: undefined,
 };
 async function setupMSYS2(windowsEnv, packages) {
@@ -94528,13 +94526,11 @@ const win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
         [WindowsEnv.UCRT64]: [LATEST],
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: undefined,
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
 };
 const GCC_RELEASES = {
@@ -94552,7 +94548,6 @@ async function installWin32(target) {
         case WindowsEnv.UCRT64:
             return await installMSYS2(target);
         case WindowsEnv.Clang64:
-        case WindowsEnv.ClangArm64:
             throw new Error(`Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
                 `Please use the "native" WindowsEnv to install the latest gfortran via conda-forge, or ` +
                 `use MSYS2 with WindowsEnv "ucrt64" for a rolling-release version of gfortran.`);
@@ -94852,13 +94847,11 @@ const ifx_win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.Native]: IFX_RELEASES.map((r) => r.version),
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: undefined,
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
 };
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
@@ -95269,13 +95262,11 @@ const ifort_win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.Native]: win32_IFORT_RELEASES.map((r) => r.version),
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: undefined,
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: undefined,
     },
 };
 const win32_ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
@@ -96083,13 +96074,11 @@ const flang_win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.Native]: ["22"],
         [WindowsEnv.UCRT64]: [LATEST],
         [WindowsEnv.Clang64]: [LATEST],
-        [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: ["22", "21", "20"],
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: [LATEST],
     },
 };
 // Windows installer suffix per arch, as used in official LLVM GitHub releases.
@@ -96168,7 +96157,6 @@ async function flang_win32_installWin32(target) {
             return await win32_installNative(target);
         case WindowsEnv.UCRT64:
         case WindowsEnv.Clang64:
-        case WindowsEnv.ClangArm64:
             return await win32_installMSYS2(target);
     }
 }
@@ -96526,13 +96514,11 @@ const lfortran_win32_SUPPORTED_VERSIONS = {
         ],
         [WindowsEnv.UCRT64]: [LATEST],
         [WindowsEnv.Clang64]: [LATEST],
-        [WindowsEnv.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [WindowsEnv.Native]: undefined,
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
-        [WindowsEnv.ClangArm64]: [LATEST],
     },
 };
 async function lfortran_win32_installWin32(target) {
@@ -96541,7 +96527,6 @@ async function lfortran_win32_installWin32(target) {
             return await installConda(target);
         case WindowsEnv.UCRT64:
         case WindowsEnv.Clang64:
-        case WindowsEnv.ClangArm64:
             return await lfortran_win32_installMSYS2(target);
     }
 }

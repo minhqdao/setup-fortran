@@ -31,13 +31,11 @@ const SUPPORTED_VERSIONS = {
     [WindowsEnv.Native]: ["22"],
     [WindowsEnv.UCRT64]: [LATEST],
     [WindowsEnv.Clang64]: [LATEST],
-    [WindowsEnv.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [WindowsEnv.Native]: ["22", "21", "20"],
     [WindowsEnv.UCRT64]: undefined,
     [WindowsEnv.Clang64]: undefined,
-    [WindowsEnv.ClangArm64]: [LATEST],
   },
 } as const satisfies Record<
   Arch,
@@ -146,7 +144,6 @@ export async function installWin32(target: Target): Promise<string> {
       return await installNative(target);
     case WindowsEnv.UCRT64:
     case WindowsEnv.Clang64:
-    case WindowsEnv.ClangArm64:
       return await installMSYS2(target);
   }
 }
