@@ -96517,9 +96517,8 @@ async function installConda(target) {
         "--solver=classic",
         `lfortran==${version}`,
     ]);
-    // In a named env, the binary lives in envs\lfortran\ not the prefix root.
     const envPrefix = external_path_.join(condaPrefix, "envs", "lfortran");
-    const lfortranExe = external_path_.join(envPrefix, "lfortran.exe");
+    const lfortranExe = external_path_.join(envPrefix, "Scripts", "lfortran.exe");
     if (!external_fs_.existsSync(lfortranExe)) {
         throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
     }
