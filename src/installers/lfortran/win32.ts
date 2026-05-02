@@ -78,9 +78,9 @@ async function installConda(target: Target): Promise<string> {
     "config",
     "--set",
     "channel_priority",
-    "strict",
+    "flexible",
   ]);
-  await exec.exec(condaExe, ["config", "--set", "solver", "classic"]);
+  await exec.exec(`"${condaExe}"`, ["config", "--set", "solver", "classic"]);
 
   core.info(`Installing lfortran==${version} from conda-forge...`);
   await exec.exec(`"${condaExe}"`, [
