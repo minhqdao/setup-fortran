@@ -17,7 +17,15 @@ import type { Target } from "../../types";
 //     currently not supported (https://anaconda.org/conda-forge/lfortran).
 //   - The binary is always named `lfortran` regardless of version.
 const SUPPORTED_VERSIONS = {
-  [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+  [Arch.X64]: [
+    "0.63.0",
+    "0.62.0",
+    "0.61.0",
+    "0.60.0",
+    "0.59.0",
+    "0.58.0",
+    "0.57.0",
+  ],
 } as const satisfies Partial<Record<Arch, readonly string[]>>;
 
 // Downloads and installs a self-contained Miniforge installer into a temporary

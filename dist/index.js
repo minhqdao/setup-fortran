@@ -96269,7 +96269,15 @@ async function installFlang(target) {
 //     currently not supported (https://anaconda.org/conda-forge/lfortran).
 //   - The binary is always named `lfortran` regardless of version.
 const lfortran_debian_SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+    [Arch.X64]: [
+        "0.63.0",
+        "0.62.0",
+        "0.61.0",
+        "0.60.0",
+        "0.59.0",
+        "0.58.0",
+        "0.57.0",
+    ],
 };
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
@@ -96359,8 +96367,24 @@ async function lfortran_debian_resolveInstalledVersion(binaryPath) {
 //     conda-forge. The conda arch strings are `osx-arm64` and `osx-64`.
 //   - LATEST resolves to the first entry in the list.
 const lfortran_darwin_SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-    [Arch.ARM64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+    [Arch.X64]: [
+        "0.63.0",
+        "0.62.0",
+        "0.61.0",
+        "0.60.0",
+        "0.59.0",
+        "0.58.0",
+        "0.57.0",
+    ],
+    [Arch.ARM64]: [
+        "0.63.0",
+        "0.62.0",
+        "0.61.0",
+        "0.60.0",
+        "0.59.0",
+        "0.58.0",
+        "0.57.0",
+    ],
 };
 // Returns the conda arch string for a given runner arch.
 function condaArch(arch) {
@@ -96466,26 +96490,23 @@ async function lfortran_darwin_resolveInstalledVersion(binaryPath) {
 //   upstream closely (verified at 0.63.0).
 const lfortran_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
-        [WindowsEnv.Native]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+        [WindowsEnv.Native]: [
+            "0.63.0",
+            "0.62.0",
+            "0.61.0",
+            "0.60.0",
+            "0.59.0",
+            "0.58.0",
+            "0.57.0",
+        ],
         [WindowsEnv.UCRT64]: [LATEST],
     },
     [Arch.ARM64]: {
-        [WindowsEnv.Native]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-        [WindowsEnv.UCRT64]: [LATEST],
+        [WindowsEnv.Native]: undefined,
+        [WindowsEnv.UCRT64]: undefined,
     },
 };
 async function lfortran_win32_installWin32(target) {
-    const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
-    if (external_fs_.existsSync(gitLink)) {
-        lib_core.info("Moving conflicting Git link.exe to link.exe.bak...");
-        try {
-            external_fs_.renameSync(gitLink, `${gitLink}.bak`);
-        }
-        catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            lib_core.warning(`Could not move Git link.exe: ${message}`);
-        }
-    }
     switch (target.windowsEnv) {
         case WindowsEnv.Native:
             return await installConda(target);
@@ -96502,6 +96523,17 @@ async function lfortran_win32_installWin32(target) {
 //   All three need to be on PATH for the toolchain to work correctly.
 async function installConda(target) {
     const version = resolveWindowsVersion(target, lfortran_win32_SUPPORTED_VERSIONS);
+    const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
+    if (external_fs_.existsSync(gitLink)) {
+        lib_core.info("Moving conflicting Git link.exe to link.exe.bak...");
+        try {
+            external_fs_.renameSync(gitLink, `${gitLink}.bak`);
+        }
+        catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            lib_core.warning(`Could not move Git link.exe: ${message}`);
+        }
+    }
     lib_core.info(`Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`);
     const condaPrefix = "C:\\lfortran-conda";
     const miniforgeInstaller = "C:\\miniforge-install.exe";

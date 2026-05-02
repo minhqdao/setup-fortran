@@ -17,8 +17,24 @@ import type { Target } from "../../types";
 //     conda-forge. The conda arch strings are `osx-arm64` and `osx-64`.
 //   - LATEST resolves to the first entry in the list.
 const SUPPORTED_VERSIONS = {
-  [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-  [Arch.ARM64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+  [Arch.X64]: [
+    "0.63.0",
+    "0.62.0",
+    "0.61.0",
+    "0.60.0",
+    "0.59.0",
+    "0.58.0",
+    "0.57.0",
+  ],
+  [Arch.ARM64]: [
+    "0.63.0",
+    "0.62.0",
+    "0.61.0",
+    "0.60.0",
+    "0.59.0",
+    "0.58.0",
+    "0.57.0",
+  ],
 } as const satisfies Record<Arch, readonly string[]>;
 
 // Returns the conda arch string for a given runner arch.

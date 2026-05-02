@@ -20,12 +20,20 @@ import { setupMSYS2 } from "../../setup_msys2";
 //   upstream closely (verified at 0.63.0).
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
-    [WindowsEnv.Native]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
+    [WindowsEnv.Native]: [
+      "0.63.0",
+      "0.62.0",
+      "0.61.0",
+      "0.60.0",
+      "0.59.0",
+      "0.58.0",
+      "0.57.0",
+    ],
     [WindowsEnv.UCRT64]: [LATEST],
   },
   [Arch.ARM64]: {
-    [WindowsEnv.Native]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-    [WindowsEnv.UCRT64]: [LATEST],
+    [WindowsEnv.Native]: undefined,
+    [WindowsEnv.UCRT64]: undefined,
   },
 } as const satisfies Record<
   Arch,
@@ -33,17 +41,6 @@ const SUPPORTED_VERSIONS = {
 >;
 
 export async function installWin32(target: Target): Promise<string> {
-  const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
-  if (fs.existsSync(gitLink)) {
-    core.info("Moving conflicting Git link.exe to link.exe.bak...");
-    try {
-      fs.renameSync(gitLink, `${gitLink}.bak`);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      core.warning(`Could not move Git link.exe: ${message}`);
-    }
-  }
-
   switch (target.windowsEnv) {
     case WindowsEnv.Native:
       return await installConda(target);
@@ -61,6 +58,17 @@ export async function installWin32(target: Target): Promise<string> {
 //   All three need to be on PATH for the toolchain to work correctly.
 async function installConda(target: Target): Promise<string> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+
+  const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
+  if (fs.existsSync(gitLink)) {
+    core.info("Moving conflicting Git link.exe to link.exe.bak...");
+    try {
+      fs.renameSync(gitLink, `${gitLink}.bak`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      core.warning(`Could not move Git link.exe: ${message}`);
+    }
+  }
 
   core.info(
     `Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`,
