@@ -158,6 +158,22 @@ async function run(): Promise<void> {
     //   );
     // }
 
+    core.info("DEBUG: Checking OpenMP support with omp_test...");
+    if (isMSYS2 && msys2Root && isFlang) {
+      const includeDir = path.join(msys2Root, "include");
+      core.info(`Checking for omp_lib.mod in ${includeDir}...`);
+      const modPath = path.join(includeDir, "omp_lib.mod");
+      if (fs.existsSync(modPath)) {
+        core.info("omp_lib.mod found.");
+      } else {
+        core.info("omp_lib.mod NOT found. Searching for it...");
+        await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+          "-lc",
+          `find C:/msys64/clang64 -name 'omp_lib.mod' 2>/dev/null || echo 'not found anywhere'`,
+        ]);
+      }
+    }
+
     // const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
     // const skipOmp =
     //   isLFortran || (isFlang && (isUnsupportedDarwin || isUCRT64));
