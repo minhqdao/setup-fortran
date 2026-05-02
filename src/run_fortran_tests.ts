@@ -71,9 +71,8 @@ async function run(): Promise<void> {
     const compiler = (process.env.FORTRAN_COMPILER ?? "") as Compiler;
     const rawVersion = process.env.FORTRAN_COMPILER_VERSION ?? "0";
     const windowsEnv = process.env.WINDOWS_ENV as WindowsEnv | undefined;
-    const msys2Root = process.env.MSYS2_ROOT_ENV;
-    const isMSYS2 =
-      windowsEnv === WindowsEnv.UCRT64 || windowsEnv === WindowsEnv.Clang64;
+    const isUCRT64 = windowsEnv === WindowsEnv.UCRT64;
+    const isMSYS2 = isUCRT64 || windowsEnv === WindowsEnv.Clang64;
 
     const rawPlatform = process.platform;
     if (!Object.values(OS).includes(rawPlatform as OS)) {
@@ -82,11 +81,11 @@ async function run(): Promise<void> {
 
     const platform = rawPlatform as OS;
     const isWindows = platform === OS.Windows;
-    // const isDarwin = platform === OS.MacOS;
+    const isDarwin = platform === OS.MacOS;
     const isLatest = rawVersion === LATEST;
     const majorVersion = isLatest ? Infinity : parseInt(rawVersion, 10);
     const isFlang = compiler === Compiler.Flang;
-    // const isLFortran = compiler === Compiler.LFortran;
+    const isLFortran = compiler === Compiler.LFortran;
 
     const testDir = path.join(process.cwd(), "fortran_tests");
 
@@ -144,56 +143,30 @@ async function run(): Promise<void> {
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
 
-    // const skipPoly = isFlang && (majorVersion < 19 || isUCRT64);
-    // // Polymorphic types (CLASS): requires flang/LLVM 19+; currently broken on UCRT64.
-    // if (!skipPoly) {
-    await execTest("polymorphism_test", [
-      "polymorphism_mod_test.f90",
-      "polymorphism_test.f90",
-    ]);
-    // } else {
-    //   skipTest(
-    //     "polymorphism_test",
-    //     `not supported by flang ${majorVersion.toString()} (requires LLVM 19+)`,
-    //   );
-    // }
-
-    core.info("DEBUG: Checking OpenMP support with omp_test...");
-    if (isMSYS2 && msys2Root && isFlang) {
-      const includeDir = path.join(msys2Root, "include");
-      core.info(`Checking for omp_lib.mod in ${includeDir}...`);
-      const modPath = path.join(includeDir, "omp_lib.mod");
-      if (fs.existsSync(modPath)) {
-        core.info("omp_lib.mod found.");
-      } else {
-        core.info("omp_lib.mod NOT found. Searching for it...");
-        await exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
-          "-lc",
-          `find C:/msys64/clang64 -name 'omp_lib.mod' 2>/dev/null || echo 'not found anywhere'`,
-        ]);
-      }
+    const skipPoly = isFlang && (majorVersion < 19 || isUCRT64);
+    // Polymorphic types (CLASS): requires flang/LLVM 19+; currently broken on UCRT64.
+    if (!skipPoly) {
+      await execTest("polymorphism_test", [
+        "polymorphism_mod_test.f90",
+        "polymorphism_test.f90",
+      ]);
+    } else {
+      skipTest(
+        "polymorphism_test",
+        `not supported by flang ${majorVersion.toString()} (requires LLVM 19+)`,
+      );
     }
 
-    // const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
-    // const skipOmp =
-    //   isLFortran || (isFlang && (isUnsupportedDarwin || isUCRT64));
-    // if (!skipOmp) {
-    await execTest(
-      "omp_test",
-      ["omp_test.f90"],
-      [
-        ...ompFlag,
-        ...(isMSYS2 && msys2Root && isFlang
-          ? [`-I${path.join(msys2Root, "include")}`]
-          : []),
-      ],
-    );
-    // } else {
-    //   skipTest(
-    //     "omp_test",
-    //     `not supported by flang ${majorVersion.toString()} on ${process.platform}`,
-    //   );
-    // }
+    const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
+    const skipOmp = isLFortran || (isFlang && (isUnsupportedDarwin || isMSYS2));
+    if (!skipOmp) {
+      await execTest("omp_test", ["omp_test.f90"], ompFlag);
+    } else {
+      skipTest(
+        "omp_test",
+        `not supported by flang ${majorVersion.toString()} on ${process.platform}`,
+      );
+    }
 
     core.info("All integration tests passed successfully!");
   } catch (error) {

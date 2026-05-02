@@ -96244,7 +96244,6 @@ async function win32_installMSYS2(target) {
     // MSYS2 rolling release has no meaningful version to export; use LATEST.
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
     lib_core.exportVariable("WINDOWS_ENV", target.windowsEnv);
-    lib_core.exportVariable("MSYS2_ROOT_ENV", msysRoot);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
     lib_core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
     return resolvedVersion;

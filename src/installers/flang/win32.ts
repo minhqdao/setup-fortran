@@ -253,7 +253,6 @@ async function installMSYS2(target: Target): Promise<string> {
   // MSYS2 rolling release has no meaningful version to export; use LATEST.
   core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
   core.exportVariable("WINDOWS_ENV", target.windowsEnv);
-  core.exportVariable("MSYS2_ROOT_ENV", msysRoot);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
