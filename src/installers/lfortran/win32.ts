@@ -2,7 +2,6 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 import { Arch, LATEST, WindowsEnv, type Target } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
@@ -56,8 +55,11 @@ async function installConda(target: Target): Promise<string> {
     `Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`,
   );
 
-  const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
-  const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.exe");
+  // NSIS rejects paths containing the ~ character (8.3 short-path notation).
+  // os.tmpdir() on GitHub Actions runners resolves to a path with RUNNER~1,
+  // so we use a fixed root-level path that is guaranteed to be tilde-free.
+  const condaPrefix = "C:\\lfortran-conda";
+  const miniforgeInstaller = "C:\\miniforge-install.exe";
 
   const arch = target.arch === Arch.ARM64 ? "arm64" : "x86_64";
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
@@ -104,6 +106,10 @@ async function installConda(target: Target): Promise<string> {
   core.exportVariable("FC", lfortranExe);
   core.exportVariable("FORTRAN_COMPILER", "lfortran");
   core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+  core.exportVariable(
+    "LFORTRAN_OMP_LIB_DIR",
+    path.join(condaPrefix, "Library", "lib"),
+  );
 
   const resolvedVersion = await resolveInstalledVersion(lfortranExe);
   core.info(
@@ -130,6 +136,10 @@ async function installMSYS2(): Promise<string> {
   core.exportVariable("FORTRAN_COMPILER", "lfortran");
   // MSYS2 rolling release has no meaningful version to export; use LATEST.
   core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
+  core.exportVariable(
+    "LFORTRAN_OMP_LIB_DIR",
+    path.join("C:\\msys64", WindowsEnv.UCRT64, "lib"),
+  );
   core.exportVariable("WINDOWS_ENV", WindowsEnv.UCRT64);
 
   const resolvedVersion = await resolveInstalledVersion(lfortranExe);

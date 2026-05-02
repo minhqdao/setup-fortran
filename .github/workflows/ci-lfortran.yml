@@ -36,13 +36,13 @@ jobs:
                     - { compiler: lfortran, version: "0.61.0" }
                     - { compiler: lfortran, version: "0.60.0" }
                     - { compiler: lfortran, version: "0.59.0" }
-                    # include:
-                    #     - image: windows-2025
-                    #       toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
-                    #     - image: windows-2022
-                    #       toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
-                    #     - image: windows-11-arm
-                    #       toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
+                include:
+                    - image: windows-2025
+                      toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
+                    - image: windows-2022
+                      toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
+                #     - image: windows-11-arm
+                #       toolchain: { compiler: lfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
         steps:
             - uses: actions/checkout@v6
 

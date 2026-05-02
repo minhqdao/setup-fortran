@@ -13,21 +13,12 @@ import type { Target } from "../../types";
 // Notes:
 //   - lfortran is installed via conda-forge, so the version here is the conda
 //     package version (e.g. "0.63.0").
-//   - The binary is always named `lfortran` regardless of the version.
+//   - conda-forge only publishes lfortran for linux-64; linux-aarch64 is
+//     currently not supported (https://anaconda.org/conda-forge/lfortran).
+//   - The binary is always named `lfortran` regardless of version.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-  [Arch.ARM64]: undefined,
-} as const satisfies Record<Arch, readonly string[] | undefined>;
-
-// Returns the conda arch string for a given runner arch.
-function condaArch(arch: Arch): string {
-  switch (arch) {
-    case Arch.X64:
-      return "x86_64";
-    case Arch.ARM64:
-      return "aarch64";
-  }
-}
+} as const satisfies Partial<Record<Arch, readonly string[]>>;
 
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
@@ -35,6 +26,13 @@ function condaArch(arch: Arch): string {
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
 export async function installDebian(target: Target): Promise<string> {
+  if (target.arch === Arch.ARM64) {
+    throw new Error(
+      `LFortran is not available for Linux ARM64 on conda-forge. ` +
+        `See https://anaconda.org/conda-forge/lfortran for supported platforms.`,
+    );
+  }
+
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
 
   core.info(`Installing LFortran ${version} on Linux (${target.arch})...`);
@@ -43,9 +41,8 @@ export async function installDebian(target: Target): Promise<string> {
   // Using a fixed path makes it easy to add to PATH later.
   const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
   const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
-  const arch = condaArch(target.arch);
 
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh`;
+  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
 
   core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
   await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
@@ -93,6 +90,7 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("FC", "lfortran");
   core.exportVariable("FORTRAN_COMPILER", "lfortran");
   core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+  core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);
   core.info(`LFortran ${resolvedVersion} installed successfully.`);

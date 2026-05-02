@@ -6,7 +6,7 @@ import { Compiler, LATEST, OS, WindowsEnv } from "./types";
 
 interface CompilerFlags {
   module: string[];
-  openmp: string;
+  openmp: string[];
 }
 
 function getCompilerFlags(
@@ -18,16 +18,22 @@ function getCompilerFlags(
     case Compiler.IFort:
       return {
         module: isWindows ? ["-module:test_build"] : ["-module", "test_build"],
-        openmp: isWindows ? "-Qopenmp" : "-qopenmp",
+        openmp: [isWindows ? "-Qopenmp" : "-qopenmp"],
       };
     case Compiler.NVFortran:
-      return { module: ["-J", "test_build"], openmp: "-mp" };
-    case "lfortran":
-      return { module: ["-J", "test_build"], openmp: "--openmp" };
+      return { module: ["-J", "test_build"], openmp: ["-mp"] };
+    case Compiler.LFortran:
+      return {
+        module: ["-J", "test_build"],
+        openmp: [
+          "--openmp",
+          `--openmp-lib-dir=${process.env.LFORTRAN_OMP_LIB_DIR ?? ""}`,
+        ],
+      };
     case "gfortran":
     case "aocc":
     case "flang":
-      return { module: ["-J", "test_build"], openmp: "-fopenmp" };
+      return { module: ["-J", "test_build"], openmp: ["-fopenmp"] };
   }
 }
 
@@ -139,7 +145,7 @@ async function run(): Promise<void> {
     const isUnsupportedDarwin = isDarwin && majorVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
     const skipOmp = isFlang && (isUnsupportedDarwin || isUCRT64);
     if (!skipOmp) {
-      await execTest("omp_test", ["omp_test.f90"], [ompFlag]);
+      await execTest("omp_test", ["omp_test.f90"], ompFlag);
     } else {
       skipTest(
         "omp_test",

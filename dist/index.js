@@ -96265,34 +96265,29 @@ async function installFlang(target) {
 // Notes:
 //   - lfortran is installed via conda-forge, so the version here is the conda
 //     package version (e.g. "0.63.0").
-//   - The binary is always named `lfortran` regardless of the version.
+//   - conda-forge only publishes lfortran for linux-64; linux-aarch64 is
+//     currently not supported (https://anaconda.org/conda-forge/lfortran).
+//   - The binary is always named `lfortran` regardless of version.
 const lfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
-    [Arch.ARM64]: undefined,
 };
-// Returns the conda arch string for a given runner arch.
-function condaArch(arch) {
-    switch (arch) {
-        case Arch.X64:
-            return "x86_64";
-        case Arch.ARM64:
-            return "aarch64";
-    }
-}
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
 //
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
 async function lfortran_debian_installDebian(target) {
+    if (target.arch === Arch.ARM64) {
+        throw new Error(`LFortran is not available for Linux ARM64 on conda-forge. ` +
+            `See https://anaconda.org/conda-forge/lfortran for supported platforms.`);
+    }
     const version = resolveVersion(target, lfortran_debian_SUPPORTED_VERSIONS);
     lib_core.info(`Installing LFortran ${version} on Linux (${target.arch})...`);
     // Install Miniforge into a dedicated prefix under the runner's temp dir.
     // Using a fixed path makes it easy to add to PATH later.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const arch = condaArch(target.arch);
-    const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh`;
+    const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
     lib_core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
     await lib_exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
     lib_core.info(`Installing Miniforge to ${condaPrefix}...`);
@@ -96329,6 +96324,7 @@ async function lfortran_debian_installDebian(target) {
     lib_core.exportVariable("FC", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     const resolvedVersion = await lfortran_debian_resolveInstalledVersion(lfortranBin);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -96367,7 +96363,7 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["0.63.0", "0.62.0", "0.61.0", "0.60.0", "0.59.0"],
 };
 // Returns the conda arch string for a given runner arch.
-function darwin_condaArch(arch) {
+function condaArch(arch) {
     switch (arch) {
         case Arch.X64:
             return "x86_64";
@@ -96382,7 +96378,7 @@ async function lfortran_darwin_installDarwin(target) {
     // avoid interfering with any pre-existing conda installation on the runner.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const arch = darwin_condaArch(target.arch);
+    const arch = condaArch(target.arch);
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
     lib_core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
     await lib_exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
@@ -96413,6 +96409,7 @@ async function lfortran_darwin_installDarwin(target) {
     lib_core.exportVariable("FC", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     // lfortran links against system libc++ on macOS; set SDKROOT so the linker
     // can find the right SDK headers when compiling generated C/C++ code.
     let sdkPath = "";
@@ -96448,7 +96445,6 @@ async function lfortran_darwin_resolveInstalledVersion(binaryPath) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/win32.ts
-
 
 
 
@@ -96496,8 +96492,11 @@ async function lfortran_win32_installWin32(target) {
 async function installConda(target) {
     const version = resolveWindowsVersion(target, lfortran_win32_SUPPORTED_VERSIONS);
     lib_core.info(`Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`);
-    const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
-    const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.exe");
+    // NSIS rejects paths containing the ~ character (8.3 short-path notation).
+    // os.tmpdir() on GitHub Actions runners resolves to a path with RUNNER~1,
+    // so we use a fixed root-level path that is guaranteed to be tilde-free.
+    const condaPrefix = "C:\\lfortran-conda";
+    const miniforgeInstaller = "C:\\miniforge-install.exe";
     const arch = target.arch === Arch.ARM64 ? "arm64" : "x86_64";
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
     lib_core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
@@ -96533,6 +96532,7 @@ async function installConda(target) {
     lib_core.exportVariable("FC", lfortranExe);
     lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
+    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
     return resolvedVersion;
@@ -96549,6 +96549,7 @@ async function lfortran_win32_installMSYS2() {
     lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
     // MSYS2 rolling release has no meaningful version to export; use LATEST.
     lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
+    lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", WindowsEnv.UCRT64, "lib"));
     lib_core.exportVariable("WINDOWS_ENV", WindowsEnv.UCRT64);
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/UCRT64).`);
