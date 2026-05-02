@@ -96524,7 +96524,6 @@ async function installConda(target) {
         "conda-forge",
         "--solver=classic",
         `lfortran==${version}`,
-        "clang",
         "lld",
     ]);
     const envPrefix = external_path_.join(condaPrefix, "envs", "lfortran");

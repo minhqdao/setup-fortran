@@ -92,7 +92,6 @@ async function installConda(target: Target): Promise<string> {
     "conda-forge",
     "--solver=classic",
     `lfortran==${version}`,
-    "clang",
     "lld",
   ]);
 

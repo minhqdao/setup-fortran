@@ -32,7 +32,7 @@ function getCompilerFlags(
           `--openmp-lib-dir=${process.env.LFORTRAN_OMP_LIB_DIR ?? ""}`,
         ],
         linkerFlags: isWindows
-          ? [`--linker=${process.env.LFORTRAN_LINKER ?? "clang"}`]
+          ? [`--linker=${process.env.LFORTRAN_LINKER ?? "link.exe"}`]
           : [],
       };
     case "gfortran":
