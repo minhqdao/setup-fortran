@@ -97,6 +97,32 @@ async function installConda(target: Target): Promise<string> {
   core.addPath(path.join(envPrefix, "Scripts"));
   core.addPath(path.join(envPrefix, "Library", "bin"));
 
+  core.info(`DEBUG: Added conda environment directories to PATH:`);
+  const searchDirs = [
+    envPrefix,
+    path.join(envPrefix, "Library", "bin"),
+    path.join(envPrefix, "Library", "usr", "bin"),
+    path.join(envPrefix, "Scripts"),
+    path.join(envPrefix, "bin"),
+  ];
+
+  for (const dir of searchDirs) {
+    if (fs.existsSync(dir)) {
+      const entries = fs
+        .readdirSync(dir)
+        .filter(
+          (f) =>
+            f.toLowerCase().includes("clang") ||
+            f.toLowerCase().includes("link") ||
+            f.toLowerCase().includes("gcc") ||
+            f.toLowerCase().includes("ld"),
+        );
+      if (entries.length > 0) {
+        core.info(`${dir}: ${entries.join(", ")}`);
+      }
+    }
+  }
+
   const clangExe = path.join(envPrefix, "Library", "bin", "clang.exe");
   if (fs.existsSync(clangExe)) {
     core.exportVariable("LFORTRAN_LINKER", clangExe);

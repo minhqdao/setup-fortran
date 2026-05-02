@@ -96525,6 +96525,26 @@ async function installConda(target) {
     lib_core.addPath(envPrefix);
     lib_core.addPath(external_path_.join(envPrefix, "Scripts"));
     lib_core.addPath(external_path_.join(envPrefix, "Library", "bin"));
+    lib_core.info(`DEBUG: Added conda environment directories to PATH:`);
+    const searchDirs = [
+        envPrefix,
+        external_path_.join(envPrefix, "Library", "bin"),
+        external_path_.join(envPrefix, "Library", "usr", "bin"),
+        external_path_.join(envPrefix, "Scripts"),
+        external_path_.join(envPrefix, "bin"),
+    ];
+    for (const dir of searchDirs) {
+        if (external_fs_.existsSync(dir)) {
+            const entries = external_fs_.readdirSync(dir)
+                .filter((f) => f.toLowerCase().includes("clang") ||
+                f.toLowerCase().includes("link") ||
+                f.toLowerCase().includes("gcc") ||
+                f.toLowerCase().includes("ld"));
+            if (entries.length > 0) {
+                lib_core.info(`${dir}: ${entries.join(", ")}`);
+            }
+        }
+    }
     const clangExe = external_path_.join(envPrefix, "Library", "bin", "clang.exe");
     if (external_fs_.existsSync(clangExe)) {
         lib_core.exportVariable("LFORTRAN_LINKER", clangExe);
