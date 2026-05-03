@@ -90590,8 +90590,8 @@ function githubHeaders() {
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
-    [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
+    [Arch.X64]: ["15", "14", "13", "12", "11"],
+    [Arch.ARM64]: ["15", "14", "13", "12", "11"],
 };
 async function installDebian(target) {
     const version = resolveVersion(target, SUPPORTED_VERSIONS);
@@ -94544,7 +94544,7 @@ const GCC_RELEASES = [
     },
     {
         version: "11",
-        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/11.5.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64ucrt-１2.0.0-r１.zip",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/11.5.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64ucrt-12.0.0-r1.zip",
     },
 ];
 const win32_SUPPORTED_VERSIONS = {

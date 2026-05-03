@@ -50,6 +50,14 @@ jobs:
                     - image: windows-2022
                       toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
                 exclude:
+                    - image: ubuntu-24.04
+                      toolchain: { compiler: gfortran, version: "16" }
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: gfortran, version: "16" }
+                    - image: ubuntu-24.04-arm
+                      toolchain: { compiler: gfortran, version: "16" }
+                    - image: ubuntu-22.04-arm
+                      toolchain: { compiler: gfortran, version: "16" }
                     - image: macos-26
                       toolchain: { compiler: gfortran, version: "16" }
                     - image: macos-26-intel
