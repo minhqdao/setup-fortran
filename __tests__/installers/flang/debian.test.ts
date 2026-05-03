@@ -101,7 +101,7 @@ describe("installDebian (Flang)", () => {
     await installDebian(baseTarget);
 
     expect(core.addPath).toHaveBeenCalledWith("/usr/lib/llvm-18/bin");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang-18");
     expect(mockedExportVariable).toHaveBeenCalledWith("CC", "clang-18");
     expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "clang++-18");
     expect(mockedExportVariable).toHaveBeenCalledWith(

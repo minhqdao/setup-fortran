@@ -121,11 +121,9 @@ export async function installDebian(target: Target): Promise<string> {
     core.addPath(llvmBinDir);
   }
 
-  core.exportVariable("FC", "flang");
+  core.exportVariable("FC", `flang-${version}`);
   core.exportVariable("CC", `clang-${version}`);
   core.exportVariable("CXX", `clang++-${version}`);
-  core.exportVariable("FORTRAN_COMPILER", "flang");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
 
   // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
   // time. This is particularly important for LLVM 15/16 where the runtime

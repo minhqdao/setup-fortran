@@ -113,8 +113,6 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("FC", "ifx");
   core.exportVariable("CC", "icx");
   core.exportVariable("CXX", "icpx");
-  core.exportVariable("FORTRAN_COMPILER", "ifx");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);

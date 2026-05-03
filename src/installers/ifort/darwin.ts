@@ -161,8 +161,6 @@ export async function installDarwin(target: Target): Promise<string> {
   core.exportVariable("FC", "ifort");
   core.exportVariable("CC", "icc");
   core.exportVariable("CXX", "icpc");
-  core.exportVariable("FORTRAN_COMPILER", "ifort");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);

@@ -36,14 +36,16 @@ function getCompilerFlags(
         linkerFlags:
           isWindows && lFortranLinker ? [`--linker=${lFortranLinker}`] : [],
       };
-    case "gfortran":
-    case "aocc":
-    case "flang":
+    case Compiler.GFortran:
+    case Compiler.AOCC:
+    case Compiler.Flang:
       return {
         module: ["-J", "test_build"],
         openmp: ["-fopenmp"],
         linkerFlags: [],
       };
+    default:
+      throw new Error(`Unsupported compiler: ${compiler as string}`);
   }
 }
 

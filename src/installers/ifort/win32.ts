@@ -138,8 +138,6 @@ export async function installWin32(target: Target): Promise<string> {
   core.exportVariable("FC", "ifort");
   core.exportVariable("CC", "icl");
   core.exportVariable("CXX", "icl");
-  core.exportVariable("FORTRAN_COMPILER", "ifort");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);

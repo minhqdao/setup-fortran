@@ -94739,8 +94739,6 @@ async function debian_installDebian(target) {
     lib_core.exportVariable("FC", "ifx");
     lib_core.exportVariable("CC", "icx");
     lib_core.exportVariable("CXX", "icpx");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifx");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     const resolvedVersion = await debian_resolveInstalledVersion();
     lib_core.info(`ifx ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -94929,8 +94927,6 @@ async function win32_installWin32(target) {
     lib_core.exportVariable("FC", "ifx");
     lib_core.exportVariable("CC", "icx");
     lib_core.exportVariable("CXX", "icpx");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifx");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     const resolvedVersion = await ifx_win32_resolveInstalledVersion();
     lib_core.info(`ifx ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -95064,8 +95060,6 @@ async function ifort_debian_installDebian(target) {
     lib_core.exportVariable("FC", "ifort");
     lib_core.exportVariable("CC", "icc");
     lib_core.exportVariable("CXX", "icpc");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifort");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     const resolvedVersion = await ifort_debian_resolveInstalledVersion();
     lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -95211,8 +95205,6 @@ async function darwin_installDarwin(target) {
     lib_core.exportVariable("FC", "ifort");
     lib_core.exportVariable("CC", "icc");
     lib_core.exportVariable("CXX", "icpc");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifort");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
     lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -95346,8 +95338,6 @@ async function ifort_win32_installWin32(target) {
     lib_core.exportVariable("FC", "ifort");
     lib_core.exportVariable("CC", "icl");
     lib_core.exportVariable("CXX", "icl");
-    lib_core.exportVariable("FORTRAN_COMPILER", "ifort");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     const resolvedVersion = await ifort_win32_resolveInstalledVersion();
     lib_core.info(`ifort ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
@@ -95849,11 +95839,9 @@ async function flang_debian_installDebian(target) {
     if (external_fs_.existsSync(llvmBinDir)) {
         lib_core.addPath(llvmBinDir);
     }
-    lib_core.exportVariable("FC", "flang");
+    lib_core.exportVariable("FC", `flang-${version}`);
     lib_core.exportVariable("CC", `clang-${version}`);
     lib_core.exportVariable("CXX", `clang++-${version}`);
-    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
     // time. This is particularly important for LLVM 15/16 where the runtime
     // libs (libFortranRuntime, libFortranDecimal, etc.) are not in the default
@@ -95947,8 +95935,6 @@ async function installBrew(target) {
     lib_core.exportVariable("FC", flangBin);
     lib_core.exportVariable("CC", external_path_.join(llvmBinDir, "clang"));
     lib_core.exportVariable("CXX", external_path_.join(llvmBinDir, "clang++"));
-    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
     // libomp.dylib lives in the llvm formula's lib dir, not a standalone formula.
     const libDir = external_path_.join(flangOptDir, "lib");
     const libompDir = external_path_.join(brewPrefix, "opt", "llvm", "lib");
@@ -96011,8 +95997,6 @@ async function installFromGitHub(target, major, patch) {
     lib_core.exportVariable("FC", flangBin);
     lib_core.exportVariable("CC", external_path_.join(binDir, "clang"));
     lib_core.exportVariable("CXX", external_path_.join(binDir, "clang++"));
-    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", major);
     let sdkPath = "";
     try {
         await lib_exec.exec("xcrun", ["--show-sdk-path"], {
@@ -96222,8 +96206,6 @@ async function win32_installNative(target) {
     lib_core.exportVariable("FC", flangExe);
     lib_core.exportVariable("CC", clangExe);
     lib_core.exportVariable("CXX", clangPPExe);
-    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", major);
     // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
     // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
     const flangLibDir = external_path_.join(toolRoot, "lib");
@@ -96248,9 +96230,6 @@ async function win32_installMSYS2(target) {
     lib_core.exportVariable("FC", flangExe);
     lib_core.exportVariable("CC", clangExe);
     lib_core.exportVariable("CXX", clangPPExe);
-    lib_core.exportVariable("FORTRAN_COMPILER", "flang");
-    // MSYS2 rolling release has no meaningful version to export; use LATEST.
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
     lib_core.exportVariable("WINDOWS_ENV", target.windowsEnv);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
     lib_core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
@@ -96363,8 +96342,6 @@ async function lfortran_debian_installDebian(target) {
     // provides as the C/C++ companion.  We leave CC/CXX unset so downstream
     // steps can choose their own C toolchain without surprising overrides.
     lib_core.exportVariable("FC", "lfortran");
-    lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     const resolvedVersion = await lfortran_debian_resolveInstalledVersion(lfortranBin);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully.`);
@@ -96464,8 +96441,6 @@ async function lfortran_darwin_installDarwin(target) {
     lib_core.info(`Found lfortran binary at: ${lfortranBin}`);
     lib_core.addPath(lfortranBinDir);
     lib_core.exportVariable("FC", "lfortran");
-    lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     // lfortran links against system libc++ on macOS; set SDKROOT so the linker
     // can find the right SDK headers when compiling generated C/C++ code.
@@ -96625,8 +96600,6 @@ async function installConda(target) {
         lib_core.warning("lld-link.exe not found; LFortran may fail to link on Windows.");
     }
     lib_core.exportVariable("FC", lfortranExe);
-    lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", version);
     lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     lib_core.info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
@@ -96641,9 +96614,6 @@ async function lfortran_win32_installMSYS2(target) {
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
     lib_core.addPath(msysBin);
     lib_core.exportVariable("FC", lfortranExe);
-    lib_core.exportVariable("FORTRAN_COMPILER", "lfortran");
-    // MSYS2 rolling release has no meaningful version to export; use LATEST.
-    lib_core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
     lib_core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", target.windowsEnv, "lib"));
     lib_core.exportVariable("WINDOWS_ENV", target.windowsEnv);
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
@@ -96725,6 +96695,8 @@ async function run() {
                 break;
         }
         lib_core.setOutput("compiler-version", installedVersion);
+        lib_core.exportVariable("FORTRAN_COMPILER", target.compiler);
+        lib_core.exportVariable("FORTRAN_COMPILER_VERSION", installedVersion);
     }
     catch (err) {
         lib_core.setFailed(err instanceof Error ? err.message : String(err));

@@ -50,6 +50,9 @@ async function run(): Promise<void> {
     }
 
     core.setOutput("compiler-version", installedVersion);
+
+    core.exportVariable("FORTRAN_COMPILER", target.compiler);
+    core.exportVariable("FORTRAN_COMPILER_VERSION", installedVersion);
   } catch (err) {
     core.setFailed(err instanceof Error ? err.message : String(err));
   }

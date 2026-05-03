@@ -96,8 +96,6 @@ export async function installDebian(target: Target): Promise<string> {
   // provides as the C/C++ companion.  We leave CC/CXX unset so downstream
   // steps can choose their own C toolchain without surprising overrides.
   core.exportVariable("FC", "lfortran");
-  core.exportVariable("FORTRAN_COMPILER", "lfortran");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);

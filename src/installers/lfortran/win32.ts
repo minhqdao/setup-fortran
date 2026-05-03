@@ -142,8 +142,6 @@ async function installConda(target: Target): Promise<string> {
   }
 
   core.exportVariable("FC", lfortranExe);
-  core.exportVariable("FORTRAN_COMPILER", "lfortran");
-  core.exportVariable("FORTRAN_COMPILER_VERSION", version);
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
     path.join(envPrefix, "Library", "lib"),
@@ -171,9 +169,6 @@ async function installMSYS2(target: Target): Promise<string> {
   core.addPath(msysBin);
 
   core.exportVariable("FC", lfortranExe);
-  core.exportVariable("FORTRAN_COMPILER", "lfortran");
-  // MSYS2 rolling release has no meaningful version to export; use LATEST.
-  core.exportVariable("FORTRAN_COMPILER_VERSION", LATEST);
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
     path.join("C:\\msys64", target.windowsEnv, "lib"),
