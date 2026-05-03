@@ -15,13 +15,13 @@ export async function installDebian(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
 
-  if (version === "15" || target.osVersion.includes("22")) {
-    await exec.exec("sudo", [
-      "add-apt-repository",
-      "--yes",
-      "ppa:ubuntu-toolchain-r/test",
-    ]);
-  }
+  // if (needsPpa(version, target.osVersion)) {
+  // await exec.exec("sudo", [
+  //   "add-apt-repository",
+  //   "--yes",
+  //   "ppa:ubuntu-toolchain-r/test",
+  // ]);
+  // }
 
   await exec.exec("sudo", ["apt-get", "update", "-y"]);
   await exec.exec("sudo", [
@@ -54,6 +54,13 @@ export async function installDebian(target: Target): Promise<string> {
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
   return resolvedVersion;
 }
+
+// function needsPpa(version: string, osVersion: string): boolean {
+//   const v = parseInt(version);
+//   if (osVersion.includes("24")) return v >= 15;
+//   if (osVersion.includes("22")) return v >= 14;
+//   return true;
+// }
 
 async function resolveInstalledVersion(): Promise<string> {
   let output = "";

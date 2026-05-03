@@ -39,38 +39,38 @@ describe("installDebian", () => {
     });
   });
 
-  it("adds PPA when version is 15", async () => {
-    const target = { ...baseTarget, version: "15" };
-    await installDebian(target);
+  // it("adds PPA when version is 15", async () => {
+  //   const target = { ...baseTarget, version: "15" };
+  //   await installDebian(target);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "add-apt-repository",
-      "--yes",
-      "ppa:ubuntu-toolchain-r/test",
-    ]);
-  });
+  //   expect(mockedExec).toHaveBeenCalledWith("sudo", [
+  //     "add-apt-repository",
+  //     "--yes",
+  //     "ppa:ubuntu-toolchain-r/test",
+  //   ]);
+  // });
 
-  it("adds PPA when osVersion includes 22", async () => {
-    const target = { ...baseTarget, osVersion: "Ubuntu 22.04.3 LTS" };
-    await installDebian(target);
+  // it("adds PPA when osVersion includes 22", async () => {
+  //   const target = { ...baseTarget, osVersion: "Ubuntu 22.04.3 LTS" };
+  //   await installDebian(target);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "add-apt-repository",
-      "--yes",
-      "ppa:ubuntu-toolchain-r/test",
-    ]);
-  });
+  //   expect(mockedExec).toHaveBeenCalledWith("sudo", [
+  //     "add-apt-repository",
+  //     "--yes",
+  //     "ppa:ubuntu-toolchain-r/test",
+  //   ]);
+  // });
 
-  it("does not add PPA when version is not 15 and osVersion does not include 22", async () => {
-    const target = { ...baseTarget, version: "13", osVersion: "20.04.6" };
-    await installDebian(target);
+  // it("does not add PPA when version is not 15 and osVersion does not include 22", async () => {
+  //   const target = { ...baseTarget, version: "13", osVersion: "20.04.6" };
+  //   await installDebian(target);
 
-    expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
-      "add-apt-repository",
-      "--yes",
-      "ppa:ubuntu-toolchain-r/test",
-    ]);
-  });
+  //   expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+  //     "add-apt-repository",
+  //     "--yes",
+  //     "ppa:ubuntu-toolchain-r/test",
+  //   ]);
+  // });
 
   it("always updates apt and installs gfortran", async () => {
     await installDebian(baseTarget);
