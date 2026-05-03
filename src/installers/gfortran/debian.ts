@@ -7,8 +7,8 @@ import type { Target } from "../../types";
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
-  [Arch.X64]: ["15", "14", "13", "12", "11"],
-  [Arch.ARM64]: ["15", "14", "13", "12", "11"],
+  [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
+  [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 export async function installDebian(target: Target): Promise<string> {

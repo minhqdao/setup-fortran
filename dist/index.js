@@ -90590,8 +90590,8 @@ function githubHeaders() {
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["15", "14", "13", "12", "11"],
-    [Arch.ARM64]: ["15", "14", "13", "12", "11"],
+    [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
+    [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
 async function installDebian(target) {
     const version = resolveVersion(target, SUPPORTED_VERSIONS);
@@ -94519,11 +94519,37 @@ function msys2PkgName(windowsEnv, pkg) {
 
 
 
-// Make sure the versions are always in descending order. The first one will be
+// Make sure the versions are in descending order. The first one will be
 // used as the default if no version was specified by the user.
+const GCC_RELEASES = [
+    {
+        version: "16",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r1.zip",
+    },
+    {
+        version: "15",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/15.2.0posix-14.0.0-ucrt-r7/winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-14.0.0-r7.zip",
+    },
+    {
+        version: "14",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/14.3.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-14.3.0-mingw-w64ucrt-12.0.0-r1.zip",
+    },
+    {
+        version: "13",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/13.3.0posix-11.0.1-ucrt-r1/winlibs-x86_64-posix-seh-gcc-13.3.0-mingw-w64ucrt-11.0.1-r1.zip",
+    },
+    {
+        version: "12",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/12.4.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-12.4.0-mingw-w64ucrt-12.0.0-r1.zip",
+    },
+    {
+        version: "11",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/11.5.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64ucrt-１2.0.0-r１.zip",
+    },
+];
 const win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
-        [WindowsEnv.Native]: ["15", "14", "13", "12", "11"],
+        [WindowsEnv.Native]: GCC_RELEASES.map((r) => r.version),
         [WindowsEnv.UCRT64]: [LATEST],
         [WindowsEnv.Clang64]: undefined,
     },
@@ -94532,13 +94558,6 @@ const win32_SUPPORTED_VERSIONS = {
         [WindowsEnv.UCRT64]: undefined,
         [WindowsEnv.Clang64]: undefined,
     },
-};
-const GCC_RELEASES = {
-    "15": "https://github.com/brechtsanders/winlibs_mingw/releases/download/15.2.0posix-14.0.0-ucrt-r7/winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-14.0.0-r7.zip",
-    "14": "https://github.com/brechtsanders/winlibs_mingw/releases/download/14.3.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-14.3.0-mingw-w64ucrt-12.0.0-r1.zip",
-    "13": "https://github.com/brechtsanders/winlibs_mingw/releases/download/13.3.0posix-11.0.1-ucrt-r1/winlibs-x86_64-posix-seh-gcc-13.3.0-mingw-w64ucrt-11.0.1-r1.zip",
-    "12": "https://github.com/brechtsanders/winlibs_mingw/releases/download/12.4.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-12.4.0-mingw-w64ucrt-12.0.0-r1.zip",
-    "11": "https://github.com/brechtsanders/winlibs_mingw/releases/download/11.5.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64ucrt-12.0.0-r1.zip",
 };
 async function installWin32(target) {
     const version = resolveWindowsVersion(target, win32_SUPPORTED_VERSIONS);
@@ -94554,10 +94573,11 @@ async function installWin32(target) {
     }
 }
 async function installNative(target, version) {
-    const downloadUrl = GCC_RELEASES[version];
-    if (!downloadUrl) {
+    const release = GCC_RELEASES.find((r) => r.version === version);
+    if (!release) {
         throw new Error(`Unsupported GFortran version: ${version}`);
     }
+    const downloadUrl = release.url;
     let toolRoot = find(`gfortran-${target.windowsEnv}`, version, target.arch);
     if (!toolRoot) {
         lib_core.info(`Downloading GFortran ${version} from ${downloadUrl}`);
