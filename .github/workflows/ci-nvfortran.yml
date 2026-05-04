@@ -23,40 +23,40 @@ jobs:
                 image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm ]
                 toolchain:
                     - { compiler: nvfortran, version: "26.3" }
-                    # - { compiler: nvfortran, version: "26.1" }
-                    # - { compiler: nvfortran, version: "25.11" }
-                    # - { compiler: nvfortran, version: "25.9" }
-                    # - { compiler: nvfortran, version: "25.7" }
-                    # - { compiler: nvfortran, version: "25.5" }
-                    # - { compiler: nvfortran, version: "25.3" }
-                    # - { compiler: nvfortran, version: "25.1" }
-                    # - { compiler: nvfortran, version: "24.11" }
-                    # - { compiler: nvfortran, version: "24.9" }
-                    # - { compiler: nvfortran, version: "24.7" }
-                    # - { compiler: nvfortran, version: "24.5" }
-                    # - { compiler: nvfortran, version: "24.3" }
-                    # - { compiler: nvfortran, version: "24.1" }
-                    # - { compiler: nvfortran, version: "23.11" }
-                    # - { compiler: nvfortran, version: "23.9" }
-                    # - { compiler: nvfortran, version: "23.7" }
-                    # - { compiler: nvfortran, version: "23.5" }
-                    # - { compiler: nvfortran, version: "23.3" }
-                    # - { compiler: nvfortran, version: "23.1" }
-                    # - { compiler: nvfortran, version: "22.11" }
-                    # - { compiler: nvfortran, version: "22.9" }
-                    # - { compiler: nvfortran, version: "22.7" }
-                    # - { compiler: nvfortran, version: "22.5" }
-                    # - { compiler: nvfortran, version: "22.3" }
-                    # - { compiler: nvfortran, version: "22.2" }
-                    # - { compiler: nvfortran, version: "22.1" }
-                    # - { compiler: nvfortran, version: "21.11" }
-                    # - { compiler: nvfortran, version: "21.9" }
-                    # - { compiler: nvfortran, version: "21.7" }
-                    # - { compiler: nvfortran, version: "21.5" }
-                    # - { compiler: nvfortran, version: "21.3" }
-                    # - { compiler: nvfortran, version: "21.2" }
-                    # - { compiler: nvfortran, version: "21.1" }
-                    # - { compiler: nvfortran, version: "20.11" }
+                    - { compiler: nvfortran, version: "26.1" }
+                    - { compiler: nvfortran, version: "25.11" }
+                    - { compiler: nvfortran, version: "25.9" }
+                    - { compiler: nvfortran, version: "25.7" }
+                    - { compiler: nvfortran, version: "25.5" }
+                    - { compiler: nvfortran, version: "25.3" }
+                    - { compiler: nvfortran, version: "25.1" }
+                    - { compiler: nvfortran, version: "24.11" }
+                    - { compiler: nvfortran, version: "24.9" }
+                    - { compiler: nvfortran, version: "24.7" }
+                    - { compiler: nvfortran, version: "24.5" }
+                    - { compiler: nvfortran, version: "24.3" }
+                    - { compiler: nvfortran, version: "24.1" }
+                    - { compiler: nvfortran, version: "23.11" }
+                    - { compiler: nvfortran, version: "23.9" }
+                    - { compiler: nvfortran, version: "23.7" }
+                    - { compiler: nvfortran, version: "23.5" }
+                    - { compiler: nvfortran, version: "23.3" }
+                    - { compiler: nvfortran, version: "23.1" }
+                    - { compiler: nvfortran, version: "22.11" }
+                    - { compiler: nvfortran, version: "22.9" }
+                    - { compiler: nvfortran, version: "22.7" }
+                    - { compiler: nvfortran, version: "22.5" }
+                    - { compiler: nvfortran, version: "22.3" }
+                    - { compiler: nvfortran, version: "22.2" }
+                    - { compiler: nvfortran, version: "22.1" }
+                    - { compiler: nvfortran, version: "21.11" }
+                    - { compiler: nvfortran, version: "21.9" }
+                    - { compiler: nvfortran, version: "21.7" }
+                    - { compiler: nvfortran, version: "21.5" }
+                    - { compiler: nvfortran, version: "21.3" }
+                    - { compiler: nvfortran, version: "21.2" }
+                    - { compiler: nvfortran, version: "21.1" }
+                    - { compiler: nvfortran, version: "20.11" }
                 exclude:
                     - image: ubuntu-24.04
                       toolchain: { compiler: nvfortran, version: "21.1" } # seems broken
