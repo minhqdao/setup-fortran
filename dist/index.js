@@ -91627,7 +91627,21 @@ async function installLegacyNcurses(target) {
         const url = `${base}/${poolPath}/${deb}`;
         const dest = external_path_.join(external_os_.tmpdir(), deb);
         core.info(`Downloading ${deb} from jammy archive...`);
-        await exec.exec("curl", ["-fsSL", "-o", dest, url]);
+        await exec.exec("curl", [
+            "--retry",
+            "5",
+            "--retry-delay",
+            "10",
+            "--retry-connrefused",
+            "--connect-timeout",
+            "30",
+            "--max-time",
+            "120",
+            "-fsSL",
+            "-o",
+            dest,
+            url,
+        ]);
         await exec.exec("sudo", ["dpkg", "-i", dest]);
     }
 }
