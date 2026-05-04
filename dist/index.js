@@ -92800,7 +92800,7 @@ async function run() {
                 installedVersion = await installLFortran(target);
                 break;
         }
-        core.setOutput("compiler-version", installedVersion);
+        core.setOutput("version", installedVersion);
         core.exportVariable("FORTRAN_COMPILER", target.compiler);
         core.exportVariable("FORTRAN_COMPILER_VERSION", installedVersion);
     }

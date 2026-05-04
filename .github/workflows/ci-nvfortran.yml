@@ -80,7 +80,7 @@ jobs:
                   version: ${{ matrix.toolchain.version }}
 
             - name: Verify installed version
-              run: "echo \"Output: ${{ steps.setup.outputs.compiler-version }}\""
+              run: "echo \"Output: ${{ steps.setup.outputs.version }}\""
 
             - name: Run Integration Tests
               run: npm run integration-test

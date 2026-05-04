@@ -1,77 +1,85 @@
 name: gfortran
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+  # it works, disable automatic trigger for now
+  workflow_dispatch:
+    # push:
+    #     branches: [ main ]
+    # pull_request:
 
 jobs:
-    build:
-        name: ci
-        uses: ./.github/workflows/ci.yml
+  build:
+    name: ci
+    uses: ./.github/workflows/ci.yml
 
-    integration-tests:
-        name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
-            matrix.toolchain.windowsEnv }}
-        runs-on: ${{ matrix.image }}
-        needs: [ build ]
-        strategy:
-            fail-fast: false
-            matrix:
-                image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm ]
-                    # macos-26,
-                    # macos-26-intel,
-                    # macos-15,
-                    # macos-15-intel,
-                    # macos-14,
-                    # windows-2025,
-                    # windows-2022,
-                toolchain:
-                    - { compiler: gfortran, version: "16" }
-                    - { compiler: gfortran, version: "15" }
-                    - { compiler: gfortran, version: "14" }
-                    - { compiler: gfortran, version: "13" }
-                    - { compiler: gfortran, version: "12" }
-                    - { compiler: gfortran, version: "11" }
-                include:
-                    - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
-                    # - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
-                    # - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
-                    # - image: windows-2025
-                    #   toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
-                    # - image: windows-2022
-                    #   toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
-                exclude:
-                    - image: macos-26
-                      toolchain: { compiler: gfortran, version: "16" }
-                    - image: macos-26-intel
-                      toolchain: { compiler: gfortran, version: "16" }
-                    - image: macos-15
-                      toolchain: { compiler: gfortran, version: "16" }
-                    - image: macos-15-intel
-                      toolchain: { compiler: gfortran, version: "16" }
-                    - image: macos-14
-                      toolchain: { compiler: gfortran, version: "16" }
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+      matrix.toolchain.windowsEnv }}
+    runs-on: ${{ matrix.image }}
+    needs: [ build ]
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          [
+            ubuntu-24.04,
+            ubuntu-22.04,
+            ubuntu-24.04-arm,
+            ubuntu-22.04-arm,
+            macos-26,
+            macos-26-intel,
+            macos-15,
+            macos-15-intel,
+            macos-14,
+            windows-2025,
+            windows-2022,
+          ]
+        toolchain:
+          - { compiler: gfortran, version: "16" }
+          - { compiler: gfortran, version: "15" }
+          - { compiler: gfortran, version: "14" }
+          - { compiler: gfortran, version: "13" }
+          - { compiler: gfortran, version: "12" }
+          - { compiler: gfortran, version: "11" }
+        include:
+          - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: windows-2025
+            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
+          - image: windows-2022
+            toolchain: { compiler: gfortran, windowsEnv: ucrt64 } # only latest version available from Pacman
+        exclude:
+          - image: macos-26
+            toolchain: { compiler: gfortran, version: "16" }
+          - image: macos-26-intel
+            toolchain: { compiler: gfortran, version: "16" }
+          - image: macos-15
+            toolchain: { compiler: gfortran, version: "16" }
+          - image: macos-15-intel
+            toolchain: { compiler: gfortran, version: "16" }
+          - image: macos-14
+            toolchain: { compiler: gfortran, version: "16" }
 
-        steps:
-            - uses: actions/checkout@v6
+    steps:
+      - uses: actions/checkout@v6
 
-            - name: Restore dist-tests
-              uses: actions/download-artifact@v8
-              with:
-                  name: generated-dist-tests
-                  path: dist-tests
+      - name: Restore dist-tests
+        uses: actions/download-artifact@v8
+        with:
+          name: generated-dist-tests
+          path: dist-tests
 
-            - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
-              id: setup
-              uses: ./
-              with:
-                  compiler: ${{ matrix.toolchain.compiler }}
-                  version: ${{ matrix.toolchain.version }}
-                  windows-env: ${{ matrix.toolchain.windowsEnv }}
+      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+          windows-env: ${{ matrix.toolchain.windowsEnv }}
 
-            - name: Verify installed version
-              run: "echo \"Output: ${{ steps.setup.outputs.compiler-version }}\""
+      - name: Verify installed version
+        run: "echo \"Output: ${{ steps.setup.outputs.version }}\""
 
-            - name: Run Integration Tests
-              run: npm run integration-test
+      - name: Run Integration Tests
+        run: npm run integration-test

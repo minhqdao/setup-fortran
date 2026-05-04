@@ -16,7 +16,7 @@ inputs:
     default: "native"
 
 outputs:
-  compiler-version:
+  version:
     description: "The installed compiler version"
 
 runs:
