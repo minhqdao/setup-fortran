@@ -91632,7 +91632,7 @@ async function installLegacyNcurses(target) {
             "5",
             "--retry-delay",
             "10",
-            "--retry-connrefused",
+            "--retry-all-errors",
             "--connect-timeout",
             "30",
             "--max-time",
