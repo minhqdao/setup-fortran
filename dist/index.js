@@ -91888,6 +91888,9 @@ async function aocc_debian_installDebian(target) {
     core.exportVariable("FC", "flang");
     core.exportVariable("CC", "clang");
     core.exportVariable("CXX", "clang++");
+    core.exportVariable("FPM_FC", "flang");
+    core.exportVariable("FPM_CC", "clang");
+    core.exportVariable("FPM_CXX", "clang++");
     return await aocc_debian_resolveInstalledVersion();
 }
 async function aocc_debian_resolveInstalledVersion() {

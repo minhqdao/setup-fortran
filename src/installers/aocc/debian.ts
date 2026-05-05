@@ -138,6 +138,9 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("FC", "flang");
   core.exportVariable("CC", "clang");
   core.exportVariable("CXX", "clang++");
+  core.exportVariable("FPM_FC", "flang");
+  core.exportVariable("FPM_CC", "clang");
+  core.exportVariable("FPM_CXX", "clang++");
 
   return await resolveInstalledVersion();
 }
