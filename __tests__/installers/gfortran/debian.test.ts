@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as cache from "@actions/cache";
 import {
   installDebian,
   needsPpa,
@@ -14,9 +15,11 @@ import {
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
+jest.mock("@actions/cache");
 
 describe("GFortran Debian Installer", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
+  const mockedCache = cache as jest.Mocked<typeof cache>;
 
   const baseTarget: Target = {
     compiler: Compiler.GFortran,
@@ -29,6 +32,8 @@ describe("GFortran Debian Installer", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
+    mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "gfortran" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
@@ -92,9 +97,13 @@ describe("GFortran Debian Installer", () => {
       ]);
     });
 
-    it("always updates apt and installs gfortran", async () => {
+    it("always updates apt and installs gfortran on cache miss", async () => {
       await installDebian(baseTarget);
 
+      expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+        ["/var/cache/apt/archives"],
+        expect.stringContaining("apt-gfortran-20.04.6-14"),
+      );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
         "update",
@@ -111,6 +120,31 @@ describe("GFortran Debian Installer", () => {
         "gcc-14",
         "gfortran-14",
       ]);
+      expect(mockedCache.saveCache).toHaveBeenCalledWith(
+        ["/var/cache/apt/archives"],
+        expect.stringContaining("apt-gfortran-20.04.6-14"),
+      );
+    });
+
+    it("installs from cache on cache hit", async () => {
+      mockedCache.restoreCache.mockResolvedValue("hit");
+      await installDebian(baseTarget);
+
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-download",
+        "--ignore-missing",
+        "gcc-14",
+        "gfortran-14",
+      ]);
+      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+        "apt-get",
+        "update",
+        "-y",
+      ]);
+      expect(mockedCache.saveCache).not.toHaveBeenCalled();
     });
 
     it("retries apt-get install on failure", async () => {
@@ -124,19 +158,22 @@ describe("GFortran Debian Installer", () => {
       });
 
       jest.useFakeTimers();
-      const installPromise = installDebian(baseTarget);
-      
-      // Advance timers repeatedly to ensure we pass the delay
-      for (let i = 0; i < 10; i++) {
-        await Promise.resolve();
-        jest.advanceTimersByTime(10000);
+      try {
+        const installPromise = installDebian(baseTarget);
+        
+        // Advance timers repeatedly to ensure we pass the delay
+        for (let i = 0; i < 10; i++) {
+          await Promise.resolve();
+          jest.advanceTimersByTime(10000);
+        }
+        
+        await installPromise;
+      } finally {
+        jest.useRealTimers();
       }
-      
-      await installPromise;
-      jest.useRealTimers();
 
       expect(core.warning).toHaveBeenCalledWith(
-        expect.stringContaining("apt-get install failed (attempt 1/3)"),
+        expect.stringContaining("apt-get install failed (attempt 1/5)"),
       );
     });
 
@@ -153,15 +190,18 @@ describe("GFortran Debian Installer", () => {
       });
 
       jest.useFakeTimers();
-      const installPromise = installDebian(target);
-      
-      for (let i = 0; i < 10; i++) {
-        await Promise.resolve();
-        jest.advanceTimersByTime(5000);
+      try {
+        const installPromise = installDebian(target);
+        
+        for (let i = 0; i < 10; i++) {
+          await Promise.resolve();
+          jest.advanceTimersByTime(5000);
+        }
+        
+        await installPromise;
+      } finally {
+        jest.useRealTimers();
       }
-      
-      await installPromise;
-      jest.useRealTimers();
 
       expect(core.warning).toHaveBeenCalledWith(
         expect.stringContaining("add-apt-repository failed (attempt 1/3)"),

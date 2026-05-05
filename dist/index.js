@@ -90295,6 +90295,8 @@ function parseInputs() {
 
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
 var exec = __nccwpck_require__(5236);
+// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
+var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/resolve_version.ts
 
 
@@ -90413,20 +90415,42 @@ function githubHeaders() {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
     [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
     [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
+const CACHE_PATHS = ["/var/cache/apt/archives"];
+function aptCacheKey(version, osVersion) {
+    return `apt-gfortran-${osVersion}-${version}`;
+}
 async function installDebian(target) {
     const version = resolveVersion(target, SUPPORTED_VERSIONS);
     core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
-    if (needsPpa(version, target.osVersion)) {
-        core.info(`Adding PPA for GFortran ${version}...`);
-        await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+    const cacheKey = aptCacheKey(version, target.osVersion);
+    const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
+    if (cacheHit) {
+        core.info(`Cache hit for ${cacheKey}, installing from cache...`);
+        await exec.exec("sudo", [
+            "apt-get",
+            "install",
+            "-y",
+            "--no-download",
+            "--ignore-missing",
+            `gcc-${version}`,
+            `gfortran-${version}`,
+        ]);
     }
-    await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
+    else {
+        if (needsPpa(version, target.osVersion)) {
+            core.info(`Adding PPA for GFortran ${version}...`);
+            await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+        }
+        await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
+        await cache.saveCache(CACHE_PATHS, cacheKey);
+    }
     await exec.exec("sudo", [
         "update-alternatives",
         "--install",
@@ -90447,7 +90471,7 @@ async function installDebian(target) {
     core.info(`GFortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
 }
-async function aptGetInstallWithRetry(packages, maxAttempts = 3) {
+async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec.exec("sudo", ["apt-get", "update", "-y"]);
@@ -90876,8 +90900,6 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
-// EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
-var cache = __nccwpck_require__(5116);
 // EXTERNAL MODULE: external "fs"
 var external_fs_ = __nccwpck_require__(9896);
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
@@ -91758,6 +91780,7 @@ async function installNVFortran(target) {
 
 
 
+
 // Make sure that the "latest" version is listed first. If the user does not
 // specify a version, the latest will be installed by default.
 const AOCC_RELEASES = [
@@ -91801,7 +91824,15 @@ async function aocc_debian_installDebian(target) {
     const version = resolveVersion(target, aocc_debian_SUPPORTED_VERSIONS);
     const metadata = getReleaseMetadata(version);
     core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
-    if (!external_fs_.existsSync(metadata.installDir)) {
+    const cacheKey = `aocc-${version}-${target.arch}-${target.osVersion}`;
+    const tempInstallDir = external_path_.join(external_os_.homedir(), ".aocc-cache");
+    const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
+    if (cacheHit) {
+        core.info("Restored from cache, moving to /opt...");
+        await exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
+        await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
+    }
+    else if (!external_fs_.existsSync(metadata.installDir)) {
         const debPath = external_path_.join(external_os_.tmpdir(), metadata.deb);
         core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
         await exec.exec("curl", [
@@ -91820,6 +91851,15 @@ async function aocc_debian_installDebian(target) {
         core.info(`Installing AOCC ${version}...`);
         await exec.exec("sudo", ["dpkg", "-i", debPath]);
         await exec.exec("sudo", ["apt-get", "install", "-f", "-y"]);
+        core.info(`Saving AOCC ${version} to cache...`);
+        await exec.exec("sudo", ["cp", "-r", metadata.installDir, tempInstallDir]);
+        await exec.exec("sudo", [
+            "chown",
+            "-R",
+            external_os_.userInfo().username,
+            tempInstallDir,
+        ]);
+        await cache.saveCache([tempInstallDir], cacheKey);
     }
     else {
         core.info(`AOCC ${version} already installed at ${metadata.installDir}, skipping download.`);

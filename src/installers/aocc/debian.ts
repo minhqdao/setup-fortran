@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as cache from "@actions/cache";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
@@ -65,7 +66,15 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
 
-  if (!fs.existsSync(metadata.installDir)) {
+  const cacheKey = `aocc-${version}-${target.arch}-${target.osVersion}`;
+  const tempInstallDir = path.join(os.homedir(), ".aocc-cache");
+  const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
+
+  if (cacheHit) {
+    core.info("Restored from cache, moving to /opt...");
+    await exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
+    await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
+  } else if (!fs.existsSync(metadata.installDir)) {
     const debPath = path.join(os.tmpdir(), metadata.deb);
 
     core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
@@ -87,6 +96,16 @@ export async function installDebian(target: Target): Promise<string> {
     core.info(`Installing AOCC ${version}...`);
     await exec.exec("sudo", ["dpkg", "-i", debPath]);
     await exec.exec("sudo", ["apt-get", "install", "-f", "-y"]);
+
+    core.info(`Saving AOCC ${version} to cache...`);
+    await exec.exec("sudo", ["cp", "-r", metadata.installDir, tempInstallDir]);
+    await exec.exec("sudo", [
+      "chown",
+      "-R",
+      os.userInfo().username,
+      tempInstallDir,
+    ]);
+    await cache.saveCache([tempInstallDir], cacheKey);
   } else {
     core.info(
       `AOCC ${version} already installed at ${metadata.installDir}, skipping download.`,

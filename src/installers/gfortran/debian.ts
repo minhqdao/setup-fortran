@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as cache from "@actions/cache";
 import { Arch } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Target } from "../../types";
@@ -11,16 +12,38 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 } as const satisfies Record<Arch, readonly string[]>;
 
+const CACHE_PATHS = ["/var/cache/apt/archives"];
+
+function aptCacheKey(version: string, osVersion: string): string {
+  return `apt-gfortran-${osVersion}-${version}`;
+}
+
 export async function installDebian(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
 
-  if (needsPpa(version, target.osVersion)) {
-    core.info(`Adding PPA for GFortran ${version}...`);
-    await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
-  }
+  const cacheKey = aptCacheKey(version, target.osVersion);
+  const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
 
-  await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
+  if (cacheHit) {
+    core.info(`Cache hit for ${cacheKey}, installing from cache...`);
+    await exec.exec("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "--no-download",
+      "--ignore-missing",
+      `gcc-${version}`,
+      `gfortran-${version}`,
+    ]);
+  } else {
+    if (needsPpa(version, target.osVersion)) {
+      core.info(`Adding PPA for GFortran ${version}...`);
+      await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+    }
+    await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
+    await cache.saveCache(CACHE_PATHS, cacheKey);
+  }
 
   await exec.exec("sudo", [
     "update-alternatives",
@@ -47,7 +70,7 @@ export async function installDebian(target: Target): Promise<string> {
 
 async function aptGetInstallWithRetry(
   packages: string[],
-  maxAttempts = 3,
+  maxAttempts = 5,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
