@@ -113,6 +113,9 @@ export async function installDebian(target: Target): Promise<string> {
   core.exportVariable("FC", "ifx");
   core.exportVariable("CC", "icx");
   core.exportVariable("CXX", "icpx");
+  core.exportVariable("FPM_FC", "ifx");
+  core.exportVariable("FPM_CC", "icx");
+  core.exportVariable("FPM_CXX", "icpx");
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
