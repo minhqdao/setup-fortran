@@ -1,6 +1,9 @@
 name: "Setup Fortran Compilers"
 description: Set up Fortran compilers on GitHub Actions runners
 author: minhqdao
+branding:
+  icon: cpu
+  color: purple
 
 inputs:
   compiler:
