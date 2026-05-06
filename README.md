@@ -262,6 +262,10 @@ jobs:
 | `FPM_CC` | Path to the C compiler for fpm (not set for `lfortran`) |
 | `FPM_CXX` | Path to the C++ compiler for fpm (not set for `lfortran`) |
 
+## Notes
+
+- `fpm` currently does not ship `linux-arm` binaries. So if you are using an ARM runner, `fpm` will fail.
+
 ## Reporting
 
 Please submit an [issue](https://github.com/minhqdao/setup-fortran/issues) if you find a problem with a specific configuration or you want features to be added.
