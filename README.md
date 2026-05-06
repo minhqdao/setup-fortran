@@ -101,6 +101,8 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 
 ---
 
+> If you are using `fpm` on `macOS` runners, make sure to additionally install `gcc@12` to satisfy runtime dependencies.
+
 ### `nvfortran`
 
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm |

@@ -118,6 +118,10 @@ jobs:
       - name: Run Integration Tests
         run: npm run integration-test
 
+      - name: Fix libgfortran.5.dylib not loaded on macOS using fpm
+        if: runner.os == 'macOS'
+        run: brew install gcc@12
+
       - uses: fortran-lang/setup-fpm@v9
       - name: Run fpm Tests
         run: |
