@@ -1,4 +1,4 @@
-name: setup-fortran
+name: "Setup Fortran Compilers"
 description: Set up Fortran compilers on GitHub Actions runners
 author: minhqdao
 
