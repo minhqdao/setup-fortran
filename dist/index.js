@@ -92609,11 +92609,11 @@ async function lfortran_debian_installDebian(target) {
     core.info(`Found lfortran binary at: ${lfortranBin}`);
     core.addPath(lfortranBinDir);
     core.exportVariable("FC", "lfortran");
-    core.exportVariable("CC", "gcc");
-    core.exportVariable("CXX", "g++");
+    core.exportVariable("CC", "clang");
+    core.exportVariable("CXX", "clang++");
     core.exportVariable("FPM_FC", "lfortran");
-    core.exportVariable("FPM_CC", "gcc");
-    core.exportVariable("FPM_CXX", "g++");
+    core.exportVariable("FPM_CC", "clang");
+    core.exportVariable("FPM_CXX", "clang++");
     core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     const resolvedVersion = await lfortran_debian_resolveInstalledVersion(lfortranBin);
     core.info(`LFortran ${resolvedVersion} installed successfully.`);
@@ -92713,11 +92713,11 @@ async function lfortran_darwin_installDarwin(target) {
     core.info(`Found lfortran binary at: ${lfortranBin}`);
     core.addPath(lfortranBinDir);
     core.exportVariable("FC", "lfortran");
-    core.exportVariable("CC", "gcc");
-    core.exportVariable("CXX", "g++");
+    core.exportVariable("CC", "clang");
+    core.exportVariable("CXX", "clang++");
     core.exportVariable("FPM_FC", "lfortran");
-    core.exportVariable("FPM_CC", "gcc");
-    core.exportVariable("FPM_CXX", "g++");
+    core.exportVariable("FPM_CC", "clang");
+    core.exportVariable("FPM_CXX", "clang++");
     core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
     // lfortran links against system libc++ on macOS; set SDKROOT so the linker
     // can find the right SDK headers when compiling generated C/C++ code.
@@ -92877,11 +92877,11 @@ async function installConda(target) {
         core.warning("lld-link.exe not found; LFortran may fail to link on Windows.");
     }
     core.exportVariable("FC", lfortranExe);
-    core.exportVariable("CC", external_path_.join(libraryBin, "gcc.exe"));
-    core.exportVariable("CXX", external_path_.join(libraryBin, "g++.exe"));
+    core.exportVariable("CC", external_path_.join(libraryBin, "clang.exe"));
+    core.exportVariable("CXX", external_path_.join(libraryBin, "clang++.exe"));
     core.exportVariable("FPM_FC", lfortranExe);
-    core.exportVariable("FPM_CC", external_path_.join(libraryBin, "gcc.exe"));
-    core.exportVariable("FPM_CXX", external_path_.join(libraryBin, "g++.exe"));
+    core.exportVariable("FPM_CC", external_path_.join(libraryBin, "clang.exe"));
+    core.exportVariable("FPM_CXX", external_path_.join(libraryBin, "clang++.exe"));
     core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     core.info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
@@ -92896,11 +92896,11 @@ async function lfortran_win32_installMSYS2(target) {
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
     core.addPath(msysBin);
     core.exportVariable("FC", lfortranExe);
-    core.exportVariable("CC", external_path_.join(msysBin, "gcc.exe"));
-    core.exportVariable("CXX", external_path_.join(msysBin, "g++.exe"));
+    core.exportVariable("CC", external_path_.join(msysBin, "clang.exe"));
+    core.exportVariable("CXX", external_path_.join(msysBin, "clang++.exe"));
     core.exportVariable("FPM_FC", lfortranExe);
-    core.exportVariable("FPM_CC", external_path_.join(msysBin, "gcc.exe"));
-    core.exportVariable("FPM_CXX", external_path_.join(msysBin, "g++.exe"));
+    core.exportVariable("FPM_CC", external_path_.join(msysBin, "clang.exe"));
+    core.exportVariable("FPM_CXX", external_path_.join(msysBin, "clang++.exe"));
     core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", target.msystem, "lib"));
     core.exportVariable("WINDOWS_ENV", target.msystem);
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
