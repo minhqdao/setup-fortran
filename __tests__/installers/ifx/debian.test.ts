@@ -113,6 +113,15 @@ describe("installDebian ifx", () => {
   it("adds the Intel repository on cache miss", async () => {
     await installDebian(baseTarget);
 
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "apt-get",
+      "update",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=60",
+      "-o",
+      "Acquire::Retries=3",
+    ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
       expect.stringContaining(

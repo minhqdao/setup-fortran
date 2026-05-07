@@ -66,7 +66,15 @@ export async function installDebian(target: Target): Promise<string> {
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", ["apt-get", "update", "-y"]);
+    await exec.exec("sudo", [
+      "apt-get",
+      "update",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=60",
+      "-o",
+      "Acquire::Retries=3",
+    ]);
 
     const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
     const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];

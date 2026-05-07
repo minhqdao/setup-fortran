@@ -88935,15 +88935,23 @@ async function installDebian(target) {
 async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec.exec("sudo", ["apt-get", "update", "-y"]);
+            await exec.exec("sudo", [
+                "apt-get",
+                "update",
+                "-y",
+                "-o",
+                "Acquire::http::Timeout=60",
+                "-o",
+                "Acquire::Retries=3",
+            ]);
             await exec.exec("sudo", [
                 "apt-get",
                 "install",
                 "-y",
                 "-o",
-                "Acquire::Retries=3",
-                "-o",
                 "Acquire::http::Timeout=60",
+                "-o",
+                "Acquire::Retries=3",
                 ...packages,
             ]);
             return;
@@ -89325,7 +89333,15 @@ async function debian_installDebian(target) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec.exec("sudo", ["apt-get", "update", "-y"]);
+        await exec.exec("sudo", [
+            "apt-get",
+            "update",
+            "-y",
+            "-o",
+            "Acquire::http::Timeout=60",
+            "-o",
+            "Acquire::Retries=3",
+        ]);
         const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
         const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
         const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) => version.startsWith(y))
@@ -89672,7 +89688,15 @@ async function ifort_debian_installDebian(target) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec.exec("sudo", ["apt-get", "update", "-y"]);
+        await exec.exec("sudo", [
+            "apt-get",
+            "update",
+            "-y",
+            "-o",
+            "Acquire::http::Timeout=60",
+            "-o",
+            "Acquire::Retries=3",
+        ]);
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
         // Because ifort only exists in <=2023, the C++ package is always the classic variant.
         const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
@@ -90242,7 +90266,15 @@ async function nvfortran_debian_installDebian(target) {
                 ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
                 ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
         ]);
-        await exec.exec("sudo", ["apt-get", "update", "-y"]);
+        await exec.exec("sudo", [
+            "apt-get",
+            "update",
+            "-y",
+            "-o",
+            "Acquire::http::Timeout=60",
+            "-o",
+            "Acquire::Retries=3",
+        ]);
         core.info("Checking if ");
         if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
             (await needsLegacyNcursesInstall())) {
