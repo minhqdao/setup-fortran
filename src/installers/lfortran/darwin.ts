@@ -97,7 +97,11 @@ export async function installDarwin(target: Target): Promise<string> {
   core.addPath(lfortranBinDir);
 
   core.exportVariable("FC", "lfortran");
+  core.exportVariable("CC", "clang");
+  core.exportVariable("CXX", "clang++");
   core.exportVariable("FPM_FC", "lfortran");
+  core.exportVariable("FPM_CC", "clang");
+  core.exportVariable("FPM_CXX", "clang++");
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   // lfortran links against system libc++ on macOS; set SDKROOT so the linker

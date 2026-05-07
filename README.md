@@ -254,11 +254,11 @@ jobs:
 | Variable | Description |
 |----------|-------------|
 | `FC` | Path to the Fortran compiler |
-| `CC` | Path to the C compiler (not set for `lfortran`) |
-| `CXX` | Path to the C++ compiler (not set for `lfortran`) |
+| `CC` | Path to the C compiler |
+| `CXX` | Path to the C++ compiler |
 | `FPM_FC` | Path to the Fortran compiler for fpm |
-| `FPM_CC` | Path to the C compiler for fpm (not set for `lfortran`) |
-| `FPM_CXX` | Path to the C++ compiler for fpm (not set for `lfortran`) |
+| `FPM_CC` | Path to the C compiler for fpm |
+| `FPM_CXX` | Path to the C++ compiler for fpm |
 
 ## Reporting
 

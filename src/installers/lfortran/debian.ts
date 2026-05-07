@@ -88,15 +88,14 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.info(`Found lfortran binary at: ${lfortranBin}`);
 
-  // Add the conda env's bin dir to PATH so `lfortran` (and gcc, g++, etc.
-  // bundled by conda) are available in subsequent steps.
   core.addPath(lfortranBinDir);
 
-  // lfortran does not ship a paired clang; use whatever GCC/clang the runner
-  // provides as the C/C++ companion.  We leave CC/CXX unset so downstream
-  // steps can choose their own C toolchain without surprising overrides.
   core.exportVariable("FC", "lfortran");
+  core.exportVariable("CC", "clang");
+  core.exportVariable("CXX", "clang++");
   core.exportVariable("FPM_FC", "lfortran");
+  core.exportVariable("FPM_CC", "clang");
+  core.exportVariable("FPM_CXX", "clang++");
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);
