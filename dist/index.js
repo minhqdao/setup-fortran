@@ -89271,7 +89271,10 @@ async function installGFortran(target) {
     }
 }
 
+// EXTERNAL MODULE: external "fs"
+var external_fs_ = __nccwpck_require__(79896);
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
+
 
 
 
@@ -89310,15 +89313,16 @@ const debian_SUPPORTED_VERSIONS = {
     ],
     [Arch.ARM64]: undefined,
 };
-const ONEAPI_CACHE_PATHS = ["/opt/intel/oneapi"];
-function oneApiCacheKey(version) {
-    return `oneapi-ifx-${version}`;
-}
 async function debian_installDebian(target) {
     const version = resolveVersion(target, debian_SUPPORTED_VERSIONS);
     core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
-    const cacheKey = oneApiCacheKey(version);
-    const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
+    const ONEAPI_ROOT = "/opt/intel/oneapi";
+    const cacheKey = `oneapi-ifx-${version}`;
+    const cachePaths = [ONEAPI_ROOT];
+    if (!external_fs_.existsSync(ONEAPI_ROOT)) {
+        external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
+    }
+    const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
     if (!cacheHit) {
         core.info("Adding Intel oneAPI apt repository...");
         await exec.exec("bash", [
@@ -89357,7 +89361,7 @@ async function debian_installDebian(target) {
             fortranPkg,
             cppPkg,
         ]);
-        await cache.saveCache(ONEAPI_CACHE_PATHS, cacheKey);
+        await cache.saveCache(cachePaths, cacheKey);
     }
     else {
         core.info(`Cache hit for ${cacheKey}, skipping installation...`);
@@ -89407,8 +89411,6 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(79896);
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
 
 
@@ -89641,6 +89643,7 @@ async function installIFX(target) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -89671,7 +89674,11 @@ async function ifort_debian_installDebian(target) {
         throw new Error(`Unsupported ifort version: ${version}`);
     }
     const bundle = entry.bundle;
-    const ONEAPI_CACHE_PATHS = ["/opt/intel/oneapi"];
+    const ONEAPI_ROOT = "/opt/intel/oneapi";
+    const ONEAPI_CACHE_PATHS = [ONEAPI_ROOT];
+    if (!external_fs_.existsSync(ONEAPI_ROOT)) {
+        external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
+    }
     const cacheKey = `oneapi-ifort-${bundle}`;
     const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
     if (!cacheHit) {
@@ -89837,6 +89844,9 @@ async function darwin_installDarwin(target) {
     }
     const cacheKey = `ifort-darwin-${target.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
+    if (!external_fs_.existsSync(darwin_ONEAPI_ROOT)) {
+        external_fs_.mkdirSync(darwin_ONEAPI_ROOT, { recursive: true });
+    }
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
     if (cacheHit) {
         core.info(`Restored ifort installation from cache (${cacheHit}).`);
@@ -89986,9 +89996,11 @@ async function ifort_win32_installWin32(target) {
             `This is likely a legacy version issue — please check release compatibility.`);
     }
     core.info(`Installing ifort ${version} on Windows (${target.arch})...`);
-    // We use a specific cache key for ifort to avoid collisions with ifx
     const cacheKey = `ifort-win32-${target.arch}-${version}`;
     const cachePaths = [win32_ONEAPI_ROOT];
+    if (!external_fs_.existsSync(win32_ONEAPI_ROOT)) {
+        external_fs_.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
+    }
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
     if (cacheHit) {
         core.info(`Restored ifort installation from cache (${cacheHit}).`);

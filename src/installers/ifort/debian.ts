@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
@@ -39,7 +40,12 @@ export async function installDebian(target: Target): Promise<string> {
 
   const bundle = entry.bundle;
 
-  const ONEAPI_CACHE_PATHS = ["/opt/intel/oneapi"];
+  const ONEAPI_ROOT = "/opt/intel/oneapi";
+  const ONEAPI_CACHE_PATHS = [ONEAPI_ROOT];
+
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
+  }
 
   const cacheKey = `oneapi-ifort-${bundle}`;
   const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);

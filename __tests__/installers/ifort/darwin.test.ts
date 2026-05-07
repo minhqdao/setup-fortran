@@ -19,6 +19,7 @@ jest.mock("@actions/tool-cache");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
 describe("installDarwin (ifort)", () => {

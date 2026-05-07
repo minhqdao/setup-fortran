@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
@@ -38,18 +39,19 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-const ONEAPI_CACHE_PATHS = ["/opt/intel/oneapi"];
-
-function oneApiCacheKey(version: string): string {
-  return `oneapi-ifx-${version}`;
-}
-
 export async function installDebian(target: Target): Promise<string> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
 
-  const cacheKey = oneApiCacheKey(version);
-  const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
+  const ONEAPI_ROOT = "/opt/intel/oneapi";
+  const cacheKey = `oneapi-ifx-${version}`;
+  const cachePaths = [ONEAPI_ROOT];
+
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
+  }
+
+  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
 
   if (!cacheHit) {
     core.info("Adding Intel oneAPI apt repository...");
@@ -95,7 +97,7 @@ export async function installDebian(target: Target): Promise<string> {
       cppPkg,
     ]);
 
-    await cache.saveCache(ONEAPI_CACHE_PATHS, cacheKey);
+    await cache.saveCache(cachePaths, cacheKey);
   } else {
     core.info(`Cache hit for ${cacheKey}, skipping installation...`);
   }

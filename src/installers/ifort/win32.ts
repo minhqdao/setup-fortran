@@ -75,9 +75,12 @@ export async function installWin32(target: Target): Promise<string> {
 
   core.info(`Installing ifort ${version} on Windows (${target.arch})...`);
 
-  // We use a specific cache key for ifort to avoid collisions with ifx
   const cacheKey = `ifort-win32-${target.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
+
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
+  }
 
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   if (cacheHit) {
