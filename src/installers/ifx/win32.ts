@@ -134,6 +134,10 @@ export async function installWin32(target: Target): Promise<string> {
   const cacheKey = `ifx-win32-${target.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
+  }
+
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   if (cacheHit) {
     core.info(`Restored ifx installation from cache (${cacheHit}).`);
