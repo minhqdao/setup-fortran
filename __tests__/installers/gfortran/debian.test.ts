@@ -108,15 +108,19 @@ describe("GFortran Debian Installer", () => {
         "apt-get",
         "update",
         "-y",
+        "-o",
+        "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
       ]);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
         "install",
         "-y",
         "-o",
-        "Acquire::Retries=3",
-        "-o",
         "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
         "gcc-14",
         "gfortran-14",
       ]);

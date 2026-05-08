@@ -209,7 +209,15 @@ export async function installDebian(target: Target): Promise<string> {
         ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
         ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
     ]);
-    await exec.exec("sudo", ["apt-get", "update", "-y"]);
+    await exec.exec("sudo", [
+      "apt-get",
+      "update",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=60",
+      "-o",
+      "Acquire::Retries=3",
+    ]);
 
     core.info("Checking if ");
 

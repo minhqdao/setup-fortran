@@ -79,15 +79,23 @@ async function aptGetInstallWithRetry(
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", ["apt-get", "update", "-y"]);
+      await exec.exec("sudo", [
+        "apt-get",
+        "update",
+        "-y",
+        "-o",
+        "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
+      ]);
       await exec.exec("sudo", [
         "apt-get",
         "install",
         "-y",
         "-o",
-        "Acquire::Retries=3",
-        "-o",
         "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
         ...packages,
       ]);
       return;

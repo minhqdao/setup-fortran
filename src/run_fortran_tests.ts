@@ -161,8 +161,8 @@ async function run(): Promise<void> {
       isFlang &&
       ((flangVersion !== undefined &&
         flangVersion !== LATEST &&
-        flangVersion < 19) || // Polymorphic types (CLASS): requires flang/LLVM 19+; currently broken on UCRT64.
-        (process.env.ImageOS === "win25" && isUCRT64)); // somehow fails on windows-2025 with UCRT64
+        flangVersion < 19) ||
+        isUCRT64);
 
     if (!skipPoly) {
       await execTest("polymorphism_test", [

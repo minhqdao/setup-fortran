@@ -21,6 +21,8 @@ jest.mock("@actions/tool-cache");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   writeFileSync: jest.fn(),
+  existsSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 jest.mock("os");
 
@@ -46,6 +48,7 @@ describe("installWin32 (ifx)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFs.existsSync.mockReturnValue(true);
     mockedOs.tmpdir.mockReturnValue("C:\\Temp");
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifx") {

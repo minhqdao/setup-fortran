@@ -75,6 +75,10 @@ export async function installDarwin(target: Target): Promise<string> {
   const cacheKey = `ifort-darwin-${target.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+  }
+
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   if (cacheHit) {
     core.info(`Restored ifort installation from cache (${cacheHit}).`);

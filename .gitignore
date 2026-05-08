@@ -1,7 +1,8 @@
 node_modules/
 lib/
-coverage/
+dist-tests
 test_build
+coverage/
 *.tsbuildinfo
 *.mod
 *.out

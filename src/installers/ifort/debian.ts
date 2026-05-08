@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
@@ -39,7 +40,12 @@ export async function installDebian(target: Target): Promise<string> {
 
   const bundle = entry.bundle;
 
-  const ONEAPI_CACHE_PATHS = ["/opt/intel/oneapi"];
+  const ONEAPI_ROOT = "/opt/intel/oneapi";
+  const ONEAPI_CACHE_PATHS = [ONEAPI_ROOT];
+
+  if (!fs.existsSync(ONEAPI_ROOT)) {
+    fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
+  }
 
   const cacheKey = `oneapi-ifort-${bundle}`;
   const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
@@ -59,7 +65,15 @@ export async function installDebian(target: Target): Promise<string> {
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", ["apt-get", "update", "-y"]);
+    await exec.exec("sudo", [
+      "apt-get",
+      "update",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=60",
+      "-o",
+      "Acquire::Retries=3",
+    ]);
 
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
     // Because ifort only exists in <=2023, the C++ package is always the classic variant.

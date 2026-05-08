@@ -185,7 +185,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | 17      | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | 16      | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-> Specific patch versions (e.g. `21.1.6`) are also accepted on macOS and Windows runners and are validated against available GitHub releases. If the requested patch does not exist, an error is thrown. Patches aren't specifically tested.
+> Specific patch versions (e.g. `21.1.6`) are also accepted on macOS and native Windows runners and are validated against available GitHub releases. If the requested patch does not exist, an error is thrown. Patches aren't specifically tested.
 
 ## Examples
 
@@ -259,6 +259,14 @@ jobs:
 | `FPM_FC` | Path to the Fortran compiler for fpm |
 | `FPM_CC` | Path to the C compiler for fpm |
 | `FPM_CXX` | Path to the C++ compiler for fpm |
+
+## Development
+
+GitHub Actions run the code straight from the `dist` folder. To bundle the content from the `src` into the `dist` folder, run `npm run bundle`. Then commit the entire `dist` folder.
+
+The integration tests are bundled, cached and executed in the CI, so you do not need to run `npm run build:integration-test` locally.
+
+You can run `npm run all` to format, lint, run unit tests and bundle the code into the `dist` folder in one go.
 
 ## Reporting
 

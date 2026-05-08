@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import { installDebian } from "../../../src/installers/ifort/debian";
 import {
   Arch,
@@ -13,10 +14,16 @@ import {
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
+jest.mock("fs", () => ({
+  ...jest.requireActual("fs"),
+  existsSync: jest.fn(),
+  mkdirSync: jest.fn(),
+}));
 
 describe("installDebian (ifort)", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedCache = cache as jest.Mocked<typeof cache>;
+  const mockedFs = fs as jest.Mocked<typeof fs>;
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
@@ -32,6 +39,7 @@ describe("installDebian (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFs.existsSync.mockReturnValue(true);
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifort" && args?.[0] === "--version") {
@@ -57,6 +65,15 @@ describe("installDebian (ifort)", () => {
   it("adds the Intel repository on cache miss", async () => {
     await installDebian(baseTarget);
 
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "apt-get",
+      "update",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=60",
+      "-o",
+      "Acquire::Retries=3",
+    ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
       expect.stringContaining(

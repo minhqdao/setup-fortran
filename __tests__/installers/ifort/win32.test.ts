@@ -20,12 +20,14 @@ jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   writeFileSync: jest.fn(),
   existsSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
 describe("installWin32 (ifort)", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedCache = cache as jest.Mocked<typeof cache>;
   const mockedTc = tc as jest.Mocked<typeof tc>;
+  const mockedFs = fs as jest.Mocked<typeof fs>;
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
@@ -41,6 +43,7 @@ describe("installWin32 (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFs.existsSync.mockReturnValue(true);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifort" && args?.[0] === "/what") {
         if (options?.listeners?.stdout) {
