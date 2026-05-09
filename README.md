@@ -6,6 +6,9 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 
 ```yaml
 - uses: minhqdao/setup-fortran@v1
+  with:
+    compiler: <compiler>
+    version: <version>
 ```
 
 ## Inputs
@@ -205,8 +208,8 @@ This defaults to `gfortran` and the newest version available on that platform.
 ```yaml
 - uses: minhqdao/setup-fortran@v1
   with:
-    compiler: ifx
-    version: "2026.0"
+    compiler: lfortran
+    version: "0.63.0"
 ```
 
 ### Matrix build
@@ -217,11 +220,14 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
     toolchain:
       - { compiler: gfortran, version: "15" }
-      - { compiler: nvfortran, version: "26.3" }
+      - { compiler: ifx }
       - { compiler: lfortran, version: "0.63.0" }
     exclude:
       - os: macos-latest
-        toolchain: { compiler: nvfortran, version: "26.3"}
+        toolchain: { compiler: ifx }
+    include:
+      - os: windows-11-arm
+        toolchain: { compiler: flang, version: "22"}
 jobs:
   test:
     runs-on: ${{ matrix.os }}
