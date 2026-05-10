@@ -5,7 +5,6 @@ import * as fs from "fs";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
-// A clean list of supported base versions (YYYY.MINOR).
 // The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const SUPPORTED_VERSIONS = {
@@ -40,7 +39,9 @@ const SUPPORTED_VERSIONS = {
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(target, SUPPORTED_VERSIONS, {
+    resolveMinorToLatestPatch: true,
+  });
   core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
 
   const ONEAPI_ROOT = "/opt/intel/oneapi";

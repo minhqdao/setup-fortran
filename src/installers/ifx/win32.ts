@@ -8,9 +8,8 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 
-// Only versions with a known installer URL are listed. LATEST resolves to the
-// first entry. ARM64 is not supported: Intel oneAPI does not provide Windows
-// ARM64 packages.
+// Only versions with a known installer URL are listed.
+// LATEST resolves to the first entry.
 const IFX_RELEASES = [
   {
     version: "2026.0.0",
@@ -119,7 +118,9 @@ const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
 export async function installWin32(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS, {
+    resolveMinorToLatestPatch: true,
+  });
 
   const release = IFX_RELEASES.find((r) => r.version === version);
   if (!release) {

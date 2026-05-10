@@ -2,7 +2,7 @@ name: ifx
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -14,11 +14,11 @@ jobs:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
     runs-on: ${{ matrix.image }}
-    needs: [ build ]
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
-        image: [ ubuntu-24.04, ubuntu-22.04 ]
+        image: [ubuntu-24.04, ubuntu-22.04]
         toolchain:
           - { compiler: ifx, version: "2026.0" }
           - { compiler: ifx, version: "2025.3" }
@@ -46,10 +46,14 @@ jobs:
           - { compiler: ifx, version: "2021.1.2" }
           - { compiler: ifx, version: "2021.1.1" }
         include:
+          - image: ubuntu-24.04
+            toolchain: { compiler: ifx, version: "2023.2" } # make sure that minor is resolved to latest patch
           - image: windows-2025
             toolchain: { compiler: ifx, version: "2026.0.0" }
           - image: windows-2022
             toolchain: { compiler: ifx, version: "2026.0.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3" } # make sure that minor is resolved to latest patch
           - image: windows-2025
             toolchain: { compiler: ifx, version: "2025.3.3" }
           - image: windows-2022
@@ -152,7 +156,7 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - name: Verify installed version
-        run: "echo \"Output: ${{ steps.setup.outputs.version }}\""
+        run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
 
       - name: Run Integration Tests
         run: npm run integration-test

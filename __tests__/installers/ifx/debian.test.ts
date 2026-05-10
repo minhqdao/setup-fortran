@@ -118,6 +118,20 @@ describe("installDebian ifx", () => {
     ]);
   });
 
+  it("resolves 2023.2 to the latest patch 2023.2.4 using resolveMinorToLatestPatch", async () => {
+    const target = { ...baseTarget, version: "2023.2" };
+    await installDebian(target);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "--no-install-recommends",
+      "intel-oneapi-compiler-fortran-2023.2.4",
+      "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.4",
+    ]);
+  });
+
   it("adds the Intel repository on cache miss", async () => {
     await installDebian(baseTarget);
 

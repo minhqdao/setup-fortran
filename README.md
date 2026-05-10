@@ -41,45 +41,56 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 |---------|--------------|--------------|--------------|--------------|
 | latest   | ✅ | ✅ | ✅ | ✅ |
 | 2026.0.0 | ❌ | ❌ | ✅ | ✅ |
-| 2026.0   | ✅ | ✅ | ❌ | ❌ |
+| 2026.0   | ✅ | ✅ | ✅ | ✅ |
 | 2025.3.3 | ❌ | ❌ | ✅ | ✅ |
 | 2025.3.2 | ❌ | ❌ | ✅ | ✅ |
 | 2025.3.1 | ❌ | ❌ | ✅ | ✅ |
 | 2025.3.0 | ❌ | ❌ | ✅ | ✅ |
-| 2025.3   | ✅ | ✅ | ❌ | ❌ |
+| 2025.3   | ✅ | ✅ | ✅ | ✅ |
 | 2025.2.1 | ❌ | ❌ | ✅ | ✅ |
 | 2025.2.0 | ❌ | ❌ | ✅ | ✅ |
-| 2025.2   | ✅ | ✅ | ❌ | ❌ |
+| 2025.2   | ✅ | ✅ | ✅ | ✅ |
 | 2025.1.0 | ❌ | ❌ | ✅ | ✅ |
-| 2025.1   | ✅ | ✅ | ❌ | ❌ |
+| 2025.1   | ✅ | ✅ | ✅ | ✅ |
 | 2025.0.0 | ❌ | ❌ | ✅ | ✅ |
-| 2025.0   | ✅ | ✅ | ❌ | ❌ |
+| 2025.0   | ✅ | ✅ | ✅ | ✅ |
 | 2024.2.1 | ❌ | ❌ | ✅ | ✅ |
 | 2024.2.0 | ❌ | ❌ | ✅ | ✅ |
-| 2024.2   | ✅ | ✅ | ❌ | ❌ |
+| 2024.2   | ✅ | ✅ | ✅ | ✅ |
 | 2024.1.0 | ❌ | ❌ | ✅ | ✅ |
-| 2024.1   | ✅ | ✅ | ❌ | ❌ |
+| 2024.1   | ✅ | ✅ | ✅ | ✅ |
 | 2024.0.2 | ❌ | ❌ | ✅ | ✅ |
 | 2024.0.1 | ❌ | ❌ | ✅ | ✅ |
-| 2024.0   | ✅ | ✅ | ❌ | ❌ |
+| 2024.0   | ✅ | ✅ | ✅ | ✅ |
 | 2023.2.4 | ✅ | ✅ | ❌ | ❌ |
 | 2023.2.3 | ✅ | ✅ | ❌ | ❌ |
 | 2023.2.2 | ✅ | ✅ | ❌ | ❌ |
 | 2023.2.1 | ✅ | ✅ | ✅ | ✅ |
 | 2023.2.0 | ✅ | ✅ | ✅ | ✅ |
+| 2023.2   | ✅ | ✅ | ✅ | ✅ |
 | 2023.1.0 | ✅ | ✅ | ✅ | ✅ |
+| 2023.1   | ✅ | ✅ | ✅ | ✅ |
 | 2023.0.0 | ✅ | ✅ | ❌ | ❌ |
+| 2023.0   | ✅ | ✅ | ❌ | ❌ |
 | 2022.3.0 | ❌ | ❌ | ✅ | ✅ |
+| 2022.3   | ❌ | ❌ | ✅ | ✅ |
 | 2022.2.1 | ✅ | ✅ | ❌ | ❌ |
 | 2022.2.0 | ✅ | ✅ | ✅ | ✅ |
+| 2022.2   | ✅ | ✅ | ✅ | ✅ |
 | 2022.1.0 | ✅ | ✅ | ❌ | ❌ |
+| 2022.1   | ✅ | ✅ | ❌ | ❌ |
 | 2022.0.2 | ✅ | ✅ | ❌ | ❌ |
 | 2022.0.1 | ✅ | ✅ | ❌ | ❌ |
+| 2022.0   | ✅ | ✅ | ❌ | ❌ |
 | 2021.4.0 | ✅ | ✅ | ❌ | ❌ |
+| 2021.4   | ✅ | ✅ | ❌ | ❌ |
 | 2021.3.0 | ✅ | ✅ | ❌ | ❌ |
+| 2021.3   | ✅ | ✅ | ❌ | ❌ |
 | 2021.2.0 | ✅ | ✅ | ❌ | ❌ |
+| 2021.2   | ✅ | ✅ | ❌ | ❌ |
 | 2021.1.2 | ✅ | ✅ | ❌ | ❌ |
 | 2021.1.1 | ✅ | ✅ | ❌ | ❌ |
+| 2021.1   | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
@@ -198,7 +209,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 steps:
   - uses: actions/checkout@v6
   - uses: minhqdao/setup-fortran@v1
-  - run: ${{ env.FC }} hello.f90 -o hello
+  - run: ${{ env.FC }} hello.f90
 ```
 
 This defaults to `gfortran` and the newest version available on that platform.
@@ -220,11 +231,11 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
     toolchain:
       - { compiler: gfortran, version: "15" }
-      - { compiler: ifx }
+      - { compiler: ifx, version: "2016.0" }
       - { compiler: lfortran, version: "0.63.0" }
     exclude:
       - os: macos-latest
-        toolchain: { compiler: ifx }
+        toolchain: { compiler: ifx, version: "2016.0" }
     include:
       - os: windows-11-arm
         toolchain: { compiler: flang, version: "22"}
@@ -237,7 +248,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-      - run: ${{ env.FC }} hello.f90 -o hello
+      - run: ${{ env.FC }} hello.f90
 ```
 
 ### Windows with MSYS2
@@ -268,7 +279,7 @@ jobs:
 
 ## Development
 
-GitHub Actions run the code straight from the `dist` folder. To bundle the content from the `src` into the `dist` folder, run `npm run bundle`. Then commit the entire `dist` folder.
+GitHub Actions run the code straight from the `dist` folder. To bundle the content from the `src` into the `dist` folder including dependencies, run `npm run bundle`. Then commit the entire `dist` folder.
 
 The integration tests are bundled, cached and executed in the CI, so you do not need to run `npm run build:integration-test` locally.
 
@@ -276,7 +287,7 @@ You can run `npm run all` to format, lint, run unit tests and bundle the code in
 
 ## Reporting
 
-Please submit an [issue](https://github.com/minhqdao/setup-fortran/issues) if you find a problem with a specific configuration or you want features to be added.
+Please submit an [issue](https://github.com/minhqdao/setup-fortran/issues) if you find a problem or would like features to be added.
 
 ## License
 

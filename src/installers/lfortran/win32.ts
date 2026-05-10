@@ -84,7 +84,16 @@ async function installConda(target: Target): Promise<string> {
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
 
   core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-  await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+  await exec.exec("curl", [
+    "-fsSL",
+    "--retry",
+    "3",
+    "--retry-delay",
+    "15",
+    "-o",
+    miniforgeInstaller,
+    miniforgeUrl,
+  ]);
 
   // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
   // install prefix and must be the last argument with no quotes around the path.

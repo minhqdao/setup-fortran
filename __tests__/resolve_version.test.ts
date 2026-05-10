@@ -59,6 +59,93 @@ describe("resolveVersion", () => {
     });
   });
 
+  describe("resolveMinorToLatestPatch", () => {
+    const supported = {
+      [Arch.X64]: ["2025.2.1", "2025.2.0", "2025.1.0", "2024.0.0"],
+    };
+
+    it("resolves YYYY.minor to the latest patch if resolveMinorToLatestPatch is true", () => {
+      const target: Target = { ...baseTarget, version: "2025.2" };
+      const result = resolveVersion(target, supported, {
+        resolveMinorToLatestPatch: true,
+      });
+      expect(result).toBe("2025.2.1");
+    });
+
+    it("does nothing if resolveMinorToLatestPatch is false", () => {
+      const target: Target = { ...baseTarget, version: "2025.2" };
+      expect(() =>
+        resolveVersion(target, supported, {
+          resolveMinorToLatestPatch: false,
+        }),
+      ).toThrow("gfortran 2025.2 is not supported on linux (x64)");
+    });
+
+    it("returns the exact version if it exists in the list even if resolveMinorToLatestPatch is true", () => {
+      const target: Target = { ...baseTarget, version: "2025.1.0" };
+      const result = resolveVersion(target, supported, {
+        resolveMinorToLatestPatch: true,
+      });
+      expect(result).toBe("2025.1.0");
+    });
+
+    it("throws if no version starts with the prefix", () => {
+      const target: Target = { ...baseTarget, version: "2025.3" };
+      expect(() =>
+        resolveVersion(target, supported, {
+          resolveMinorToLatestPatch: true,
+        }),
+      ).toThrow("gfortran 2025.3 is not supported on linux (x64)");
+    });
+
+    it("only matches YYYY.minor format", () => {
+      const target: Target = { ...baseTarget, version: "2025" };
+      expect(() =>
+        resolveVersion(target, supported, {
+          resolveMinorToLatestPatch: true,
+        }),
+      ).toThrow("gfortran 2025 is not supported on linux (x64)");
+    });
+
+    it("does not match versions with more than two parts as YYYY.minor", () => {
+      const target: Target = { ...baseTarget, version: "2025.2.1" };
+      const result = resolveVersion(target, supported, {
+        resolveMinorToLatestPatch: true,
+      });
+      expect(result).toBe("2025.2.1");
+    });
+
+    it("does not match non-numeric versions", () => {
+      const target: Target = { ...baseTarget, version: "abcd.ef" };
+      expect(() =>
+        resolveVersion(target, supported, {
+          resolveMinorToLatestPatch: true,
+        }),
+      ).toThrow("gfortran abcd.ef is not supported on linux (x64)");
+    });
+
+    it("resolves to the first matching entry (latest patch) even if multiple patches exist", () => {
+      const manyPatches = {
+        [Arch.X64]: ["2025.2.2", "2025.2.1", "2025.2.0"],
+      };
+      const target: Target = { ...baseTarget, version: "2025.2" };
+      const result = resolveVersion(target, manyPatches, {
+        resolveMinorToLatestPatch: true,
+      });
+      expect(result).toBe("2025.2.2");
+    });
+
+    it("handles an empty version list with the flag enabled", () => {
+      const emptyList = { [Arch.X64]: [] };
+      const target: Target = { ...baseTarget, version: "2025.2" };
+      expect(() =>
+        resolveVersion(target, emptyList, {
+          resolveMinorToLatestPatch: true,
+        }),
+      ).toThrow("gfortran 2025.2 is not supported on linux (x64)");
+    });
+  });
+
   describe("when the arch has no supported versions", () => {
     it("throws a no supported versions error for LATEST", () => {
       const emptySupported: Record<string, readonly string[]> = {
@@ -163,5 +250,27 @@ describe("resolveWindowsVersion", () => {
     expect(() => resolveWindowsVersion(target, SUPPORTED_WIN)).toThrow(
       'Architecture "ppc64" is not supported for gfortran on Windows.',
     );
+  });
+
+  it("handles resolveMinorToLatestPatch", () => {
+    const supported: Record<
+      string,
+      Record<Msystem, readonly string[] | undefined>
+    > = {
+      [Arch.X64]: {
+        [Msystem.Native]: ["2025.1.1", "2025.1.0"],
+        [Msystem.UCRT64]: undefined,
+        [Msystem.Clang64]: undefined,
+      },
+    };
+    const target = {
+      ...winTarget,
+      msystem: Msystem.Native,
+      version: "2025.1",
+    };
+    const result = resolveWindowsVersion(target, supported, {
+      resolveMinorToLatestPatch: true,
+    });
+    expect(result).toBe("2025.1.1");
   });
 });

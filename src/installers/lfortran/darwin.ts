@@ -61,7 +61,16 @@ export async function installDarwin(target: Target): Promise<string> {
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
 
   core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-  await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+  await exec.exec("curl", [
+    "-fsSL",
+    "--retry",
+    "3",
+    "--retry-delay",
+    "15",
+    "-o",
+    miniforgeInstaller,
+    miniforgeUrl,
+  ]);
 
   core.info(`Installing Miniforge to ${condaPrefix}...`);
   await exec.exec("bash", [

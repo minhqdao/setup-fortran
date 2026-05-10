@@ -5,7 +5,10 @@ import { LATEST, type Msystem, type Target } from "./types";
 export function resolveVersion<T extends readonly string[]>(
   target: Target,
   supportedVersions: Record<string, T | undefined>,
-  { matchMajorIfPatch = false }: { matchMajorIfPatch?: boolean } = {},
+  {
+    matchMajorIfPatch = false,
+    resolveMinorToLatestPatch = false,
+  }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
 ): string {
   const versions = supportedVersions[target.arch];
 
@@ -26,16 +29,28 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
-  // Try exact match first (covers Intel-style versions like "2025.1.0" and
-  // LLVM-style major-only entries like "22"). If that fails and the version
-  // looks like a full x.y.z patch, fall back to matching just the major —
-  // this allows users to enter "22.1.3" when the list contains "22".
   const versionList = versions as readonly string[];
   if (!versionList.includes(version)) {
+    // Try exact match first (covers Intel-style versions like "2025.1.0" and
+    // LLVM-style major-only entries like "22"). If that fails and the version
+    // looks like a full x.y.z patch, fall back to matching just the major —
+    // this allows users to enter "22.1.3" when the list contains "22".
     if (matchMajorIfPatch) {
       const major = parseMajorOrPatch(version).major;
       if (versionList.includes(major)) {
         return version;
+      }
+    }
+
+    // When true, a minor-only version string in "YYYY.minor" format (e.g.
+    // "2025.2") is expanded to the latest known patch for that minor (e.g.
+    // "2025.2.1") by finding the first entry in the version list whose prefix
+    // matches "YYYY.minor.".
+    if (resolveMinorToLatestPatch && /^\d{4}\.\d+$/.test(version)) {
+      const prefix = `${version}.`;
+      const match = versionList.find((v) => v.startsWith(prefix));
+      if (match) {
+        return match;
       }
     }
 
@@ -55,7 +70,13 @@ export function resolveWindowsVersion(
     string,
     Record<Msystem, readonly string[] | undefined> | undefined
   >,
-  { matchMajorIfPatch = false }: { matchMajorIfPatch?: boolean } = {},
+  {
+    matchMajorIfPatch = false,
+    resolveMinorToLatestPatch = false,
+  }: {
+    matchMajorIfPatch?: boolean;
+    resolveMinorToLatestPatch?: boolean;
+  } = {},
 ): string {
   const archVersions = supportedVersions[target.arch];
 
@@ -77,7 +98,7 @@ export function resolveWindowsVersion(
   return resolveVersion(
     target,
     { [target.arch]: versions },
-    { matchMajorIfPatch: matchMajorIfPatch },
+    { matchMajorIfPatch, resolveMinorToLatestPatch },
   );
 }
 

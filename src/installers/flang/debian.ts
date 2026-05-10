@@ -76,16 +76,14 @@ export async function installDebian(target: Target): Promise<string> {
   await exec.exec("bash", [
     "-c",
     [
-      `curl -fsSL https://apt.llvm.org/llvm.sh`,
+      `curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
       `| sudo bash -s -- ${version}`,
     ].join(" "),
   ]);
 
   const pkgName = `flang-${version}`;
-  core.info(`Installing apt package ${pkgName}...`);
-  await exec.exec("sudo", ["apt-get", "install", "-y", pkgName]);
 
-  core.info(`Installing apt package libomp-${version}-dev...`);
+  core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
   await exec.exec("sudo", [
     "apt-get",
     "install",

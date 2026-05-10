@@ -80,6 +80,10 @@ export async function installDebian(target: Target): Promise<string> {
     core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
     await exec.exec("curl", [
       "-fSL",
+      "--retry",
+      "3",
+      "--retry-delay",
+      "15",
       "--user-agent",
       "Mozilla/5.0",
       "-o",
