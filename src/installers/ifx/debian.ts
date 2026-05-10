@@ -5,7 +5,6 @@ import * as fs from "fs";
 import { Arch, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
-// A clean list of supported base versions (YYYY.MINOR).
 // The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const SUPPORTED_VERSIONS = {

@@ -10,7 +10,7 @@ import path from "path";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
-// LATEST resolves to the first entry (2023.2.1).
+// LATEST resolves to the first entry
 const IFORT_RELEASES = [
   {
     version: "2021.13",

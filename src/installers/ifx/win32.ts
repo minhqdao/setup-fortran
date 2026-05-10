@@ -8,9 +8,8 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 
-// Only versions with a known installer URL are listed. LATEST resolves to the
-// first entry. ARM64 is not supported: Intel oneAPI does not provide Windows
-// ARM64 packages.
+// Only versions with a known installer URL are listed.
+// LATEST resolves to the first entry.
 const IFX_RELEASES = [
   {
     version: "2026.0.0",
