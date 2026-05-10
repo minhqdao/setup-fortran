@@ -71,7 +71,18 @@ describe("installDebian (AOCC)", () => {
       [tempInstallDir],
       expect.stringContaining("aocc-5.1-x64-22.04"),
     );
-    expect(mockedExec).toHaveBeenCalledWith("curl", expect.arrayContaining(["-o", expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb")]));
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-fSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+      ]),
+    );
     expect(mockedExec).toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb")]);
     
     expect(mockedExec).toHaveBeenCalledWith("sudo", ["cp", "-r", "/opt/AMD/aocc-compiler-5.1.0", tempInstallDir]);

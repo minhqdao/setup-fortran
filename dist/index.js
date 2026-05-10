@@ -90430,6 +90430,10 @@ async function aocc_debian_installDebian(target) {
         core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
         await exec.exec("curl", [
             "-fSL",
+            "--retry",
+            "3",
+            "--retry-delay",
+            "15",
             "--user-agent",
             "Mozilla/5.0",
             "-o",
@@ -90575,14 +90579,12 @@ async function flang_debian_installDebian(target) {
     await exec.exec("bash", [
         "-c",
         [
-            `curl -fsSL https://apt.llvm.org/llvm.sh`,
+            `curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
             `| sudo bash -s -- ${version}`,
         ].join(" "),
     ]);
     const pkgName = `flang-${version}`;
-    core.info(`Installing apt package ${pkgName}...`);
-    await exec.exec("sudo", ["apt-get", "install", "-y", pkgName]);
-    core.info(`Installing apt package libomp-${version}-dev...`);
+    core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
     await exec.exec("sudo", [
         "apt-get",
         "install",
@@ -91101,7 +91103,16 @@ async function lfortran_debian_installDebian(target) {
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
     core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+    await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforgeUrl,
+    ]);
     core.info(`Installing Miniforge to ${condaPrefix}...`);
     await exec.exec("bash", [
         miniforgeInstaller,
@@ -91207,7 +91218,16 @@ async function lfortran_darwin_installDarwin(target) {
     const arch = condaArch(target.arch);
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
     core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+    await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforgeUrl,
+    ]);
     core.info(`Installing Miniforge to ${condaPrefix}...`);
     await exec.exec("bash", [
         miniforgeInstaller,
@@ -91348,7 +91368,16 @@ async function installConda(target) {
     const arch = target.arch === Arch.ARM64 ? "arm64" : "x86_64";
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
     core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await exec.exec("curl", ["-fsSL", "-o", miniforgeInstaller, miniforgeUrl]);
+    await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforgeUrl,
+    ]);
     // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
     // install prefix and must be the last argument with no quotes around the path.
     core.info(`Installing Miniforge to ${condaPrefix}...`);

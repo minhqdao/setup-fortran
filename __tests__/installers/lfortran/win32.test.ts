@@ -57,6 +57,10 @@ describe("installWin32 (LFortran)", () => {
 
       expect(mockedExec).toHaveBeenCalledWith("curl", [
         "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
         "-o",
         expect.stringContaining("miniforge-install.exe"),
         expect.stringContaining("Miniforge3-Windows-x86_64.exe"),

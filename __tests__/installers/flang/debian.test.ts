@@ -68,7 +68,7 @@ describe("installDebian (Flang)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
-      "curl -fsSL https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
+      "curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
     ]);
   });
 
@@ -80,6 +80,7 @@ describe("installDebian (Flang)", () => {
       "install",
       "-y",
       "flang-18",
+      "libomp-18-dev",
     ]);
   });
 

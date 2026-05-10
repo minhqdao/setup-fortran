@@ -51,6 +51,10 @@ describe("installDebian (LFortran)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith("curl", [
       "-fsSL",
+      "--retry",
+      "3",
+      "--retry-delay",
+      "15",
       "-o",
       expect.stringContaining("miniforge.sh"),
       expect.stringContaining("Miniforge3-Linux-x86_64.sh"),

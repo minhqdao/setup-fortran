@@ -82,10 +82,8 @@ export async function installDebian(target: Target): Promise<string> {
   ]);
 
   const pkgName = `flang-${version}`;
-  core.info(`Installing apt package ${pkgName}...`);
-  await exec.exec("sudo", ["apt-get", "install", "-y", pkgName]);
 
-  core.info(`Installing apt package libomp-${version}-dev...`);
+  core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
   await exec.exec("sudo", [
     "apt-get",
     "install",

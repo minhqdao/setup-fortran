@@ -151,62 +151,64 @@ describe("GFortran Debian Installer", () => {
       expect(mockedCache.saveCache).not.toHaveBeenCalled();
     });
 
-    it("retries apt-get install on failure", async () => {
+    it("retries apt-get install on failure and eventually succeeds", async () => {
+      let attempts = 0;
       mockedExec.mockImplementation(async (cmd, args) => {
         if (cmd === "sudo" && args?.[0] === "apt-get" && args?.[1] === "install") {
-          if (mockedExec.mock.calls.filter(c => c[1]?.[1] === "install").length === 1) {
-            throw new Error("Failed");
-          }
+          attempts++;
+          if (attempts === 1) throw new Error("Apt failure");
         }
         return 0;
       });
 
       jest.useFakeTimers();
-      try {
-        const installPromise = installDebian(baseTarget);
-        
-        // Advance timers repeatedly to ensure we pass the delay
-        for (let i = 0; i < 10; i++) {
-          await Promise.resolve();
-          jest.advanceTimersByTime(10000);
-        }
-        
-        await installPromise;
-      } finally {
-        jest.useRealTimers();
-      }
+      const installPromise = installDebian(baseTarget);
 
+      // Flush microtasks to allow the first attempt to fail and reach the setTimeout
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      // Fast-forward past the 10s delay for the first retry
+      jest.advanceTimersByTime(10000);
+
+      // Flush microtasks to allow the second attempt to run
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+      jest.useRealTimers();
+
+      expect(attempts).toBe(2);
       expect(core.warning).toHaveBeenCalledWith(
         expect.stringContaining("apt-get install failed (attempt 1/5)"),
       );
     });
 
-    it("retries add-apt-repository on failure", async () => {
+    it("retries add-apt-repository on failure and eventually succeeds", async () => {
       const target = { ...baseTarget, version: "15", osVersion: "24.04" };
-      
+      let attempts = 0;
       mockedExec.mockImplementation(async (cmd, args) => {
         if (cmd === "sudo" && args?.[0] === "add-apt-repository") {
-          if (mockedExec.mock.calls.filter(c => c[1]?.[0] === "add-apt-repository").length === 1) {
-            throw new Error("Failed");
-          }
+          attempts++;
+          if (attempts === 1) throw new Error("PPA failure");
         }
         return 0;
       });
 
       jest.useFakeTimers();
-      try {
-        const installPromise = installDebian(target);
-        
-        for (let i = 0; i < 10; i++) {
-          await Promise.resolve();
-          jest.advanceTimersByTime(5000);
-        }
-        
-        await installPromise;
-      } finally {
-        jest.useRealTimers();
-      }
+      const installPromise = installDebian(target);
 
+      // Flush microtasks
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      // Fast-forward past the 5s delay for the first retry
+      jest.advanceTimersByTime(5000);
+
+      // Flush microtasks
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+      jest.useRealTimers();
+
+      expect(attempts).toBe(2);
       expect(core.warning).toHaveBeenCalledWith(
         expect.stringContaining("add-apt-repository failed (attempt 1/3)"),
       );

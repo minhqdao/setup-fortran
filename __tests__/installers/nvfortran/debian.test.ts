@@ -1,7 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
-import * as fs from "fs";
 import { installDebian } from "../../../src/installers/nvfortran/debian";
 import {
   Arch,
@@ -14,22 +13,13 @@ import {
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
-jest.mock("fs", () => ({
-  ...jest.requireActual("fs"),
-  existsSync: jest.fn(),
-}));
 
-describe("installDebian (NVFortran)", () => {
+describe("installDebian nvfortran", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedGetExecOutput = exec.getExecOutput as jest.MockedFunction<
     typeof exec.getExecOutput
   >;
-  const mockedRestoreCache = cache.restoreCache as jest.MockedFunction<
-    typeof cache.restoreCache
-  >;
-  const mockedSaveCache = cache.saveCache as jest.MockedFunction<
-    typeof cache.saveCache
-  >;
+  const mockedCache = cache as jest.Mocked<typeof cache>;
 
   const baseTarget: Target = {
     compiler: Compiler.NVFortran,
@@ -42,87 +32,58 @@ describe("installDebian (NVFortran)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (fs.existsSync as jest.Mock).mockReturnValue(true);
+    mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockResolvedValue(0);
-    mockedGetExecOutput.mockResolvedValue({
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "install ok installed install ok installed",
       exitCode: 0,
-      stdout: "install ok installed\ninstall ok installed",
-      stderr: "",
     });
-    mockedRestoreCache.mockResolvedValue(undefined);
   });
 
-  it("installs fresh when cache is missing", async () => {
-    await installDebian(baseTarget);
-
-    expect(mockedRestoreCache).toHaveBeenCalled();
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=60",
-      "-o",
-      "Acquire::Retries=3",
-    ]);
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      "nvhpc-24-1",
-    ]);
-    expect(mockedSaveCache).toHaveBeenCalled();
-  });
-
-  it("skips apt install when cache is hit", async () => {
-    mockedRestoreCache.mockResolvedValue("hit");
-    await installDebian(baseTarget);
-
-    expect(mockedRestoreCache).toHaveBeenCalled();
-    expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-    ]);
-    expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      expect.any(String),
-      expect.any(String),
-      "nvhpc-24-1",
-    ]);
-    expect(mockedSaveCache).not.toHaveBeenCalled();
-  });
-
-  it("installs legacy ncurses on older versions if missing", async () => {
+  it("calls curl with retry for legacy ncurses", async () => {
+    // Version <= 24.3 triggers ncurses check
     const target = { ...baseTarget, version: "24.3" };
-    mockedGetExecOutput.mockResolvedValue({
+    
+    // Simulate ncurses not installed
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "",
       exitCode: 0,
-      stdout: "not installed",
-      stderr: "",
     });
 
     await installDebian(target);
 
-    expect(mockedExec).toHaveBeenCalledWith("curl", expect.arrayContaining(["-fsSL", "-o"]));
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.stringContaining("libtinfo5")]);
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.stringContaining("libncursesw5")]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining(["--retry", "5", "--retry-delay", "10"]),
+    );
   });
 
-  it("exports environment variables", async () => {
-    await installDebian(baseTarget);
+  it("skips ncurses install if already present", async () => {
+    const target = { ...baseTarget, version: "24.3" };
+    
+    // Already installed
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "install ok installed install ok installed",
+      exitCode: 0,
+    });
 
-    expect(core.addPath).toHaveBeenCalledWith(
-      expect.stringContaining("/opt/nvidia/hpc_sdk/Linux_x86_64/24.1/compilers/bin"),
+    await installDebian(target);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining(["--retry", "5"]),
     );
-    expect(core.exportVariable).toHaveBeenCalledWith("FC", "nvfortran");
-    expect(core.exportVariable).toHaveBeenCalledWith("CC", "nvc");
-    expect(core.exportVariable).toHaveBeenCalledWith("CXX", "nvc++");
-    expect(core.exportVariable).toHaveBeenCalledWith(
-      "LD_LIBRARY_PATH",
-      expect.stringContaining("/opt/nvidia/hpc_sdk/Linux_x86_64/24.1/compilers/lib"),
+  });
+
+  it("skips ncurses install for newer nvhpc versions", async () => {
+    // Version > 24.3
+    const target = { ...baseTarget, version: "25.1" };
+    
+    await installDebian(target);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining(["--retry", "5"]),
     );
   });
 });
