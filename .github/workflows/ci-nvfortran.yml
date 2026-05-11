@@ -2,23 +2,25 @@ name: nvfortran
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
   build:
     name: ci
+    if: github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/ci.yml
 
   integration-tests:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
     runs-on: ${{ matrix.image }}
-    needs: [ build ]
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
-        image: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm ]
+        image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
         toolchain:
           - { compiler: nvfortran, version: "26.3" }
           - { compiler: nvfortran, version: "26.1" }
@@ -78,7 +80,7 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - name: Verify installed version
-        run: "echo \"Output: ${{ steps.setup.outputs.version }}\""
+        run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
 
       - name: Run Integration Tests
         run: npm run integration-test

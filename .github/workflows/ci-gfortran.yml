@@ -2,19 +2,21 @@ name: gfortran
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
   build:
     name: ci
+    if: github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/ci.yml
 
   integration-tests:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
     runs-on: ${{ matrix.image }}
-    needs: [ build ]
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +79,7 @@ jobs:
           msystem: ${{ matrix.toolchain.msystem }}
 
       - name: Verify installed version
-        run: "echo \"Output: ${{ steps.setup.outputs.version }}\""
+        run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
 
       - name: Run Integration Tests
         run: npm run integration-test
