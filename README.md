@@ -1,3 +1,8 @@
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-setup--fortran-blueviolet?logo=github)](https://github.com/marketplace/actions/setup-fortran-compilers)
+[![GitHub release](https://img.shields.io/github/v/release/minhqdao/setup-fortran?color=orange)](https://github.com/minhqdao/setup-fortran/releases)
+[![CI](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/minhqdao/setup-fortran/actions/workflows/ci-gfortran.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 # setup-fortran
 
 A GitHub Action to install and configure Fortran compilers across Linux, macOS, and Windows runners.
