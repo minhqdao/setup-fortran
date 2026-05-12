@@ -123,6 +123,37 @@ describe("installWin32 (ifx)", () => {
     );
   });
 
+  it("skips installation if exit code is 1001 (already installed)", async () => {
+    mockedRestoreCache.mockResolvedValue(undefined);
+    mockedDownloadTool.mockResolvedValue("C:\\Temp\\installer.exe");
+
+    let installerCalls = 0;
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "\"C:\\Temp\\installer.exe\"") {
+        installerCalls++;
+        const error = new Error("Already installed");
+        (error as any).exitCode = 1001;
+        throw error;
+      } else if (commandLine === "ifx") {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(Buffer.from("ifx version 2026.0.0"));
+        }
+      } else if (commandLine === "cmd" && args?.[0] === "/C") {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(Buffer.from("PATH=C:\\bin\nINTEL_VAR=foo"));
+        }
+      }
+      return 0;
+    });
+
+    await installWin32(baseTarget);
+
+    expect(installerCalls).toBe(1);
+    expect(core.info).toHaveBeenCalledWith(
+      "Intel oneAPI is already installed, skipping.",
+    );
+  });
+
   it("resolves 2025.3 to 2025.3.3 using resolveMinorToLatestPatch", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
     const target = { ...baseTarget, version: "2025.3" };
