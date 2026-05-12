@@ -72,6 +72,14 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
 
+  core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
+  await exec.exec("sudo", [
+    "sed",
+    "-i",
+    "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
+    "/etc/apt/sources.list",
+  ]);
+
   core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
   await exec.exec("bash", [
     "-c",
