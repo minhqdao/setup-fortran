@@ -212,6 +212,11 @@ async function runInstallerWithRetry(
       ]);
       return;
     } catch (err) {
+      const exitCode = (err as { exitCode?: number }).exitCode;
+      if (exitCode === 1001) {
+        core.info("Intel oneAPI is already installed, skipping.");
+        return;
+      }
       if (attempt === maxAttempts) throw err;
       core.warning(
         `Installer crashed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`,
