@@ -27,6 +27,23 @@ jest.mock("fs", () => ({
 }));
 
 describe("installDarwin (Flang)", () => {
+  beforeAll(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
+    } as unknown as Response);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedTc = tc as jest.Mocked<typeof tc>;
   const mockedFs = fs as jest.Mocked<typeof fs>;
@@ -70,7 +87,10 @@ describe("installDarwin (Flang)", () => {
     await installDarwin(baseTarget);
 
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("flang"));
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FC",
+      expect.stringContaining("flang"),
+    );
   });
 
   it("downloads from GitHub when version is specified", async () => {
@@ -93,12 +113,30 @@ describe("installDarwin (Flang)", () => {
     await installDarwin(baseTarget);
 
     expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.any(String));
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("clang"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("clang++"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.any(String));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("SDKROOT", "/path/to/SDK");
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CC",
+      expect.stringContaining("clang"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CXX",
+      expect.stringContaining("clang++"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_FC",
+      expect.any(String),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_CC",
+      expect.stringContaining("clang"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_CXX",
+      expect.stringContaining("clang++"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "SDKROOT",
+      "/path/to/SDK",
+    );
   });
 
   it("resolves and returns the installed version", async () => {
