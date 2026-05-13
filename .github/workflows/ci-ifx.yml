@@ -145,10 +145,14 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Restore dist-tests
-        uses: actions/download-artifact@v8
+        uses: nick-fields/retry@v4
         with:
-          name: generated-dist-tests
-          path: dist-tests
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
