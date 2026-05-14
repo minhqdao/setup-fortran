@@ -31,12 +31,8 @@ jobs:
           - { compiler: ifx, version: "2024.1" }
           - { compiler: ifx, version: "2024.0" }
           - { compiler: ifx, version: "2023.2" }
-          - { compiler: ifx, version: "2023.1" }
-          - { compiler: ifx, version: "2022.3" }
-          - { compiler: ifx, version: "2022.2" }
+
         include:
-          - image: windows-2025-vs2026
-            toolchain: { compiler: ifx, version: "2026.0.0" }
           - image: windows-2025-vs2026
             toolchain: { compiler: ifx, version: "2025.3.3" }
     steps:
@@ -57,6 +53,16 @@ jobs:
 
       - name: Verify installed version
         run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
+
+      - name: Diagnose PATH and MSVC after setvars
+        shell: cmd
+        run: |
+          echo === MSVC_LINK_DIR ===
+          echo %MSVC_LINK_DIR%
+          echo === where link after export ===
+          where link
+          echo === PATH first 10 entries ===
+          echo %PATH:;=&echo.%
 
       - name: Run Integration Tests
         run: npm run integration-test

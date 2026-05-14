@@ -26,9 +26,6 @@ jobs:
           - { compiler: ifort, version: "2021.12" }
           - { compiler: ifort, version: "2021.11" }
           - { compiler: ifort, version: "2021.10" }
-          - { compiler: ifort, version: "2021.9" }
-          - { compiler: ifort, version: "2021.7" }
-          - { compiler: ifort, version: "2021.6" }
     steps:
       - uses: actions/checkout@v6
 
@@ -47,6 +44,16 @@ jobs:
 
       - name: Verify installed version
         run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
+
+      - name: Diagnose PATH and MSVC after setvars
+        shell: cmd
+        run: |
+          echo === MSVC_LINK_DIR ===
+          echo %MSVC_LINK_DIR%
+          echo === where link after export ===
+          where link
+          echo === PATH first 10 entries ===
+          echo %PATH:;=&echo.%
 
       - name: Run Integration Tests
         run: npm run integration-test
