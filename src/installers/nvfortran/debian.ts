@@ -281,7 +281,7 @@ export async function installDebian(target: Target): Promise<string> {
   return resolvedVersion;
 }
 
-async function safelyFreeDiskSpace(minGb = 12): Promise<void> {
+async function safelyFreeDiskSpace(): Promise<void> {
   let output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {
     listeners: { stdout: (data) => (output += data.toString()) },
@@ -290,15 +290,7 @@ async function safelyFreeDiskSpace(minGb = 12): Promise<void> {
 
   // parseInt cleanly ignores the trailing 'G' (e.g., "14G" -> 14)
   const availGb = parseInt(output.trim().split("\n")[1], 10);
-
-  if (availGb >= minGb) {
-    core.info(`Disk space looks good: ${availGb.toString()}GB available.`);
-    return;
-  }
-
-  core.info(
-    `Only ${availGb.toString()}GB available. Running safe disk cleanup...`,
-  );
+  core.info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
 
   // 1. Clear the apt cache to ensure no old .deb files are sitting around
   await exec.exec("sudo", ["apt-get", "clean"]);

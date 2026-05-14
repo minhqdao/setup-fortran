@@ -90398,7 +90398,7 @@ async function nvfortran_debian_installDebian(target) {
     core.info(`nvfortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
 }
-async function safelyFreeDiskSpace(minGb = 12) {
+async function safelyFreeDiskSpace() {
     let output = "";
     await exec.exec("df", ["--output=avail", "-BG", "/"], {
         listeners: { stdout: (data) => (output += data.toString()) },
@@ -90406,11 +90406,7 @@ async function safelyFreeDiskSpace(minGb = 12) {
     });
     // parseInt cleanly ignores the trailing 'G' (e.g., "14G" -> 14)
     const availGb = parseInt(output.trim().split("\n")[1], 10);
-    if (availGb >= minGb) {
-        core.info(`Disk space looks good: ${availGb.toString()}GB available.`);
-        return;
-    }
-    core.info(`Only ${availGb.toString()}GB available. Running safe disk cleanup...`);
+    core.info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
     // 1. Clear the apt cache to ensure no old .deb files are sitting around
     await exec.exec("sudo", ["apt-get", "clean"]);
     // 2. Prune unused Docker images (Frees ~3-5GB safely)
