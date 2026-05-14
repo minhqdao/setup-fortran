@@ -48,6 +48,18 @@ jobs:
           name: generated-dist-tests
           path: dist-tests
 
+      - name: Diagnose link.exe on PATH
+        shell: cmd
+        run: |
+          echo === PATH entries ===
+          for %%p in ("%PATH:;=" "%") do echo %%p
+          echo === where link ===
+          where link
+          echo === where link.exe ===
+          where link.exe
+          echo === vswhere result ===
+          "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -find "VC\Tools\MSVC\*\bin\Hostx64\x64\link.exe"
+
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
         uses: ./
