@@ -90415,7 +90415,13 @@ async function safelyFreeDiskSpace() {
         ignoreReturnCode: true,
         silent: true,
     });
-    core.info("Safe disk cleanup complete.");
+    output = "";
+    await exec.exec("df", ["--output=avail", "-BG", "/"], {
+        listeners: { stdout: (data) => (output += data.toString()) },
+        silent: true,
+    });
+    const availGbAfter = parseInt(output.trim().split("\n")[1], 10);
+    core.info(`${availGbAfter.toString()}GB available after cleanup.`);
 }
 async function nvfortran_debian_resolveInstalledVersion() {
     let output = "";
