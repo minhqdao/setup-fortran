@@ -89566,8 +89566,19 @@ async function win32_installWin32(target) {
         core.info("Saving installation to cache...");
         await cache.saveCache(cachePaths, cacheKey);
     }
+    // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_and_dump.bat");
-    external_fs_.writeFileSync(batFile, `@echo off\r\ncall "${SETVARS_BAT}" --force\r\nset\r\n`);
+    external_fs_.writeFileSync(batFile, [
+        `@echo off`,
+        `:: 1. Find MSVC Installation Path via vswhere`,
+        `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
+        `:: 2. Initialize MSVC Environment Natively`,
+        `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
+        `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
+        `call "${SETVARS_BAT}" --force`,
+        `:: 4. Dump the fully combined environment`,
+        `set`,
+    ].join("\r\n"));
     let envOutput = "";
     await exec.exec("cmd", ["/C", batFile], {
         listeners: {
@@ -89582,8 +89593,20 @@ async function win32_installWin32(target) {
             continue;
         const key = line.substring(0, eqIdx).trim();
         const val = line.substring(eqIdx + 1).trimEnd();
-        if (/^(PATH|LIB|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-            core.exportVariable(key, val);
+        if (/^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
+            if (key.toUpperCase() === "PATH") {
+                // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
+                // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
+                // we no longer need the secondary TypeScript vswhere lookup.
+                const filteredPath = val
+                    .split(";")
+                    .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+                    .join(";");
+                core.exportVariable("PATH", filteredPath);
+            }
+            else {
+                core.exportVariable(key, val);
+            }
         }
     }
     core.exportVariable("FC", "ifx");
@@ -90041,9 +90064,19 @@ async function ifort_win32_installWin32(target) {
         core.info("Saving installation to cache...");
         await cache.saveCache(cachePaths, cacheKey);
     }
-    // Create a temporary batch file to capture the environment variables from setvars.bat
+    // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
-    external_fs_.writeFileSync(batFile, `@echo off\r\ncall "${win32_SETVARS_BAT}" --force\r\nset\r\n`);
+    external_fs_.writeFileSync(batFile, [
+        `@echo off`,
+        `:: 1. Find MSVC Installation Path via vswhere`,
+        `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
+        `:: 2. Initialize MSVC Environment Natively`,
+        `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
+        `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
+        `call "${win32_SETVARS_BAT}" --force`,
+        `:: 4. Dump the fully combined environment`,
+        `set`,
+    ].join("\r\n"));
     let envOutput = "";
     await exec.exec("cmd", ["/C", batFile], {
         listeners: {
@@ -90059,7 +90092,19 @@ async function ifort_win32_installWin32(target) {
         const key = line.substring(0, eqIdx).trim();
         const val = line.substring(eqIdx + 1).trimEnd();
         if (/^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-            core.exportVariable(key, val);
+            if (key.toUpperCase() === "PATH") {
+                // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
+                // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
+                // we no longer need the secondary TypeScript vswhere lookup.
+                const filteredPath = val
+                    .split(";")
+                    .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+                    .join(";");
+                core.exportVariable("PATH", filteredPath);
+            }
+            else {
+                core.exportVariable(key, val);
+            }
         }
     }
     core.exportVariable("FC", "ifort");
