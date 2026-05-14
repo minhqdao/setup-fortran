@@ -1,4 +1,4 @@
-name: ifort
+name: ci-ifort
 
 on:
   push:

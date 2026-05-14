@@ -1,4 +1,4 @@
-name: ifx
+name: ci-ifx
 
 on:
   push:

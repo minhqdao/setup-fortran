@@ -1,4 +1,4 @@
-name: aocc
+name: ci-aocc
 
 on:
     push:

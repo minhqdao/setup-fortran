@@ -1,4 +1,4 @@
-name: nvfortran
+name: ci-nvfortran
 
 on:
   push:

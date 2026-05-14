@@ -1,4 +1,4 @@
-name: lfortran
+name: ci-lfortran
 
 on:
   push:
