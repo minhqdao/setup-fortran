@@ -89554,7 +89554,21 @@ async function win32_installWin32(target) {
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
-    const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+    let cacheHit;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            cacheHit = await cache.restoreCache(cachePaths, cacheKey); // Sometimes fails
+            break;
+        }
+        catch (err) {
+            if (attempt === 3) {
+                core.warning(`Cache restore failed after 3 attempts, proceeding with fresh install: ${String(err)}`);
+                break;
+            }
+            core.warning(`Cache restore failed (attempt ${attempt.toString()}/3), retrying in ${(attempt * 15).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
     if (cacheHit) {
         core.info(`Restored ifx installation from cache (${cacheHit}).`);
     }
@@ -90328,6 +90342,7 @@ async function nvfortran_debian_installDebian(target) {
         core.info(`Restored nvhpc ${version} from cache.`);
     }
     else {
+        await safelyFreeDiskSpace();
         // Add NVIDIA's apt repo.
         // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
         // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -90366,8 +90381,14 @@ async function nvfortran_debian_installDebian(target) {
             "install",
             "-y",
             "--no-install-recommends",
+            "-o",
+            "Dpkg::Options::=--force-confdef",
+            "-o",
+            "Dpkg::Options::=--force-confold",
             pkgName,
         ]);
+        core.info("Cleaning up apt archives...");
+        await exec.exec("sudo", ["apt-get", "clean"]);
         // --- Cache save ---
         // The install lands entirely under installDir, so caching that directory
         // is sufficient to skip apt on subsequent runs.
@@ -90390,6 +90411,31 @@ async function nvfortran_debian_installDebian(target) {
     const resolvedVersion = await nvfortran_debian_resolveInstalledVersion();
     core.info(`nvfortran ${resolvedVersion} installed successfully.`);
     return resolvedVersion;
+}
+async function safelyFreeDiskSpace() {
+    let output = "";
+    await exec.exec("df", ["--output=avail", "-BG", "/"], {
+        listeners: { stdout: (data) => (output += data.toString()) },
+        silent: true,
+    });
+    // parseInt cleanly ignores the trailing 'G' (e.g., "14G" -> 14)
+    const availGb = parseInt(output.trim().split("\n")[1], 10);
+    core.info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
+    // 1. Clear the apt cache to ensure no old .deb files are sitting around
+    await exec.exec("sudo", ["apt-get", "clean"]);
+    // 2. Prune unused Docker images (Frees ~3-5GB safely)
+    // If the user needs an image later, Docker will just download it again.
+    await exec.exec("sudo", ["docker", "image", "prune", "--all", "--force"], {
+        ignoreReturnCode: true,
+        silent: true,
+    });
+    output = "";
+    await exec.exec("df", ["--output=avail", "-BG", "/"], {
+        listeners: { stdout: (data) => (output += data.toString()) },
+        silent: true,
+    });
+    const availGbAfter = parseInt(output.trim().split("\n")[1], 10);
+    core.info(`${availGbAfter.toString()}GB available after cleanup.`);
 }
 async function nvfortran_debian_resolveInstalledVersion() {
     let output = "";

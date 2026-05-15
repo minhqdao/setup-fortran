@@ -139,7 +139,25 @@ export async function installWin32(target: Target): Promise<string> {
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  let cacheHit: string | undefined;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      cacheHit = await cache.restoreCache(cachePaths, cacheKey); // Sometimes fails
+      break;
+    } catch (err) {
+      if (attempt === 3) {
+        core.warning(
+          `Cache restore failed after 3 attempts, proceeding with fresh install: ${String(err)}`,
+        );
+        break;
+      }
+      core.warning(
+        `Cache restore failed (attempt ${attempt.toString()}/3), retrying in ${(attempt * 15).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
+
   if (cacheHit) {
     core.info(`Restored ifx installation from cache (${cacheHit}).`);
   } else {

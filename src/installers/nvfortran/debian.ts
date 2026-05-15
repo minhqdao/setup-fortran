@@ -194,6 +194,7 @@ export async function installDebian(target: Target): Promise<string> {
   if (cacheHit) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
+    await safelyFreeDiskSpace();
     // Add NVIDIA's apt repo.
     // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
     // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -239,8 +240,15 @@ export async function installDebian(target: Target): Promise<string> {
       "install",
       "-y",
       "--no-install-recommends",
+      "-o",
+      "Dpkg::Options::=--force-confdef",
+      "-o",
+      "Dpkg::Options::=--force-confold",
       pkgName,
     ]);
+
+    core.info("Cleaning up apt archives...");
+    await exec.exec("sudo", ["apt-get", "clean"]);
 
     // --- Cache save ---
     // The install lands entirely under installDir, so caching that directory
@@ -271,6 +279,36 @@ export async function installDebian(target: Target): Promise<string> {
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`nvfortran ${resolvedVersion} installed successfully.`);
   return resolvedVersion;
+}
+
+async function safelyFreeDiskSpace(): Promise<void> {
+  let output = "";
+  await exec.exec("df", ["--output=avail", "-BG", "/"], {
+    listeners: { stdout: (data) => (output += data.toString()) },
+    silent: true,
+  });
+
+  // parseInt cleanly ignores the trailing 'G' (e.g., "14G" -> 14)
+  const availGb = parseInt(output.trim().split("\n")[1], 10);
+  core.info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
+
+  // 1. Clear the apt cache to ensure no old .deb files are sitting around
+  await exec.exec("sudo", ["apt-get", "clean"]);
+
+  // 2. Prune unused Docker images (Frees ~3-5GB safely)
+  // If the user needs an image later, Docker will just download it again.
+  await exec.exec("sudo", ["docker", "image", "prune", "--all", "--force"], {
+    ignoreReturnCode: true,
+    silent: true,
+  });
+
+  output = "";
+  await exec.exec("df", ["--output=avail", "-BG", "/"], {
+    listeners: { stdout: (data) => (output += data.toString()) },
+    silent: true,
+  });
+  const availGbAfter = parseInt(output.trim().split("\n")[1], 10);
+  core.info(`${availGbAfter.toString()}GB available after cleanup.`);
 }
 
 async function resolveInstalledVersion(): Promise<string> {
