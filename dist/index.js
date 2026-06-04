@@ -89052,13 +89052,14 @@ async function installDarwin(target) {
         },
     });
     const cellarLibDir = external_path_.join(cellarPrefix, "lib", "gcc", version);
-    const existingDyldPath = process.env.DYLD_LIBRARY_PATH ?? "";
-    core.exportVariable("DYLD_LIBRARY_PATH", existingDyldPath ? `${cellarLibDir}:${existingDyldPath}` : cellarLibDir);
+    // Instead of DYLD_LIBRARY_PATH, symlink libgfortran into the brew prefix lib
+    // so dyld finds it without embedding duplicate rpaths.
+    const brewLibDir = external_path_.join(brewPrefix, "lib");
+    await exec.exec("bash", [
+        "-c",
+        `ln -sf "${cellarLibDir}"/libgfortran*.dylib "${brewLibDir}"/`,
+    ]);
     const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
-    const libraryPath = existingLibraryPath
-        ? `${cellarLibDir}:${existingLibraryPath}`
-        : cellarLibDir;
-    core.exportVariable("LIBRARY_PATH", libraryPath);
     const binDir = external_path_.join(brewPrefix, "bin");
     const gfortranBinary = external_path_.join(binDir, `gfortran-${version}`);
     const genericGfortran = external_path_.join(binDir, "gfortran");
@@ -89074,7 +89075,9 @@ async function installDarwin(target) {
         });
         if (sdkPath) {
             core.exportVariable("SDKROOT", sdkPath);
-            core.exportVariable("LIBRARY_PATH", `${sdkPath}/usr/lib:${libraryPath}`);
+            core.exportVariable("LIBRARY_PATH", existingLibraryPath
+                ? `${sdkPath}/usr/lib:${existingLibraryPath}`
+                : `${sdkPath}/usr/lib`);
         }
     }
     catch (e) {

@@ -56,10 +56,6 @@ export async function installDarwin(target: Target): Promise<string> {
   ]);
 
   const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
-  const libraryPath = existingLibraryPath
-    ? `${cellarLibDir}:${existingLibraryPath}`
-    : cellarLibDir;
-  core.exportVariable("LIBRARY_PATH", libraryPath);
 
   const binDir = path.join(brewPrefix, "bin");
   const gfortranBinary = path.join(binDir, `gfortran-${version}`);
@@ -79,7 +75,12 @@ export async function installDarwin(target: Target): Promise<string> {
     });
     if (sdkPath) {
       core.exportVariable("SDKROOT", sdkPath);
-      core.exportVariable("LIBRARY_PATH", `${sdkPath}/usr/lib:${libraryPath}`);
+      core.exportVariable(
+        "LIBRARY_PATH",
+        existingLibraryPath
+          ? `${sdkPath}/usr/lib:${existingLibraryPath}`
+          : `${sdkPath}/usr/lib`,
+      );
     }
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
