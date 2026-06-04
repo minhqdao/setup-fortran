@@ -47,11 +47,13 @@ export async function installDarwin(target: Target): Promise<string> {
   });
   const cellarLibDir = path.join(cellarPrefix, "lib", "gcc", version);
 
-  const existingDyldPath = process.env.DYLD_LIBRARY_PATH ?? "";
-  core.exportVariable(
-    "DYLD_LIBRARY_PATH",
-    existingDyldPath ? `${cellarLibDir}:${existingDyldPath}` : cellarLibDir,
-  );
+  // Instead of DYLD_LIBRARY_PATH, symlink libgfortran into the brew prefix lib
+  // so dyld finds it without embedding duplicate rpaths.
+  const brewLibDir = path.join(brewPrefix, "lib");
+  await exec.exec("bash", [
+    "-c",
+    `ln -sf "${cellarLibDir}"/libgfortran*.dylib "${brewLibDir}"/`,
+  ]);
 
   const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
   const libraryPath = existingLibraryPath

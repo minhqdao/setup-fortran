@@ -89044,9 +89044,22 @@ async function installDarwin(target) {
     else {
         await exec.exec("brew", ["install", formula]);
     }
-    // Homebrew usually installs to /opt/homebrew/bin (ARM) or /usr/local/bin (x64)
-    const brewPrefixOutput = await getBrewPrefix();
-    const binDir = external_path_.join(brewPrefixOutput, "bin");
+    const brewPrefix = await getBrewPrefix();
+    let cellarPrefix = "";
+    await exec.exec("brew", ["--prefix", `gcc@${version}`], {
+        listeners: {
+            stdout: (data) => (cellarPrefix += data.toString().trim()),
+        },
+    });
+    const cellarLibDir = external_path_.join(cellarPrefix, "lib", "gcc", version);
+    const existingDyldPath = process.env.DYLD_LIBRARY_PATH ?? "";
+    core.exportVariable("DYLD_LIBRARY_PATH", existingDyldPath ? `${cellarLibDir}:${existingDyldPath}` : cellarLibDir);
+    const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
+    const libraryPath = existingLibraryPath
+        ? `${cellarLibDir}:${existingLibraryPath}`
+        : cellarLibDir;
+    core.exportVariable("LIBRARY_PATH", libraryPath);
+    const binDir = external_path_.join(brewPrefix, "bin");
     const gfortranBinary = external_path_.join(binDir, `gfortran-${version}`);
     const genericGfortran = external_path_.join(binDir, "gfortran");
     core.info(`Symlinking ${gfortranBinary} to ${genericGfortran}`);
@@ -89061,8 +89074,7 @@ async function installDarwin(target) {
         });
         if (sdkPath) {
             core.exportVariable("SDKROOT", sdkPath);
-            // Also helpful for some older C-interop scenarios:
-            core.exportVariable("LIBRARY_PATH", `${sdkPath}/usr/lib`);
+            core.exportVariable("LIBRARY_PATH", `${sdkPath}/usr/lib:${libraryPath}`);
         }
     }
     catch (e) {
