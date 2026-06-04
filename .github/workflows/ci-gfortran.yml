@@ -87,8 +87,3 @@ jobs:
 
       - name: Run Integration Tests
         run: npm run integration-test
-
-      - name: Install fpm
-        uses: fortran-lang/setup-fpm@v10
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
