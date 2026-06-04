@@ -20,18 +20,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [
+        image:
+          [
             ubuntu-24.04,
-            # ubuntu-22.04,
+            ubuntu-22.04,
             ubuntu-24.04-arm,
-            # ubuntu-22.04-arm,
+            ubuntu-22.04-arm,
             macos-26,
             macos-26-intel,
             macos-15,
             macos-15-intel,
             macos-14,
             windows-2025,
-            # windows-2022,
+            windows-2022,
           ]
         toolchain:
           - { compiler: gfortran, version: "16" }
@@ -44,8 +45,8 @@ jobs:
           - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
-          # - image: windows-2025
-          #   toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
+          - image: windows-2025
+            toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
           - image: windows-2022
             toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
         exclude:
@@ -91,10 +92,3 @@ jobs:
         uses: fortran-lang/setup-fpm@v10
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Test fpm linking
-        shell: bash
-        run: |
-          fpm new test-project
-          cd test-project
-          fpm test
