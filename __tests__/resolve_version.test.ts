@@ -1,6 +1,13 @@
-import { resolveVersion, resolveWindowsVersion } from "../src/resolve_version";
+import {
+  resolveVersion,
+  resolveWindowsVersion,
+  resolveLatestPatch,
+} from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, Msystem } from "../src/types";
 import type { Target } from "../src/types";
+import * as core from "@actions/core";
+
+jest.mock("@actions/core");
 
 const baseTarget: Target = {
   compiler: Compiler.GFortran,
@@ -289,5 +296,167 @@ describe("resolveWindowsVersion", () => {
       resolveMinorToLatestPatch: true,
     });
     expect(result).toBe("2025.1.1");
+  });
+});
+
+describe("resolveLatestPatch", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    // Fresh mock for each test to avoid interference
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it("resolves version successfully on the first attempt", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
+    });
+
+    const result = await resolveLatestPatch("llvm/llvm-project", "19");
+    expect(result).toBe("19.1.7");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries on HTTP error and eventually succeeds", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
+      });
+
+    const promise = resolveLatestPatch("llvm/llvm-project", "19");
+    // Prevent unhandled rejection warning
+    promise.catch(() => {});
+
+    // Attempt 1 fails. Backoff 2000ms.
+    await jest.advanceTimersByTimeAsync(2000);
+
+    const result = await promise;
+    expect(result).toBe("19.1.7");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("GitHub API fetch failed (HTTP 500: Internal Server Error)"),
+    );
+  });
+
+  it("retries on timeout and eventually succeeds", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    
+    // Attempt 1: hangs until aborted
+    mockFetch.mockImplementationOnce((_url, options) => new Promise((_resolve, reject) => {
+      if (options.signal) {
+        options.signal.addEventListener("abort", () => {
+          const error = new Error("The operation was aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      }
+    }));
+    
+    // Attempt 2: succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
+    });
+
+    const promise = resolveLatestPatch("llvm/llvm-project", "19");
+    // Prevent unhandled rejection warning
+    promise.catch(() => {});
+
+    // 1. Trigger timeout (5000ms)
+    await jest.advanceTimersByTimeAsync(5000);
+    
+    // 2. Trigger backoff (2000ms)
+    await jest.advanceTimersByTimeAsync(2000);
+
+    const result = await promise;
+    expect(result).toBe("19.1.7");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("GitHub API fetch failed (Request timed out after 5000ms)"),
+    );
+  });
+
+  it("throws error after exhausting all retries", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+    });
+
+    const promise = resolveLatestPatch("llvm/llvm-project", "19");
+    // Prevent unhandled rejection warning
+    promise.catch(() => {});
+
+    // Attempt 1 fails, backoff 2000ms
+    await jest.advanceTimersByTimeAsync(2000);
+    // Attempt 2 fails, backoff 4000ms
+    await jest.advanceTimersByTimeAsync(4000);
+    
+    // Attempt 3 fails.
+    let caughtError: Error | undefined;
+    try {
+      await promise;
+    } catch (e) {
+      caughtError = e as Error;
+    }
+
+    expect(caughtError?.message).toContain(
+      "Failed to resolve version for llvm/llvm-project after 3 attempts"
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("respects custom tagPrefix and tagStripper", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ tag_name: "v1.2.3", prerelease: false }],
+    });
+
+    const result = await resolveLatestPatch(
+      "repo",
+      "1",
+      "v1.",
+      (tag) => tag.substring(1)
+    );
+    expect(result).toBe("1.2.3");
+  });
+
+  it("throws error if no stable release is found", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { tag_name: "llvmorg-19.1.0-rc1", prerelease: false },
+        { tag_name: "llvmorg-20.0.0", prerelease: true },
+      ],
+    });
+
+    const promise = resolveLatestPatch("llvm/llvm-project", "19");
+    // Prevent unhandled rejection warning during retries
+    promise.catch(() => {});
+
+    // It will retry 3 times because no match was found.
+    await jest.advanceTimersByTimeAsync(2000);
+    await jest.advanceTimersByTimeAsync(4000);
+
+    await expect(promise).rejects.toThrow(
+      "No stable release found for llvm/llvm-project major 19 in the last 100 GitHub releases."
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });

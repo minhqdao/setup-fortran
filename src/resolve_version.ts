@@ -137,36 +137,76 @@ export async function resolveLatestPatch(
     `Resolving latest patch version for ${repo} major ${major} via GitHub API...`,
   );
 
-  const response = await fetch(
-    `https://api.github.com/repos/${repo}/releases?per_page=100`,
-    { headers: githubHeaders() },
-  );
+  const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
+  const options = { headers: githubHeaders() };
 
-  if (!response.ok) {
-    throw new Error(
-      `GitHub API request failed: ${response.status.toString()} ${response.statusText}`,
-    );
+  const maxRetries = 3;
+  const timeoutMs = 5000;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status.toString()}: ${response.statusText}`,
+        );
+      }
+
+      const releases = (await response.json()) as {
+        tag_name: string;
+        prerelease: boolean;
+      }[];
+
+      const match = releases.find(
+        (r) =>
+          r.tag_name.startsWith(tagPrefix) &&
+          !r.prerelease &&
+          !r.tag_name.includes("rc"),
+      );
+
+      if (!match) {
+        throw new Error(
+          `No stable release found for ${repo} major ${major} in the last 100 GitHub releases.`,
+        );
+      }
+
+      return tagStripper(match.tag_name);
+    } catch (e) {
+      clearTimeout(timeoutId);
+
+      const error = e instanceof Error ? e : new Error(String(e));
+      const isAbort = error.name === "AbortError";
+      const errorMessage = isAbort
+        ? `Request timed out after ${timeoutMs.toString()}ms`
+        : error.message;
+
+      if (attempt === maxRetries) {
+        throw new Error(
+          `Failed to resolve version for ${repo} after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`,
+          { cause: e },
+        );
+      }
+
+      const backoffMs = 1000 * Math.pow(2, attempt);
+      core.warning(
+        `GitHub API fetch failed (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s (Attempt ${attempt.toString()}/${maxRetries.toString()})...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
   }
 
-  const releases = (await response.json()) as {
-    tag_name: string;
-    prerelease: boolean;
-  }[];
-
-  const match = releases.find(
-    (r) =>
-      r.tag_name.startsWith(tagPrefix) &&
-      !r.prerelease &&
-      !r.tag_name.includes("rc"),
-  );
-
-  if (!match) {
-    throw new Error(
-      `No stable release found for ${repo} major ${major} in the last 100 GitHub releases.`,
-    );
-  }
-
-  return tagStripper(match.tag_name);
+  throw new Error("Unreachable");
 }
 
 // Verifies that a specific release exists on GitHub and that the named asset
