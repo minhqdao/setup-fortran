@@ -2,6 +2,7 @@ import {
   resolveVersion,
   resolveWindowsVersion,
   resolveLatestPatch,
+  verifyAssetExists,
 } from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, Msystem } from "../src/types";
 import type { Target } from "../src/types";
@@ -315,6 +316,7 @@ describe("resolveLatestPatch", () => {
     const mockFetch = global.fetch as jest.Mock;
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      status: 200,
       json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
     });
 
@@ -333,21 +335,24 @@ describe("resolveLatestPatch", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
         json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
       });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    // Prevent unhandled rejection warning
-    promise.catch(() => {});
+    
+    // Flush microtasks to ensure fetch is called and we reach the backoff wait
+    await Promise.resolve();
+    await Promise.resolve();
 
-    // Attempt 1 fails. Backoff 2000ms.
-    await jest.advanceTimersByTimeAsync(2000);
+    // Attempt 1 fails. Backoff is 1000 * 2^(1+1) = 4000ms.
+    await jest.advanceTimersByTimeAsync(4000);
 
     const result = await promise;
     expect(result).toBe("19.1.7");
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(core.warning).toHaveBeenCalledWith(
-      expect.stringContaining("GitHub API fetch failed (HTTP 500: Internal Server Error)"),
+      expect.stringContaining("Network error encountered (HTTP 500: Internal Server Error)"),
     );
   });
 
@@ -368,24 +373,29 @@ describe("resolveLatestPatch", () => {
     // Attempt 2: succeeds
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      status: 200,
       json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
     });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    // Prevent unhandled rejection warning
-    promise.catch(() => {});
+
+    await Promise.resolve();
+    await Promise.resolve();
 
     // 1. Trigger timeout (5000ms)
     await jest.advanceTimersByTimeAsync(5000);
     
-    // 2. Trigger backoff (2000ms)
-    await jest.advanceTimersByTimeAsync(2000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // 2. Trigger backoff (4000ms)
+    await jest.advanceTimersByTimeAsync(4000);
 
     const result = await promise;
     expect(result).toBe("19.1.7");
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(core.warning).toHaveBeenCalledWith(
-      expect.stringContaining("GitHub API fetch failed (Request timed out after 5000ms)"),
+      expect.stringContaining("Network error encountered (Request or body streaming timed out after 5000ms)"),
     );
   });
 
@@ -398,25 +408,26 @@ describe("resolveLatestPatch", () => {
     });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    // Prevent unhandled rejection warning
+    // Ensure we don't get unhandled rejection during timer advancement
     promise.catch(() => {});
 
-    // Attempt 1 fails, backoff 2000ms
-    await jest.advanceTimersByTimeAsync(2000);
-    // Attempt 2 fails, backoff 4000ms
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Attempt 1 fails, backoff 4000ms
     await jest.advanceTimersByTimeAsync(4000);
     
-    // Attempt 3 fails.
-    let caughtError: Error | undefined;
-    try {
-      await promise;
-    } catch (e) {
-      caughtError = e as Error;
-    }
+    await Promise.resolve();
+    await Promise.resolve();
 
-    expect(caughtError?.message).toContain(
-      "Failed to resolve version for llvm/llvm-project after 3 attempts"
-    );
+    // Attempt 2 fails, backoff 8000ms
+    await jest.advanceTimersByTimeAsync(8000);
+    
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Attempt 3 fails.
+    await expect(promise).rejects.toThrow("Request failed after 3 attempts");
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
@@ -424,6 +435,7 @@ describe("resolveLatestPatch", () => {
     const mockFetch = global.fetch as jest.Mock;
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      status: 200,
       json: async () => [{ tag_name: "v1.2.3", prerelease: false }],
     });
 
@@ -438,8 +450,10 @@ describe("resolveLatestPatch", () => {
 
   it("throws error if no stable release is found", async () => {
     const mockFetch = global.fetch as jest.Mock;
+    // Mock 3 pages of empty/non-matching releases to trigger the final error
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => [
         { tag_name: "llvmorg-19.1.0-rc1", prerelease: false },
         { tag_name: "llvmorg-20.0.0", prerelease: true },
@@ -447,16 +461,205 @@ describe("resolveLatestPatch", () => {
     });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    // Prevent unhandled rejection warning during retries
-    promise.catch(() => {});
+    
+    await expect(promise).rejects.toThrow(
+      "No stable release found for llvm/llvm-project major 19 within visible historical GitHub releases."
+    );
+    // Should have tried all 3 pages
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
 
-    // It will retry 3 times because no match was found.
-    await jest.advanceTimersByTimeAsync(2000);
+  it("handles GitHub rate limits with intelligent sleep", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    const resetTime = Math.floor(Date.now() / 1000) + 2; // Resets in 2 seconds
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({
+          "x-ratelimit-reset": resetTime.toString(),
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
+      });
+
+    const promise = resolveLatestPatch("llvm/llvm-project", "19");
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Advance by the rate limit reset time (approx 2s + 1s buffer = 3000ms)
+    await jest.advanceTimersByTimeAsync(3000);
+
+    const result = await promise;
+    expect(result).toBe("19.1.7");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("GitHub API Rate limit hit")
+    );
+  });
+});
+
+describe("verifyAssetExists", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it("verifies asset existence successfully", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "fortran.tar.gz" }, { name: "other.zip" }],
+      }),
+    });
+
+    await expect(
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+    ).resolves.not.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws error if release does not exist (404)", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ message: "Not Found" }),
+    });
+
+    await expect(
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+    ).rejects.toThrow(
+      'Requested version "19.1.7" does not exist (no release for llvmorg-19.1.7 in repo).'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws error if asset is missing in existing release", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "other.zip" }],
+      }),
+    });
+
+    await expect(
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+    ).rejects.toThrow(
+      'Release llvmorg-19.1.7 in repo exists but has no asset "fortran.tar.gz".'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries on network error and succeeds", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: "Service Unavailable",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assets: [{ name: "fortran.tar.gz" }],
+        }),
+      });
+
+    const promise = verifyAssetExists("repo", "19.1.7", "fortran.tar.gz");
+    
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Attempt 1 fails. Backoff is 4000ms.
     await jest.advanceTimersByTimeAsync(4000);
 
-    await expect(promise).rejects.toThrow(
-      "No stable release found for llvm/llvm-project major 19 in the last 100 GitHub releases."
+    await expect(promise).resolves.not.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Network error encountered (HTTP 503: Service Unavailable)")
     );
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries on timeout and succeeds", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    
+    // Attempt 1: hangs until aborted
+    mockFetch.mockImplementationOnce((_url, options) => new Promise((_resolve, reject) => {
+      if (options.signal) {
+        options.signal.addEventListener("abort", () => {
+          const error = new Error("The operation was aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      }
+    }));
+    
+    // Attempt 2: succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "fortran.tar.gz" }],
+      }),
+    });
+
+    const promise = verifyAssetExists("repo", "19.1.7", "fortran.tar.gz");
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // 1. Trigger timeout (5000ms)
+    await jest.advanceTimersByTimeAsync(5000);
+    
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // 2. Trigger backoff (4000ms)
+    await jest.advanceTimersByTimeAsync(4000);
+
+    await expect(promise).resolves.not.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Network error encountered (Request or body streaming timed out after 5000ms)")
+    );
+  });
+
+  it("respects custom tagFromPatch", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "fortran.tar.gz" }],
+      }),
+    });
+
+    await verifyAssetExists(
+      "repo",
+      "1.2.3",
+      "fortran.tar.gz",
+      (p) => `v${p}`
+    );
+    
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.github.com/repos/repo/releases/tags/v1.2.3",
+      expect.any(Object)
+    );
   });
 });

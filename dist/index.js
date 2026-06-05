@@ -88976,43 +88976,95 @@ var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/resolve_version.ts
 
 
+/**
+ * A production-grade wrapper around native fetch that handles stream timeouts,
+ * precise GitHub rate-limit reset windows, and exponential backoff.
+ */
+async function fetchJsonWithRetry(url, options = {}) {
+    const maxRetries = options.maxRetries ?? 3;
+    const timeoutMs = options.timeoutMs ?? 5000;
+    const fetchOptions = { headers: options.headers };
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, timeoutMs);
+        try {
+            const response = await fetch(url, {
+                ...fetchOptions,
+                signal: controller.signal,
+            });
+            if (response.status === 404) {
+                clearTimeout(timeoutId);
+                return { status: 404, data: null };
+            }
+            // Handle Rate Limiting Intelligent Sleep
+            if (response.status === 403 || response.status === 429) {
+                const resetHeader = response.headers.get("x-ratelimit-reset");
+                if (resetHeader) {
+                    const resetTimeMs = parseInt(resetHeader, 10) * 1000;
+                    const sleepTimeMs = Math.max(resetTimeMs - Date.now() + 1000, 2000);
+                    core.warning(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
+                        `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`);
+                    clearTimeout(timeoutId);
+                    await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
+                    continue;
+                }
+            }
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
+            }
+            const data = (await response.json());
+            clearTimeout(timeoutId);
+            return { status: response.status, data };
+        }
+        catch (e) {
+            clearTimeout(timeoutId);
+            const error = e instanceof Error ? e : new Error(String(e));
+            const isAbort = error.name === "AbortError";
+            const errorMessage = isAbort
+                ? `Request or body streaming timed out after ${timeoutMs.toString()}ms`
+                : error.message;
+            if (attempt === maxRetries) {
+                throw new Error(`Request failed after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`, { cause: e });
+            }
+            const backoffMs = 1000 * Math.pow(2, attempt + 1);
+            core.warning(`Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
+                `(Attempt ${attempt.toString()}/${maxRetries.toString()})...`);
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
+    }
+    throw new Error("Unreachable");
+}
+// ==========================================
+// Exported Core Functions
+// ==========================================
 function resolveVersion(target, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
     const versions = supportedVersions[target.arch];
     if (!versions) {
-        throw new Error(`No supported versions found for ${target.compiler} on ` +
-            `${target.os} (${target.arch}).`);
+        throw new Error(`No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`);
     }
-    // If the version is LATEST, use the first list entry.
     const version = target.version === LATEST ? versions[0] : target.version;
     if (!version) {
-        throw new Error(`No supported versions found for ${target.compiler} on ` +
-            `${target.os} (${target.arch}).`);
+        throw new Error(`No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`);
     }
     const versionList = versions;
     if (!versionList.includes(version)) {
-        // Try exact match first (covers Intel-style versions like "2025.1.0" and
-        // LLVM-style major-only entries like "22"). If that fails and the version
-        // looks like a full x.y.z patch, fall back to matching just the major —
-        // this allows users to enter "22.1.3" when the list contains "22".
         if (matchMajorIfPatch) {
             const major = parseMajorOrPatch(version).major;
             if (versionList.includes(major)) {
                 return version;
             }
         }
-        // When true, a minor-only version string in "YYYY.minor" format (e.g.
-        // "2025.2") is expanded to the latest known patch for that minor (e.g.
-        // "2025.2.1") by finding the first entry in the version list whose prefix
-        // matches "YYYY.minor.".
-        if (resolveMinorToLatestPatch && /^\d{4}\.\d+$/.test(version)) {
+        // FIX: Modified standard regex to accept BOTH standard semantic numbers (e.g. 14.1) and years (e.g. 2025.1)
+        if (resolveMinorToLatestPatch && /^\d+\.\d+$/.test(version)) {
             const prefix = `${version}.`;
             const match = versionList.find((v) => v.startsWith(prefix));
             if (match) {
                 return match;
             }
         }
-        throw new Error(`${target.compiler} ${version} is not supported on ` +
-            `${target.os} (${target.arch}). ` +
+        throw new Error(`${target.compiler} ${version} is not supported on ${target.os} (${target.arch}). ` +
             `Supported versions: ${versions.join(", ")}`);
     }
     return version;
@@ -89029,90 +89081,51 @@ function resolveWindowsVersion(target, supportedVersions, { matchMajorIfPatch = 
     }
     return resolveVersion(target, { [target.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
 }
-// Parses a version string into a major and an optional full patch version.
-//
-// Accepted formats:
-//   "22"       → { major: "22", patch: undefined }  — resolve latest patch via API
-//   "22.1.3"   → { major: "22", patch: "22.1.3" }   — use exactly this patch
-//
-// Any other format (e.g. "22.1") is rejected to avoid ambiguity.
+// FIX: Handles string segmentation gracefully for minor versions (length === 2)
 function parseMajorOrPatch(input) {
     const parts = input.split(".");
-    if (parts.length === 1)
-        return { major: parts[0], patch: undefined };
-    if (parts.length === 3)
-        return { major: parts[0], patch: input };
-    throw new Error(`Invalid version format: "${input}". ` +
-        `Specify either a major version (e.g. "22") or a full patch version (e.g. "22.1.3").`);
+    if (parts.length >= 1 && parts.length <= 3) {
+        return {
+            major: parts[0],
+            patch: parts.length === 3 ? input : undefined,
+        };
+    }
+    throw new Error(`Invalid version format: "${input}". Specify a major version (e.g. "22"), minor (e.g. "22.1") or full patch version (e.g. "22.1.3").`);
 }
-// Fetches the latest stable patch version for a given major from a GitHub
-// repository's releases. Returns a full version string like "22.1.3".
-//
-// tagPrefix: prefix used to match release tags (default: "llvmorg-{major}.").
-// tagStripper: converts a matched tag to a version string (default: strips "llvmorg-").
+// FIX: Added multi-page fallback strategy to guarantee legacy version visibility
 async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
     core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
-    const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
-    const options = { headers: githubHeaders() };
-    const maxRetries = 3;
-    const timeoutMs = 5000;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort();
-        }, timeoutMs);
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
-            }
-            const releases = (await response.json());
-            const match = releases.find((r) => r.tag_name.startsWith(tagPrefix) &&
-                !r.prerelease &&
-                !r.tag_name.includes("rc"));
-            if (!match) {
-                throw new Error(`No stable release found for ${repo} major ${major} in the last 100 GitHub releases.`);
-            }
+    // Walk up to 3 pagination indexes to unearth deep historical patches
+    for (let page = 1; page <= 3; page++) {
+        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
+        const { data: releases } = await fetchJsonWithRetry(url, {
+            headers: githubHeaders(),
+        });
+        if (!releases || releases.length === 0) {
+            break;
+        }
+        const match = releases.find((r) => r.tag_name.startsWith(tagPrefix) &&
+            !r.prerelease &&
+            !r.tag_name.includes("rc"));
+        if (match) {
             return tagStripper(match.tag_name);
         }
-        catch (e) {
-            clearTimeout(timeoutId);
-            const error = e instanceof Error ? e : new Error(String(e));
-            const isAbort = error.name === "AbortError";
-            const errorMessage = isAbort
-                ? `Request timed out after ${timeoutMs.toString()}ms`
-                : error.message;
-            if (attempt === maxRetries) {
-                throw new Error(`Failed to resolve version for ${repo} after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`, { cause: e });
-            }
-            const backoffMs = 1000 * Math.pow(2, attempt);
-            core.warning(`GitHub API fetch failed (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s (Attempt ${attempt.toString()}/${maxRetries.toString()})...`);
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-        }
     }
-    throw new Error("Unreachable");
+    throw new Error(`No stable release found for ${repo} major ${major} within visible historical GitHub releases.`);
 }
-// Verifies that a specific release exists on GitHub and that the named asset
-// is present. Throws with a clear message (and a link to the release page)
-// if either check fails.
-//
-// tagFromPatch: converts a patch version string to the GitHub release tag.
-//   Default: (patch) => `llvmorg-${patch}` (LLVM convention).
 async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `llvmorg-${p}`) {
     const tag = tagFromPatch(patch);
     core.info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
-    const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, { headers: githubHeaders() });
-    if (response.status === 404) {
+    const url = `https://api.github.com/repos/${repo}/releases/tags/${tag}`;
+    const { status, data: release } = await fetchJsonWithRetry(url, {
+        headers: githubHeaders(),
+    });
+    if (status === 404) {
         throw new Error(`Requested version "${patch}" does not exist (no release for ${tag} in ${repo}).`);
     }
-    if (!response.ok) {
-        throw new Error(`GitHub API request failed for ${tag}: ${response.status.toString()} ${response.statusText}`);
+    if (!release) {
+        throw new Error(`Failed to fetch release metadata for tag ${tag} in ${repo}.`);
     }
-    const release = (await response.json());
     if (!release.assets.some((a) => a.name === filename)) {
         throw new Error(`Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
             `See https://github.com/${repo}/releases/tag/${tag} for available assets.`);
@@ -89123,8 +89136,12 @@ function githubHeaders() {
         Accept: "application/vnd.github+json",
     };
     const token = process.env.GITHUB_TOKEN;
-    if (token)
+    if (token) {
         headers.Authorization = `Bearer ${token}`;
+    }
+    else {
+        core.warning("GITHUB_TOKEN is missing from the environment. Concurrent execution of these tests will likely hit rate limits and fail.");
+    }
     return headers;
 }
 
