@@ -48108,8 +48108,7 @@ function buildScopes(challengeOptions, challengeInfo) {
         return challengeOptions.scopes;
     }
     const challengeScopes = new URL(challengeInfo.resource_id);
-    challengeScopes.pathname = Constants.DefaultScope;
-    let scope = challengeScopes.toString();
+    let scope = new URL(Constants.DefaultScope, challengeScopes.origin).toString();
     if (scope === "https://disk.azure.com/.default") {
         // the extra slash is required by the service
         scope = "https://disk.azure.com//.default";
@@ -48157,7 +48156,7 @@ function requestToOptions(request) {
 /***/ }),
 
 /***/ 20741:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
@@ -48168,22 +48167,22 @@ exports.encodeString = encodeString;
 exports.encodeByteArray = encodeByteArray;
 exports.decodeString = decodeString;
 exports.decodeStringToString = decodeStringToString;
+const core_util_1 = __nccwpck_require__(87779);
 /**
  * Encodes a string in base64 format.
  * @param value - the string to encode
  * @internal
  */
 function encodeString(value) {
-    return Buffer.from(value).toString("base64");
+    return (0, core_util_1.uint8ArrayToString)((0, core_util_1.stringToUint8Array)(value, "utf-8"), "base64");
 }
 /**
  * Encodes a byte array in base64 format.
- * @param value - the Uint8Aray to encode
+ * @param value - the Uint8Array to encode
  * @internal
  */
 function encodeByteArray(value) {
-    const bufferValue = value instanceof Buffer ? value : Buffer.from(value.buffer);
-    return bufferValue.toString("base64");
+    return (0, core_util_1.uint8ArrayToString)(value, "base64");
 }
 /**
  * Decodes a base64 string into a byte array.
@@ -48191,7 +48190,7 @@ function encodeByteArray(value) {
  * @internal
  */
 function decodeString(value) {
-    return Buffer.from(value, "base64");
+    return (0, core_util_1.stringToUint8Array)(value, "base64");
 }
 /**
  * Decodes a base64 string into a string.
@@ -48199,7 +48198,7 @@ function decodeString(value) {
  * @internal
  */
 function decodeStringToString(value) {
-    return Buffer.from(value, "base64").toString();
+    return (0, core_util_1.uint8ArrayToString)((0, core_util_1.stringToUint8Array)(value, "base64"), "utf-8");
 }
 //# sourceMappingURL=base64.js.map
 
@@ -48517,8 +48516,7 @@ const serializer_js_1 = __nccwpck_require__(31530);
  */
 function getStreamingResponseStatusCodes(operationSpec) {
     const result = new Set();
-    for (const statusCode in operationSpec.responses) {
-        const operationResponse = operationSpec.responses[statusCode];
+    for (const [statusCode, operationResponse] of Object.entries(operationSpec.responses)) {
         if (operationResponse.bodyMapper &&
             operationResponse.bodyMapper.type.name === serializer_js_1.MapperTypeNames.Stream) {
             result.add(Number(statusCode));
@@ -48596,7 +48594,7 @@ exports.logger = (0, logger_1.createClientLogger)("core-client");
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getOperationArgumentValueFromParameter = getOperationArgumentValueFromParameter;
 exports.getOperationRequestInfo = getOperationRequestInfo;
-const state_js_1 = __nccwpck_require__(33345);
+const state_1 = __nccwpck_require__(70030);
 /**
  * @internal
  * Retrieves the value to use for a given operation argument
@@ -48636,9 +48634,8 @@ function getOperationArgumentValueFromParameter(operationArguments, parameter, f
         if (parameterMapper.required) {
             value = {};
         }
-        for (const propertyName in parameterPath) {
+        for (const [propertyName, propertyPath] of Object.entries(parameterPath)) {
             const propertyMapper = parameterMapper.type.modelProperties[propertyName];
-            const propertyPath = parameterPath[propertyName];
             const propertyValue = getOperationArgumentValueFromParameter(operationArguments, {
                 parameterPath: propertyPath,
                 mapper: propertyMapper,
@@ -48647,7 +48644,12 @@ function getOperationArgumentValueFromParameter(operationArguments, parameter, f
                 if (!value) {
                     value = {};
                 }
-                value[propertyName] = propertyValue;
+                Object.defineProperty(value, propertyName, {
+                    value: propertyValue,
+                    enumerable: true,
+                    configurable: true,
+                    writable: true,
+                });
             }
         }
     }
@@ -48680,10 +48682,10 @@ function getOperationRequestInfo(request) {
     if (hasOriginalRequest(request)) {
         return getOperationRequestInfo(request[originalRequestSymbol]);
     }
-    let info = state_js_1.state.operationRequestMap.get(request);
+    let info = state_1.state.operationRequestMap.get(request);
     if (!info) {
         info = {};
-        state_js_1.state.operationRequestMap.set(request, info);
+        state_1.state.operationRequestMap.set(request, info);
     }
     return info;
 }
@@ -48755,7 +48757,7 @@ function serializationPolicy(options = {}) {
     const stringifyXML = options.stringifyXML;
     return {
         name: exports.serializationPolicyName,
-        async sendRequest(request, next) {
+        sendRequest(request, next) {
             const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(request);
             const operationSpec = operationInfo?.operationSpec;
             const operationArguments = operationInfo?.operationArguments;
@@ -49337,8 +49339,8 @@ function serializeSequenceType(serializer, mapper, object, objectName, isXml, op
     }
     let elementType = mapper.type.element;
     if (!elementType || typeof elementType !== "object") {
-        throw new Error(`element" metadata for an Array must be defined in the ` +
-            `mapper and it must of type "object" in ${objectName}.`);
+        throw new Error(`"element" metadata for an Array must be defined in the ` +
+            `mapper and it must be of type "object" in ${objectName}.`);
     }
     // Quirk: Composite mappers referenced by `element` might
     // not have *all* properties declared (like uberParent),
@@ -49517,10 +49519,15 @@ function serializeCompositeType(serializer, mapper, object, objectName, isXml, o
         const additionalPropertiesMapper = resolveAdditionalProperties(serializer, mapper, objectName);
         if (additionalPropertiesMapper) {
             const propNames = Object.keys(modelProps);
-            for (const clientPropName in object) {
+            for (const clientPropName of Object.keys(object)) {
                 const isAdditionalProperty = propNames.every((pn) => pn !== clientPropName);
                 if (isAdditionalProperty) {
-                    payload[clientPropName] = serializer.serialize(additionalPropertiesMapper, object[clientPropName], objectName + '["' + clientPropName + '"]', options);
+                    Object.defineProperty(payload, clientPropName, {
+                        value: serializer.serialize(additionalPropertiesMapper, object[clientPropName], objectName + '["' + clientPropName + '"]', options),
+                        enumerable: true,
+                        configurable: true,
+                        writable: true,
+                    });
                 }
             }
         }
@@ -49615,7 +49622,12 @@ function deserializeCompositeType(serializer, mapper, responseBody, objectName, 
                     */
                     const wrapped = responseBody[xmlName];
                     const elementList = wrapped?.[xmlElementName] ?? [];
-                    instance[key] = serializer.deserialize(propertyMapper, elementList, propertyObjectName, options);
+                    Object.defineProperty(instance, key, {
+                        value: serializer.deserialize(propertyMapper, elementList, propertyObjectName, options),
+                        enumerable: true,
+                        configurable: true,
+                        writable: true,
+                    });
                     handledPropertyNames.push(xmlName);
                 }
                 else {
@@ -49680,7 +49692,7 @@ function deserializeCompositeType(serializer, mapper, responseBody, objectName, 
     const additionalPropertiesMapper = mapper.type.additionalProperties;
     if (additionalPropertiesMapper) {
         const isAdditionalProperty = (responsePropName) => {
-            for (const clientPropName in modelProps) {
+            for (const clientPropName of Object.keys(modelProps)) {
                 const paths = splitSerializeName(modelProps[clientPropName].serializedName);
                 if (paths[0] === responsePropName) {
                     return false;
@@ -49688,9 +49700,15 @@ function deserializeCompositeType(serializer, mapper, responseBody, objectName, 
             }
             return true;
         };
-        for (const responsePropName in responseBody) {
+        for (const responsePropName of Object.keys(responseBody)) {
             if (isAdditionalProperty(responsePropName)) {
-                instance[responsePropName] = serializer.deserialize(additionalPropertiesMapper, responseBody[responsePropName], objectName + '["' + responsePropName + '"]', options);
+                const deserializedValue = serializer.deserialize(additionalPropertiesMapper, responseBody[responsePropName], objectName + '["' + responsePropName + '"]', options);
+                Object.defineProperty(instance, responsePropName, {
+                    value: deserializedValue,
+                    enumerable: true,
+                    configurable: true,
+                    writable: true,
+                });
             }
         }
     }
@@ -49699,7 +49717,12 @@ function deserializeCompositeType(serializer, mapper, responseBody, objectName, 
             if (instance[key] === undefined &&
                 !handledPropertyNames.includes(key) &&
                 !isSpecialXmlProperty(key, options)) {
-                instance[key] = responseBody[key];
+                Object.defineProperty(instance, key, {
+                    value: responseBody[key],
+                    enumerable: true,
+                    configurable: true,
+                    writable: true,
+                });
             }
         }
     }
@@ -49724,8 +49747,8 @@ function deserializeDictionaryType(serializer, mapper, responseBody, objectName,
 function deserializeSequenceType(serializer, mapper, responseBody, objectName, options) {
     let element = mapper.type.element;
     if (!element || typeof element !== "object") {
-        throw new Error(`element" metadata for an Array must be defined in the ` +
-            `mapper and it must of type "object" in ${objectName}`);
+        throw new Error(`"element" metadata for an Array must be defined in the ` +
+            `mapper and it must be of type "object" in ${objectName}`);
     }
     if (responseBody) {
         if (!Array.isArray(responseBody)) {
@@ -49894,7 +49917,7 @@ class ServiceClient {
     /**
      * Send the provided httpRequest.
      */
-    async sendRequest(request) {
+    sendRequest(request) {
         return this.pipeline.sendRequest(this._httpClient, request);
     }
     /**
@@ -49998,7 +50021,7 @@ function getCredentialScopes(options) {
     if (options.baseUri) {
         return `${options.baseUri}/.default`;
     }
-    if (options.credential && !options.credentialScopes) {
+    if (options.credential) {
         throw new Error(`When using credentials, the ServiceClientOptions must contain either a endpoint or a credentialScopes. Unable to create a bearerTokenAuthenticationPolicy`);
     }
     return undefined;
@@ -50007,7 +50030,7 @@ function getCredentialScopes(options) {
 
 /***/ }),
 
-/***/ 33345:
+/***/ 70030:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -50022,7 +50045,7 @@ exports.state = void 0;
 exports.state = {
     operationRequestMap: new WeakMap(),
 };
-//# sourceMappingURL=state-cjs.cjs.map
+//# sourceMappingURL=state-cjs.js.map
 
 /***/ }),
 
@@ -50127,7 +50150,8 @@ function appendPath(url, pathToAppend) {
     else {
         newPath = newPath + pathToAppend;
     }
-    parsedUrl.pathname = newPath;
+    // Use Object.assign to bypass react-native's incorrect readonly URL.pathname declaration
+    Object.assign(parsedUrl, { pathname: newPath });
     return parsedUrl.toString();
 }
 function calculateQueryParameters(operationSpec, operationArguments, fallbackObject) {
@@ -83709,7 +83733,7 @@ __export(clientHelpers_exports, {
   getCachedDefaultHttpsClient: () => getCachedDefaultHttpsClient
 });
 module.exports = __toCommonJS(clientHelpers_exports);
-var import_defaultHttpClient = __nccwpck_require__(69468);
+var import_httpClient = __nccwpck_require__(69468);
 var import_createPipelineFromOptions = __nccwpck_require__(91810);
 var import_apiVersionPolicy = __nccwpck_require__(71408);
 var import_credentials = __nccwpck_require__(36227);
@@ -83745,7 +83769,7 @@ function createDefaultPipeline(options = {}) {
 }
 function getCachedDefaultHttpsClient() {
   if (!cachedHttpClient) {
-    cachedHttpClient = (0, import_defaultHttpClient.createDefaultHttpClient)();
+    cachedHttpClient = (0, import_httpClient.createDefaultHttpClient)();
   }
   return cachedHttpClient;
 }
@@ -83784,7 +83808,7 @@ module.exports = __toCommonJS(getClient_exports);
 var import_clientHelpers = __nccwpck_require__(88728);
 var import_sendRequest = __nccwpck_require__(16311);
 var import_urlHelpers = __nccwpck_require__(37088);
-var import_checkEnvironment = __nccwpck_require__(85086);
+var import_env = __nccwpck_require__(41573);
 function getClient(endpoint, clientOptions = {}) {
   const pipeline = clientOptions.pipeline ?? (0, import_clientHelpers.createDefaultPipeline)(clientOptions);
   if (clientOptions.additionalPolicies?.length) {
@@ -83901,7 +83925,7 @@ function buildOperation(method, url, pipeline, options, allowInsecureConnection,
       ).then(onFulfilled, onrejected);
     },
     async asBrowserStream() {
-      if (import_checkEnvironment.isNodeLike) {
+      if (import_env.isNodeLike) {
         throw new Error(
           "`asBrowserStream` is supported only in the browser environment. Use `asNodeStream` instead to obtain the response body stream. If you require a Web stream of the response in Node, consider using `Readable.toWeb` on the result of `asNodeStream`."
         );
@@ -83916,7 +83940,7 @@ function buildOperation(method, url, pipeline, options, allowInsecureConnection,
       }
     },
     async asNodeStream() {
-      if (import_checkEnvironment.isNodeLike) {
+      if (import_env.isNodeLike) {
         return (0, import_sendRequest.sendRequest)(
           method,
           url,
@@ -84159,11 +84183,12 @@ function createRestError(messageOrResponse, response) {
     response: toPipelineResponse(resp)
   });
 }
-function toPipelineResponse(response) {
+function toPipelineResponse(errorResponse) {
   return {
-    headers: (0, import_httpHeaders.createHttpHeaders)(response.headers),
-    request: response.request,
-    status: statusCodeToNumber(response.status) ?? -1
+    headers: (0, import_httpHeaders.createHttpHeaders)(errorResponse.headers),
+    request: errorResponse.request,
+    status: statusCodeToNumber(errorResponse.status) ?? -1,
+    ...typeof errorResponse.body === "string" ? { bodyAsText: errorResponse.body } : {}
   };
 }
 function statusCodeToNumber(statusCode) {
@@ -84276,20 +84301,36 @@ function buildPipelineRequest(method, url, options = {}) {
       "content-type": requestContentType
     }
   });
-  return (0, import_pipelineRequest.createPipelineRequest)({
+  const {
+    allowInsecureConnection,
+    abortSignal,
+    onUploadProgress,
+    onDownloadProgress,
+    timeout,
+    responseAsStream,
+    url: _url,
+    method: _method,
+    body: _body,
+    multipartBody: _multiBody,
+    headers: _headers,
+    ...rest
+  } = options;
+  const request = (0, import_pipelineRequest.createPipelineRequest)({
     url,
     method,
     body,
     multipartBody,
     headers,
-    allowInsecureConnection: options.allowInsecureConnection,
-    abortSignal: options.abortSignal,
-    onUploadProgress: options.onUploadProgress,
-    onDownloadProgress: options.onDownloadProgress,
-    timeout: options.timeout,
+    allowInsecureConnection,
+    abortSignal,
+    onUploadProgress,
+    onDownloadProgress,
+    timeout,
     enableBrowserStreams: true,
-    streamResponseStatusCodes: options.responseAsStream ? /* @__PURE__ */ new Set([Number.POSITIVE_INFINITY]) : void 0
+    streamResponseStatusCodes: responseAsStream ? /* @__PURE__ */ new Set([Number.POSITIVE_INFINITY]) : void 0
   });
+  Object.assign(request, rest);
+  return request;
 }
 function getRequestBody(body, contentType = "") {
   if (body === void 0) {
@@ -84308,7 +84349,9 @@ function getRequestBody(body, contentType = "") {
     return { body };
   }
   if (ArrayBuffer.isView(body)) {
-    return { body: body instanceof Uint8Array ? body : JSON.stringify(body) };
+    return {
+      body: body instanceof Uint8Array ? body : JSON.stringify(body)
+    };
   }
   const firstType = contentType.split(";")[0];
   switch (firstType) {
@@ -84616,7 +84659,7 @@ __export(constants_exports, {
   SDK_VERSION: () => SDK_VERSION
 });
 module.exports = __toCommonJS(constants_exports);
-const SDK_VERSION = "0.3.5";
+const SDK_VERSION = "0.3.6";
 const DEFAULT_RETRY_POLICY_COUNT = 3;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (0);
@@ -84652,35 +84695,18 @@ __export(createPipelineFromOptions_exports, {
 module.exports = __toCommonJS(createPipelineFromOptions_exports);
 var import_logPolicy = __nccwpck_require__(47129);
 var import_pipeline = __nccwpck_require__(22338);
-var import_redirectPolicy = __nccwpck_require__(92187);
 var import_userAgentPolicy = __nccwpck_require__(91691);
-var import_decompressResponsePolicy = __nccwpck_require__(35035);
 var import_defaultRetryPolicy = __nccwpck_require__(32462);
 var import_formDataPolicy = __nccwpck_require__(14197);
-var import_checkEnvironment = __nccwpck_require__(85086);
-var import_proxyPolicy = __nccwpck_require__(80067);
-var import_agentPolicy = __nccwpck_require__(85366);
-var import_tlsPolicy = __nccwpck_require__(96690);
+var import_policies = __nccwpck_require__(66316);
 var import_multipartPolicy = __nccwpck_require__(27427);
 function createPipelineFromOptions(options) {
   const pipeline = (0, import_pipeline.createEmptyPipeline)();
-  if (import_checkEnvironment.isNodeLike) {
-    if (options.agent) {
-      pipeline.addPolicy((0, import_agentPolicy.agentPolicy)(options.agent));
-    }
-    if (options.tlsOptions) {
-      pipeline.addPolicy((0, import_tlsPolicy.tlsPolicy)(options.tlsOptions));
-    }
-    pipeline.addPolicy((0, import_proxyPolicy.proxyPolicy)(options.proxyOptions));
-    pipeline.addPolicy((0, import_decompressResponsePolicy.decompressResponsePolicy)());
-  }
+  (0, import_policies.addPlatformPolicies)(pipeline, options);
   pipeline.addPolicy((0, import_formDataPolicy.formDataPolicy)(), { beforePolicies: [import_multipartPolicy.multipartPolicyName] });
   pipeline.addPolicy((0, import_userAgentPolicy.userAgentPolicy)(options.userAgentOptions));
   pipeline.addPolicy((0, import_multipartPolicy.multipartPolicy)(), { afterPhase: "Deserialize" });
   pipeline.addPolicy((0, import_defaultRetryPolicy.defaultRetryPolicy)(options.retryOptions), { phase: "Retry" });
-  if (import_checkEnvironment.isNodeLike) {
-    pipeline.addPolicy((0, import_redirectPolicy.redirectPolicy)(options.redirectOptions), { afterPhase: "Retry" });
-  }
   pipeline.addPolicy((0, import_logPolicy.logPolicy)(options.loggingOptions), { afterPhase: "Sign" });
   return pipeline;
 }
@@ -84727,6 +84753,117 @@ function createDefaultHttpClient() {
 
 /***/ }),
 
+/***/ 41573:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var env_exports = {};
+__export(env_exports, {
+  emitNodeWarning: () => emitNodeWarning,
+  getEnvironmentVariable: () => getEnvironmentVariable,
+  isBrowser: () => isBrowser,
+  isBun: () => isBun,
+  isDeno: () => isDeno,
+  isNodeLike: () => isNodeLike,
+  isNodeRuntime: () => isNodeRuntime,
+  isReactNative: () => isReactNative,
+  isWebWorker: () => isWebWorker
+});
+module.exports = __toCommonJS(env_exports);
+var import_node_process = __toESM(__nccwpck_require__(1708));
+function getEnvironmentVariable(name) {
+  return import_node_process.default.env[name];
+}
+function emitNodeWarning(warning) {
+  import_node_process.default.emitWarning(warning);
+}
+const isBrowser = false;
+const isWebWorker = false;
+const isDeno = typeof import_node_process.default.versions.deno === "string" && import_node_process.default.versions.deno.length > 0;
+const isBun = typeof import_node_process.default.versions.bun === "string" && import_node_process.default.versions.bun.length > 0;
+const isNodeLike = true;
+const isNodeRuntime = !isBun && !isDeno;
+const isReactNative = false;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=env.js.map
+
+
+/***/ }),
+
+/***/ 59182:
+/***/ ((module) => {
+
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var formData_exports = {};
+__export(formData_exports, {
+  convertBodyToFormDataMap: () => convertBodyToFormDataMap
+});
+module.exports = __toCommonJS(formData_exports);
+function convertBodyToFormDataMap(body) {
+  if (typeof FormData !== "undefined" && body instanceof FormData) {
+    const formDataMap = {};
+    for (const [key, value] of body.entries()) {
+      const existing = formDataMap[key];
+      if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        formDataMap[key] = existing !== void 0 ? [existing, value] : [value];
+      }
+    }
+    return formDataMap;
+  }
+  return void 0;
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=formData.js.map
+
+
+/***/ }),
+
 /***/ 4220:
 /***/ ((module) => {
 
@@ -84755,6 +84892,9 @@ module.exports = __toCommonJS(httpHeaders_exports);
 function normalizeName(name) {
   return name.toLowerCase();
 }
+function normalizeValue(value) {
+  return String(value).trim().replace(/[\r\n]/g, "");
+}
 function* headerIterator(map) {
   for (const entry of map.values()) {
     yield [entry.name, entry.value];
@@ -84777,7 +84917,7 @@ class HttpHeadersImpl {
    * @param value - The value of the header to set.
    */
   set(name, value) {
-    this._headersMap.set(normalizeName(name), { name, value: String(value).trim() });
+    this._headersMap.set(normalizeName(name), { name, value: normalizeValue(value) });
   }
   /**
    * Get the header value for the provided header name, or undefined if no header exists in this
@@ -84866,7 +85006,7 @@ __export(src_exports, {
   RestError: () => import_restError.RestError,
   TypeSpecRuntimeLogger: () => import_logger.TypeSpecRuntimeLogger,
   createClientLogger: () => import_logger.createClientLogger,
-  createDefaultHttpClient: () => import_defaultHttpClient.createDefaultHttpClient,
+  createDefaultHttpClient: () => import_httpClient.createDefaultHttpClient,
   createEmptyPipeline: () => import_pipeline.createEmptyPipeline,
   createHttpHeaders: () => import_httpHeaders.createHttpHeaders,
   createPipelineRequest: () => import_pipelineRequest.createPipelineRequest,
@@ -84887,7 +85027,7 @@ var import_pipelineRequest = __nccwpck_require__(72305);
 var import_pipeline = __nccwpck_require__(22338);
 var import_restError = __nccwpck_require__(9758);
 var import_bytesEncoding = __nccwpck_require__(82921);
-var import_defaultHttpClient = __nccwpck_require__(69468);
+var import_httpClient = __nccwpck_require__(69468);
 var import_getClient = __nccwpck_require__(86191);
 var import_operationOptionHelpers = __nccwpck_require__(19635);
 var import_restError2 = __nccwpck_require__(97332);
@@ -84958,7 +85098,8 @@ __export(debug_exports, {
 });
 module.exports = __toCommonJS(debug_exports);
 var import_log = __nccwpck_require__(38029);
-const debugEnvVariable = typeof process !== "undefined" && process.env && process.env.DEBUG || void 0;
+var import_env = __nccwpck_require__(41573);
+const debugEnvVariable = (0, import_env.getEnvironmentVariable)("DEBUG");
 let enabledString;
 let enabledNamespaces = [];
 let skippedNamespaces = [];
@@ -85243,6 +85384,7 @@ __export(logger_exports, {
 });
 module.exports = __toCommonJS(logger_exports);
 var import_debug = __toESM(__nccwpck_require__(36836));
+var import_env = __nccwpck_require__(41573);
 const TYPESPEC_RUNTIME_LOG_LEVELS = ["verbose", "info", "warning", "error"];
 const levelMap = {
   verbose: 400,
@@ -85260,7 +85402,7 @@ function isTypeSpecRuntimeLogLevel(level) {
 }
 function createLoggerContext(options) {
   const registeredLoggers = /* @__PURE__ */ new Set();
-  const logLevelFromEnv = typeof process !== "undefined" && process.env && process.env[options.logLevelEnvVarName] || void 0;
+  const logLevelFromEnv = (0, import_env.getEnvironmentVariable)(options.logLevelEnvVarName);
   let logLevel;
   const clientLogger = (0, import_debug.default)(options.namespace);
   clientLogger.log = (...args) => {
@@ -85578,7 +85720,9 @@ class NodeHttpClient {
         if (typeof body === "string" || Buffer.isBuffer(body)) {
           req.end(body);
         } else if (isArrayBuffer(body)) {
-          req.end(ArrayBuffer.isView(body) ? Buffer.from(body.buffer) : Buffer.from(body));
+          req.end(
+            ArrayBuffer.isView(body) ? Buffer.from(body.buffer, body.byteOffset, body.byteLength) : Buffer.from(body)
+          );
         } else {
           import_log.logger.error("Unrecognized body type", body);
           reject(new import_restError.RestError("Unrecognized body type"));
@@ -85937,7 +86081,7 @@ __export(pipelineRequest_exports, {
 });
 module.exports = __toCommonJS(pipelineRequest_exports);
 var import_httpHeaders = __nccwpck_require__(4220);
-var import_uuidUtils = __nccwpck_require__(5023);
+var import_uuid = __nccwpck_require__(5023);
 class PipelineRequestImpl {
   url;
   method;
@@ -85973,7 +86117,7 @@ class PipelineRequestImpl {
     this.abortSignal = options.abortSignal;
     this.onUploadProgress = options.onUploadProgress;
     this.onDownloadProgress = options.onDownloadProgress;
-    this.requestId = options.requestId || (0, import_uuidUtils.randomUUID)();
+    this.requestId = options.requestId || (0, import_uuid.randomUUID)();
     this.allowInsecureConnection = options.allowInsecureConnection ?? false;
     this.enableBrowserStreams = options.enableBrowserStreams ?? false;
     this.requestOverrides = options.requestOverrides;
@@ -86224,6 +86368,7 @@ __export(checkInsecureConnection_exports, {
 });
 module.exports = __toCommonJS(checkInsecureConnection_exports);
 var import_log = __nccwpck_require__(3644);
+var import_env = __nccwpck_require__(41573);
 let insecureConnectionWarningEmmitted = false;
 function allowInsecureConnection(request, options) {
   if (options.allowInsecureConnection && request.allowInsecureConnection) {
@@ -86237,9 +86382,9 @@ function allowInsecureConnection(request, options) {
 function emitInsecureConnectionWarning() {
   const warning = "Sending token over insecure transport. Assume any token issued is compromised.";
   import_log.logger.warning(warning);
-  if (typeof process?.emitWarning === "function" && !insecureConnectionWarningEmmitted) {
+  if (!insecureConnectionWarningEmmitted) {
     insecureConnectionWarningEmmitted = true;
-    process.emitWarning(warning);
+    (0, import_env.emitNodeWarning)(warning);
   }
 }
 function ensureSecureConnection(request, options) {
@@ -86480,23 +86625,16 @@ __export(formDataPolicy_exports, {
 });
 module.exports = __toCommonJS(formDataPolicy_exports);
 var import_bytesEncoding = __nccwpck_require__(82921);
-var import_checkEnvironment = __nccwpck_require__(85086);
+var import_formData = __nccwpck_require__(59182);
 var import_httpHeaders = __nccwpck_require__(4220);
 const formDataPolicyName = "formDataPolicy";
-function formDataToFormDataMap(formData) {
-  const formDataMap = {};
-  for (const [key, value] of formData.entries()) {
-    formDataMap[key] ??= [];
-    formDataMap[key].push(value);
-  }
-  return formDataMap;
-}
 function formDataPolicy() {
   return {
     name: formDataPolicyName,
     async sendRequest(request, next) {
-      if (import_checkEnvironment.isNodeLike && typeof FormData !== "undefined" && request.body instanceof FormData) {
-        request.formData = formDataToFormDataMap(request.body);
+      const converted = (0, import_formData.convertBodyToFormDataMap)(request.body);
+      if (converted) {
+        request.formData = converted;
         request.body = void 0;
       }
       if (request.formData) {
@@ -86593,21 +86731,21 @@ var internal_exports = {};
 __export(internal_exports, {
   agentPolicy: () => import_agentPolicy.agentPolicy,
   agentPolicyName: () => import_agentPolicy.agentPolicyName,
-  decompressResponsePolicy: () => import_decompressResponsePolicy.decompressResponsePolicy,
-  decompressResponsePolicyName: () => import_decompressResponsePolicy.decompressResponsePolicyName,
+  decompressResponsePolicy: () => import_decompress.decompressResponsePolicy,
+  decompressResponsePolicyName: () => import_decompress.decompressResponsePolicyName,
   defaultRetryPolicy: () => import_defaultRetryPolicy.defaultRetryPolicy,
   defaultRetryPolicyName: () => import_defaultRetryPolicy.defaultRetryPolicyName,
   exponentialRetryPolicy: () => import_exponentialRetryPolicy.exponentialRetryPolicy,
   exponentialRetryPolicyName: () => import_exponentialRetryPolicy.exponentialRetryPolicyName,
   formDataPolicy: () => import_formDataPolicy.formDataPolicy,
   formDataPolicyName: () => import_formDataPolicy.formDataPolicyName,
-  getDefaultProxySettings: () => import_proxyPolicy.getDefaultProxySettings,
+  getDefaultProxySettings: () => import_proxy.getDefaultProxySettings,
   logPolicy: () => import_logPolicy.logPolicy,
   logPolicyName: () => import_logPolicy.logPolicyName,
   multipartPolicy: () => import_multipartPolicy.multipartPolicy,
   multipartPolicyName: () => import_multipartPolicy.multipartPolicyName,
-  proxyPolicy: () => import_proxyPolicy.proxyPolicy,
-  proxyPolicyName: () => import_proxyPolicy.proxyPolicyName,
+  proxyPolicy: () => import_proxy.proxyPolicy,
+  proxyPolicyName: () => import_proxy.proxyPolicyName,
   redirectPolicy: () => import_redirectPolicy.redirectPolicy,
   redirectPolicyName: () => import_redirectPolicy.redirectPolicyName,
   retryPolicy: () => import_retryPolicy.retryPolicy,
@@ -86622,7 +86760,7 @@ __export(internal_exports, {
 });
 module.exports = __toCommonJS(internal_exports);
 var import_agentPolicy = __nccwpck_require__(85366);
-var import_decompressResponsePolicy = __nccwpck_require__(35035);
+var import_decompress = __nccwpck_require__(35035);
 var import_defaultRetryPolicy = __nccwpck_require__(32462);
 var import_exponentialRetryPolicy = __nccwpck_require__(74656);
 var import_retryPolicy = __nccwpck_require__(43345);
@@ -86631,7 +86769,7 @@ var import_throttlingRetryPolicy = __nccwpck_require__(24728);
 var import_formDataPolicy = __nccwpck_require__(14197);
 var import_logPolicy = __nccwpck_require__(47129);
 var import_multipartPolicy = __nccwpck_require__(27427);
-var import_proxyPolicy = __nccwpck_require__(80067);
+var import_proxy = __nccwpck_require__(80067);
 var import_redirectPolicy = __nccwpck_require__(92187);
 var import_tlsPolicy = __nccwpck_require__(96690);
 var import_userAgentPolicy = __nccwpck_require__(91691);
@@ -86726,10 +86864,10 @@ __export(multipartPolicy_exports, {
 module.exports = __toCommonJS(multipartPolicy_exports);
 var import_bytesEncoding = __nccwpck_require__(82921);
 var import_typeGuards = __nccwpck_require__(48505);
-var import_uuidUtils = __nccwpck_require__(5023);
+var import_uuid = __nccwpck_require__(5023);
 var import_concat = __nccwpck_require__(20547);
 function generateBoundary() {
-  return `----AzSDKFormBoundary${(0, import_uuidUtils.randomUUID)()}`;
+  return `----AzSDKFormBoundary${(0, import_uuid.randomUUID)()}`;
 }
 function encodeHeaders(headers) {
   let result = "";
@@ -86832,6 +86970,54 @@ function multipartPolicy() {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (0);
 //# sourceMappingURL=multipartPolicy.js.map
+
+
+/***/ }),
+
+/***/ 66316:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var platformPolicies_exports = {};
+__export(platformPolicies_exports, {
+  addPlatformPolicies: () => addPlatformPolicies
+});
+module.exports = __toCommonJS(platformPolicies_exports);
+var import_agentPolicy = __nccwpck_require__(85366);
+var import_tlsPolicy = __nccwpck_require__(96690);
+var import_proxy = __nccwpck_require__(80067);
+var import_decompress = __nccwpck_require__(35035);
+var import_redirectPolicy = __nccwpck_require__(92187);
+function addPlatformPolicies(pipeline, options) {
+  if (options.agent) {
+    pipeline.addPolicy((0, import_agentPolicy.agentPolicy)(options.agent));
+  }
+  if (options.tlsOptions) {
+    pipeline.addPolicy((0, import_tlsPolicy.tlsPolicy)(options.tlsOptions));
+  }
+  pipeline.addPolicy((0, import_proxy.proxyPolicy)(options.proxyOptions));
+  pipeline.addPolicy((0, import_decompress.decompressResponsePolicy)());
+  pipeline.addPolicy((0, import_redirectPolicy.redirectPolicy)(options.redirectOptions), { afterPhase: "Retry" });
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=platformPolicies.js.map
 
 
 /***/ }),
@@ -87703,51 +87889,6 @@ function stringToUint8Array(value, format) {
 
 /***/ }),
 
-/***/ 85086:
-/***/ ((module) => {
-
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var checkEnvironment_exports = {};
-__export(checkEnvironment_exports, {
-  isBrowser: () => isBrowser,
-  isBun: () => isBun,
-  isDeno: () => isDeno,
-  isNodeLike: () => isNodeLike,
-  isNodeRuntime: () => isNodeRuntime,
-  isReactNative: () => isReactNative,
-  isWebWorker: () => isWebWorker
-});
-module.exports = __toCommonJS(checkEnvironment_exports);
-const isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
-const isWebWorker = typeof self === "object" && typeof self?.importScripts === "function" && (self.constructor?.name === "DedicatedWorkerGlobalScope" || self.constructor?.name === "ServiceWorkerGlobalScope" || self.constructor?.name === "SharedWorkerGlobalScope");
-const isDeno = typeof Deno !== "undefined" && typeof Deno.version !== "undefined" && typeof Deno.version.deno !== "undefined";
-const isBun = typeof Bun !== "undefined" && typeof Bun.version !== "undefined";
-const isNodeLike = typeof globalThis.process !== "undefined" && Boolean(globalThis.process.version) && Boolean(globalThis.process.versions?.node);
-const isNodeRuntime = isNodeLike && !isBun && !isDeno;
-const isReactNative = typeof navigator !== "undefined" && navigator?.product === "ReactNative";
-// Annotate the CommonJS export names for ESM import in node:
-0 && (0);
-//# sourceMappingURL=checkEnvironment.js.map
-
-
-/***/ }),
-
 /***/ 20547:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -88051,16 +88192,16 @@ __export(internal_exports, {
   computeSha256Hash: () => import_sha256.computeSha256Hash,
   computeSha256Hmac: () => import_sha256.computeSha256Hmac,
   getRandomIntegerInclusive: () => import_random.getRandomIntegerInclusive,
-  isBrowser: () => import_checkEnvironment.isBrowser,
-  isBun: () => import_checkEnvironment.isBun,
-  isDeno: () => import_checkEnvironment.isDeno,
+  isBrowser: () => import_env.isBrowser,
+  isBun: () => import_env.isBun,
+  isDeno: () => import_env.isDeno,
   isError: () => import_error.isError,
-  isNodeLike: () => import_checkEnvironment.isNodeLike,
-  isNodeRuntime: () => import_checkEnvironment.isNodeRuntime,
+  isNodeLike: () => import_env.isNodeLike,
+  isNodeRuntime: () => import_env.isNodeRuntime,
   isObject: () => import_object.isObject,
-  isReactNative: () => import_checkEnvironment.isReactNative,
-  isWebWorker: () => import_checkEnvironment.isWebWorker,
-  randomUUID: () => import_uuidUtils.randomUUID,
+  isReactNative: () => import_env.isReactNative,
+  isWebWorker: () => import_env.isWebWorker,
+  randomUUID: () => import_uuid.randomUUID,
   stringToUint8Array: () => import_bytesEncoding.stringToUint8Array,
   uint8ArrayToString: () => import_bytesEncoding.uint8ArrayToString
 });
@@ -88070,8 +88211,8 @@ var import_random = __nccwpck_require__(78640);
 var import_object = __nccwpck_require__(53632);
 var import_error = __nccwpck_require__(52573);
 var import_sha256 = __nccwpck_require__(2016);
-var import_uuidUtils = __nccwpck_require__(5023);
-var import_checkEnvironment = __nccwpck_require__(85086);
+var import_uuid = __nccwpck_require__(5023);
+var import_env = __nccwpck_require__(41573);
 var import_bytesEncoding = __nccwpck_require__(82921);
 var import_sanitizer = __nccwpck_require__(7784);
 // Annotate the CommonJS export names for ESM import in node:
@@ -88369,8 +88510,48 @@ async function computeSha256Hash(content, encoding) {
 
 /***/ }),
 
+/***/ 72250:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var typeGuards_node_exports = {};
+__export(typeGuards_node_exports, {
+  isNodeReadableStream: () => isNodeReadableStream,
+  isWebReadableStream: () => isWebReadableStream
+});
+module.exports = __toCommonJS(typeGuards_node_exports);
+var import_stream = __nccwpck_require__(2203);
+function isNodeReadableStream(x) {
+  return x instanceof import_stream.Readable;
+}
+function isWebReadableStream(x) {
+  return x instanceof ReadableStream;
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=typeGuards-node.js.map
+
+
+/***/ }),
+
 /***/ 48505:
-/***/ ((module) => {
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -88393,27 +88574,20 @@ var typeGuards_exports = {};
 __export(typeGuards_exports, {
   isBinaryBody: () => isBinaryBody,
   isBlob: () => isBlob,
-  isNodeReadableStream: () => isNodeReadableStream,
+  isNodeReadableStream: () => import_typeGuards.isNodeReadableStream,
   isReadableStream: () => isReadableStream,
-  isWebReadableStream: () => isWebReadableStream
+  isWebReadableStream: () => import_typeGuards.isWebReadableStream
 });
 module.exports = __toCommonJS(typeGuards_exports);
-function isNodeReadableStream(x) {
-  return Boolean(x && typeof x["pipe"] === "function");
-}
-function isWebReadableStream(x) {
-  return Boolean(
-    x && typeof x.getReader === "function" && typeof x.tee === "function"
-  );
-}
+var import_typeGuards = __nccwpck_require__(72250);
 function isBinaryBody(body) {
-  return body !== void 0 && (body instanceof Uint8Array || isReadableStream(body) || typeof body === "function" || typeof Blob !== "undefined" && body instanceof Blob);
+  return body !== void 0 && (body instanceof Uint8Array || isReadableStream(body) || typeof body === "function" || body instanceof Blob);
 }
 function isReadableStream(x) {
-  return isNodeReadableStream(x) || isWebReadableStream(x);
+  return (0, import_typeGuards.isNodeReadableStream)(x) || (0, import_typeGuards.isWebReadableStream)(x);
 }
 function isBlob(x) {
-  return typeof Blob !== "undefined" && x instanceof Blob;
+  return x instanceof Blob;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (0);
@@ -88445,10 +88619,11 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var userAgent_exports = {};
 __export(userAgent_exports, {
   getUserAgentHeaderName: () => getUserAgentHeaderName,
-  getUserAgentValue: () => getUserAgentValue
+  getUserAgentValue: () => getUserAgentValue,
+  setPlatformSpecificData: () => import_userAgent.setPlatformSpecificData
 });
 module.exports = __toCommonJS(userAgent_exports);
-var import_userAgentPlatform = __nccwpck_require__(83196);
+var import_userAgent = __nccwpck_require__(83196);
 var import_constants = __nccwpck_require__(31255);
 function getUserAgentString(telemetryInfo) {
   const parts = [];
@@ -88459,12 +88634,12 @@ function getUserAgentString(telemetryInfo) {
   return parts.join(" ");
 }
 function getUserAgentHeaderName() {
-  return (0, import_userAgentPlatform.getHeaderName)();
+  return (0, import_userAgent.getHeaderName)();
 }
 async function getUserAgentValue(prefix) {
   const runtimeInfo = /* @__PURE__ */ new Map();
   runtimeInfo.set("ts-http-runtime", import_constants.SDK_VERSION);
-  await (0, import_userAgentPlatform.setPlatformSpecificData)(runtimeInfo);
+  await (0, import_userAgent.setPlatformSpecificData)(runtimeInfo);
   const defaultAgent = getUserAgentString(runtimeInfo);
   const userAgentValue = prefix ? `${prefix} ${defaultAgent}` : defaultAgent;
   return userAgentValue;
