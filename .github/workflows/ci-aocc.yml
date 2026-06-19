@@ -29,7 +29,7 @@ jobs:
                     - { compiler: aocc, version: "4.1" }
 
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - name: Restore dist-tests
               uses: nick-fields/retry@v4

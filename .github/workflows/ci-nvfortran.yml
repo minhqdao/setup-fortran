@@ -64,7 +64,7 @@ jobs:
             toolchain: { compiler: nvfortran, version: "21.1" } # seems broken
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Restore dist-tests
         uses: nick-fields/retry@v4
