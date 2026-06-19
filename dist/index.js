@@ -95535,18 +95535,9 @@ async function installDarwin(target) {
     const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
     core.info(`Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`);
     const formula = await resolveFormula(version);
-    let listOutput = "";
-    await exec.exec("brew", ["list", "--versions", formula], {
-        listeners: {
-            stdout: (data) => {
-                listOutput += data.toString();
-            },
-        },
-        ignoreReturnCode: true,
-    });
-    const alreadyInstalled = listOutput.trim().length > 0;
+    const alreadyInstalled = await isCorrectVersionInstalled(formula, version);
     if (alreadyInstalled) {
-        core.info(`${formula} is already installed, skipping brew install.`);
+        core.info(`${formula} ${version} is already installed, skipping brew install.`);
     }
     else {
         await exec.exec("brew", ["install", formula]);
@@ -95639,6 +95630,24 @@ async function resolveFormula(version) {
     }
     core.info(`${versionedFormula} not found as a distinct formula, falling back to "gcc".`);
     return "gcc";
+}
+async function isCorrectVersionInstalled(formula, version) {
+    let infoOutput = "";
+    const exitCode = await exec.exec("brew", ["info", "--json=v2", "--installed", formula], {
+        listeners: {
+            stdout: (data) => {
+                infoOutput += data.toString();
+            },
+        },
+        ignoreReturnCode: true,
+    });
+    if (exitCode !== 0 || !infoOutput.trim())
+        return false;
+    const info = JSON.parse(infoOutput);
+    const installedVersions = info.formulae[0]?.installed ?? [];
+    if (installedVersions.length === 0)
+        return false;
+    return installedVersions.some((v) => v.version.split(".")[0] === version);
 }
 async function getBrewPrefix() {
     let output = "";

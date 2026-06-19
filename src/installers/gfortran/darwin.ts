@@ -20,19 +20,12 @@ export async function installDarwin(target: Target): Promise<string> {
 
   const formula = await resolveFormula(version);
 
-  let listOutput = "";
-  await exec.exec("brew", ["list", "--versions", formula], {
-    listeners: {
-      stdout: (data: Buffer) => {
-        listOutput += data.toString();
-      },
-    },
-    ignoreReturnCode: true,
-  });
-  const alreadyInstalled = listOutput.trim().length > 0;
+  const alreadyInstalled = await isCorrectVersionInstalled(formula, version);
 
   if (alreadyInstalled) {
-    core.info(`${formula} is already installed, skipping brew install.`);
+    core.info(
+      `${formula} ${version} is already installed, skipping brew install.`,
+    );
   } else {
     await exec.exec("brew", ["install", formula]);
   }
@@ -148,6 +141,36 @@ async function resolveFormula(version: string): Promise<string> {
     `${versionedFormula} not found as a distinct formula, falling back to "gcc".`,
   );
   return "gcc";
+}
+
+async function isCorrectVersionInstalled(
+  formula: string,
+  version: string,
+): Promise<boolean> {
+  let infoOutput = "";
+  const exitCode = await exec.exec(
+    "brew",
+    ["info", "--json=v2", "--installed", formula],
+    {
+      listeners: {
+        stdout: (data: Buffer) => {
+          infoOutput += data.toString();
+        },
+      },
+      ignoreReturnCode: true,
+    },
+  );
+
+  if (exitCode !== 0 || !infoOutput.trim()) return false;
+
+  const info = JSON.parse(infoOutput) as {
+    formulae: { installed: { version: string }[] }[];
+  };
+
+  const installedVersions = info.formulae[0]?.installed ?? [];
+  if (installedVersions.length === 0) return false;
+
+  return installedVersions.some((v) => v.version.split(".")[0] === version);
 }
 
 async function getBrewPrefix(): Promise<string> {

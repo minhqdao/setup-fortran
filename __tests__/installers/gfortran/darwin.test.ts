@@ -27,16 +27,27 @@ describe("installDarwin (gfortran)", () => {
     msystem: Msystem.Native,
   };
 
+  let isGccInstalled = false;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    isGccInstalled = false;
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "gfortran" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("GNU Fortran (Homebrew GCC 14.1.0) 14.1.0"));
         }
       }
-      if (commandLine === "brew" && args?.[0] === "list") {
-        return 1; // Not installed
+      if (commandLine === "brew" && args?.[0] === "info") {
+        if (args.includes("--installed")) {
+          const installed = isGccInstalled ? [{ version: "14.2.0_1" }] : [];
+          if (options?.listeners?.stdout) {
+            options.listeners.stdout(
+              Buffer.from(JSON.stringify({ formulae: [{ installed }] })),
+            );
+          }
+        }
+        return 0;
       }
       if (commandLine === "brew" && args?.[0] === "--prefix") {
         if (options?.listeners?.stdout) {
@@ -64,20 +75,7 @@ describe("installDarwin (gfortran)", () => {
   });
 
   it("skips install if already present", async () => {
-    mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (commandLine === "brew" && args?.[0] === "list") {
-        if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("14.1.0"));
-        }
-        return 0;
-      }
-      if (commandLine === "brew" && args?.[0] === "--prefix") {
-        if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("/usr/local"));
-        }
-      }
-      return 0;
-    });
+    isGccInstalled = true;
 
     await installDarwin(baseTarget);
     expect(mockedExec).not.toHaveBeenCalledWith("brew", ["install", "gcc@14"]);
