@@ -18,7 +18,7 @@ export async function installDarwin(target: Target): Promise<string> {
     `Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`,
   );
 
-  const formula = `gcc@${version}`;
+  const formula = await resolveFormula(version);
 
   let listOutput = "";
   await exec.exec("brew", ["list", "--versions", formula], {
@@ -125,6 +125,29 @@ export async function installDarwin(target: Target): Promise<string> {
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
   return resolvedVersion;
+}
+
+async function resolveFormula(version: string): Promise<string> {
+  const versionedFormula = `gcc@${version}`;
+  let infoOutput = "";
+
+  const exitCode = await exec.exec(
+    "brew",
+    ["info", "--json=v2", versionedFormula],
+    {
+      listeners: { stdout: (data: Buffer) => (infoOutput += data.toString()) },
+      ignoreReturnCode: true,
+    },
+  );
+
+  if (exitCode === 0) {
+    return versionedFormula;
+  }
+
+  core.info(
+    `${versionedFormula} not found as a distinct formula, falling back to "gcc".`,
+  );
+  return "gcc";
 }
 
 async function getBrewPrefix(): Promise<string> {

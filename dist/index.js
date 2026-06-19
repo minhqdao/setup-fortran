@@ -95534,7 +95534,7 @@ const darwin_SUPPORTED_VERSIONS = {
 async function installDarwin(target) {
     const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
     core.info(`Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`);
-    const formula = `gcc@${version}`;
+    const formula = await resolveFormula(version);
     let listOutput = "";
     await exec.exec("brew", ["list", "--versions", formula], {
         listeners: {
@@ -95626,6 +95626,19 @@ async function installDarwin(target) {
     const resolvedVersion = await darwin_resolveInstalledVersion();
     core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     return resolvedVersion;
+}
+async function resolveFormula(version) {
+    const versionedFormula = `gcc@${version}`;
+    let infoOutput = "";
+    const exitCode = await exec.exec("brew", ["info", "--json=v2", versionedFormula], {
+        listeners: { stdout: (data) => (infoOutput += data.toString()) },
+        ignoreReturnCode: true,
+    });
+    if (exitCode === 0) {
+        return versionedFormula;
+    }
+    core.info(`${versionedFormula} not found as a distinct formula, falling back to "gcc".`);
+    return "gcc";
 }
 async function getBrewPrefix() {
     let output = "";
