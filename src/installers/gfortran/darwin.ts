@@ -40,7 +40,7 @@ export async function installDarwin(target: Target): Promise<string> {
   const brewPrefix = await getBrewPrefix();
 
   let cellarPrefix = "";
-  await exec.exec("brew", ["--prefix", `gcc@${version}`], {
+  await exec.exec("brew", ["--prefix", formula], {
     listeners: {
       stdout: (data: Buffer) => (cellarPrefix += data.toString().trim()),
     },

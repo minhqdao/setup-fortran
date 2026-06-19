@@ -95553,7 +95553,7 @@ async function installDarwin(target) {
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
-    await exec.exec("brew", ["--prefix", `gcc@${version}`], {
+    await exec.exec("brew", ["--prefix", formula], {
         listeners: {
             stdout: (data) => (cellarPrefix += data.toString().trim()),
         },
