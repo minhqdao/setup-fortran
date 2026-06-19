@@ -95534,17 +95534,26 @@ const darwin_SUPPORTED_VERSIONS = {
 async function installDarwin(target) {
     const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
     core.info(`Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`);
-    const formula = await resolveFormula(version);
-    const alreadyInstalled = await isCorrectVersionInstalled(formula, version);
+    const formula = `gcc@${version}`;
+    let listOutput = "";
+    await exec.exec("brew", ["list", "--versions", formula], {
+        listeners: {
+            stdout: (data) => {
+                listOutput += data.toString();
+            },
+        },
+        ignoreReturnCode: true,
+    });
+    const alreadyInstalled = listOutput.trim().length > 0;
     if (alreadyInstalled) {
-        core.info(`${formula} ${version} is already installed, skipping brew install.`);
+        core.info(`${formula} is already installed, skipping brew install.`);
     }
     else {
         await exec.exec("brew", ["install", formula]);
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
-    await exec.exec("brew", ["--prefix", formula], {
+    await exec.exec("brew", ["--prefix", `gcc@${version}`], {
         listeners: {
             stdout: (data) => (cellarPrefix += data.toString().trim()),
         },
@@ -95617,46 +95626,6 @@ async function installDarwin(target) {
     const resolvedVersion = await darwin_resolveInstalledVersion();
     core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     return resolvedVersion;
-}
-async function resolveFormula(version) {
-    const versionedFormula = `gcc@${version}`;
-    let infoOutput = "";
-    const exitCode = await exec.exec("brew", ["info", "--json=v2", versionedFormula], {
-        silent: true,
-        listeners: { stdout: (data) => (infoOutput += data.toString()) },
-        ignoreReturnCode: true,
-    });
-    if (exitCode === 0) {
-        return versionedFormula;
-    }
-    core.info(`${versionedFormula} not found as a distinct formula, falling back to "gcc".`);
-    return "gcc";
-}
-async function isCorrectVersionInstalled(formula, version) {
-    let infoOutput = "";
-    const exitCode = await exec.exec("brew", ["info", "--json=v2", formula], {
-        silent: true,
-        listeners: {
-            stdout: (data) => {
-                infoOutput += data.toString();
-            },
-        },
-        ignoreReturnCode: true,
-    });
-    if (exitCode !== 0 || !infoOutput.trim())
-        return false;
-    try {
-        const info = JSON.parse(infoOutput);
-        const installedVersions = info.formulae[0]?.installed ?? [];
-        if (installedVersions.length === 0)
-            return false;
-        return installedVersions.some((v) => v.version.split(".")[0] === version);
-    }
-    catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        core.warning(`Failed to parse brew info output for ${formula}: ${message}`);
-        return false;
-    }
 }
 async function getBrewPrefix() {
     let output = "";
