@@ -49,17 +49,6 @@ jobs:
             toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
           - image: windows-2022
             toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
-        exclude:
-          - image: macos-26
-            toolchain: { compiler: gfortran, version: "16" }
-          - image: macos-26-intel
-            toolchain: { compiler: gfortran, version: "16" }
-          - image: macos-15
-            toolchain: { compiler: gfortran, version: "16" }
-          - image: macos-15-intel
-            toolchain: { compiler: gfortran, version: "16" }
-          - image: macos-14
-            toolchain: { compiler: gfortran, version: "16" }
 
     steps:
       - uses: actions/checkout@v7
