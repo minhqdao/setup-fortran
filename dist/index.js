@@ -95622,6 +95622,7 @@ async function resolveFormula(version) {
     const versionedFormula = `gcc@${version}`;
     let infoOutput = "";
     const exitCode = await exec.exec("brew", ["info", "--json=v2", versionedFormula], {
+        silent: true,
         listeners: { stdout: (data) => (infoOutput += data.toString()) },
         ignoreReturnCode: true,
     });
@@ -95633,7 +95634,8 @@ async function resolveFormula(version) {
 }
 async function isCorrectVersionInstalled(formula, version) {
     let infoOutput = "";
-    const exitCode = await exec.exec("brew", ["info", "--json=v2", "--installed", formula], {
+    const exitCode = await exec.exec("brew", ["info", "--json=v2", formula], {
+        silent: true,
         listeners: {
             stdout: (data) => {
                 infoOutput += data.toString();
@@ -95643,11 +95645,18 @@ async function isCorrectVersionInstalled(formula, version) {
     });
     if (exitCode !== 0 || !infoOutput.trim())
         return false;
-    const info = JSON.parse(infoOutput);
-    const installedVersions = info.formulae[0]?.installed ?? [];
-    if (installedVersions.length === 0)
+    try {
+        const info = JSON.parse(infoOutput);
+        const installedVersions = info.formulae[0]?.installed ?? [];
+        if (installedVersions.length === 0)
+            return false;
+        return installedVersions.some((v) => v.version.split(".")[0] === version);
+    }
+    catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        core.warning(`Failed to parse brew info output for ${formula}: ${message}`);
         return false;
-    return installedVersions.some((v) => v.version.split(".")[0] === version);
+    }
 }
 async function getBrewPrefix() {
     let output = "";

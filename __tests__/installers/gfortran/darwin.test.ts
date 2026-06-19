@@ -39,13 +39,11 @@ describe("installDarwin (gfortran)", () => {
         }
       }
       if (commandLine === "brew" && args?.[0] === "info") {
-        if (args.includes("--installed")) {
-          const installed = isGccInstalled ? [{ version: "14.2.0_1" }] : [];
-          if (options?.listeners?.stdout) {
-            options.listeners.stdout(
-              Buffer.from(JSON.stringify({ formulae: [{ installed }] })),
-            );
-          }
+        const installed = isGccInstalled ? [{ version: "14.2.0_1" }] : [];
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(
+            Buffer.from(JSON.stringify({ formulae: [{ installed }] })),
+          );
         }
         return 0;
       }

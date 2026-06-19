@@ -128,6 +128,7 @@ async function resolveFormula(version: string): Promise<string> {
     "brew",
     ["info", "--json=v2", versionedFormula],
     {
+      silent: true,
       listeners: { stdout: (data: Buffer) => (infoOutput += data.toString()) },
       ignoreReturnCode: true,
     },
@@ -148,29 +149,32 @@ async function isCorrectVersionInstalled(
   version: string,
 ): Promise<boolean> {
   let infoOutput = "";
-  const exitCode = await exec.exec(
-    "brew",
-    ["info", "--json=v2", "--installed", formula],
-    {
-      listeners: {
-        stdout: (data: Buffer) => {
-          infoOutput += data.toString();
-        },
+  const exitCode = await exec.exec("brew", ["info", "--json=v2", formula], {
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        infoOutput += data.toString();
       },
-      ignoreReturnCode: true,
     },
-  );
+    ignoreReturnCode: true,
+  });
 
   if (exitCode !== 0 || !infoOutput.trim()) return false;
 
-  const info = JSON.parse(infoOutput) as {
-    formulae: { installed: { version: string }[] }[];
-  };
+  try {
+    const info = JSON.parse(infoOutput) as {
+      formulae: { installed: { version: string }[] }[];
+    };
 
-  const installedVersions = info.formulae[0]?.installed ?? [];
-  if (installedVersions.length === 0) return false;
+    const installedVersions = info.formulae[0]?.installed ?? [];
+    if (installedVersions.length === 0) return false;
 
-  return installedVersions.some((v) => v.version.split(".")[0] === version);
+    return installedVersions.some((v) => v.version.split(".")[0] === version);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    core.warning(`Failed to parse brew info output for ${formula}: ${message}`);
+    return false;
+  }
 }
 
 async function getBrewPrefix(): Promise<string> {
