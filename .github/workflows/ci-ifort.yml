@@ -98,7 +98,7 @@ jobs:
             toolchain: { compiler: ifort, version: "2021.6" }
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Restore dist-tests
         uses: nick-fields/retry@v4
