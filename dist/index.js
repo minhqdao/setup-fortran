@@ -95528,8 +95528,8 @@ var external_path_default = /*#__PURE__*/__nccwpck_require__.n(external_path_);
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const darwin_SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["15", "14", "13", "12", "11"],
-    [Arch.ARM64]: ["15", "14", "13", "12", "11"],
+    [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
+    [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
 async function installDarwin(target) {
     const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
