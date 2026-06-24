@@ -95551,7 +95551,13 @@ async function installDarwin(target) {
         core.info(`${formula} is already installed, skipping brew install.`);
     }
     else {
-        await exec.exec("brew", ["update"]);
+        const infoExitCode = await exec.exec("brew", ["info", formula], {
+            ignoreReturnCode: true,
+        });
+        if (infoExitCode !== 0) {
+            core.info(`${formula} not found in local index, running brew update...`);
+            await exec.exec("brew", ["update"]);
+        }
         await exec.exec("brew", ["install", formula]);
     }
     const brewPrefix = await getBrewPrefix();
