@@ -30,7 +30,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) |
 |---------|--------------|--------------|------------------|------------------|----------|----------------|----------|----------------|----------|--------------|--------------|----------------------|----------------------|
 | latest  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 16      | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   | ✓ | ✓ |   |   |
+| 16      | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |
 | 15      | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |
 | 14      | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |
 | 13      | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |
@@ -211,7 +211,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 
 ```yaml
 steps:
-  - uses: actions/checkout@v6
+  - uses: actions/checkout@v7
   - uses: minhqdao/setup-fortran@v1
   - run: ${{ env.FC }} hello.f90
 ```
@@ -247,7 +247,7 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: minhqdao/setup-fortran@v1
         with:
           compiler: ${{ matrix.toolchain.compiler }}
