@@ -34,6 +34,7 @@ export async function installDarwin(target: Target): Promise<string> {
   if (alreadyInstalled) {
     core.info(`${formula} is already installed, skipping brew install.`);
   } else {
+    await exec.exec("brew", ["update"]);
     await exec.exec("brew", ["install", formula]);
   }
 
