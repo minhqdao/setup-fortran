@@ -96731,6 +96731,7 @@ async function installIFort(target) {
 // Releases ship roughly every two months.
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "26.5",
         "26.3",
         "26.1",
         "25.11",
@@ -96770,6 +96771,7 @@ const nvfortran_debian_SUPPORTED_VERSIONS = {
         // 20.7 excluded: predates the apt repo (tarball-only releases)
     ],
     [Arch.ARM64]: [
+        "26.5",
         "26.3",
         "26.1",
         "25.11",
@@ -97024,6 +97026,10 @@ async function installNVFortran(target) {
 // Make sure that the "latest" version is listed first. If the user does not
 // specify a version, the latest will be installed by default.
 const AOCC_RELEASES = [
+    {
+        version: "5.2",
+        sha256: "10e8287be61d0181caf6bf00603a15b143ec79a5010f3fb7642036cc08763cb3",
+    },
     {
         version: "5.1",
         sha256: "42f9ed0713a8fe269d5a5b40b1992a5380ff59b4441e58d38eb9f27df5bfe6df",

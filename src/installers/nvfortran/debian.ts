@@ -13,6 +13,7 @@ import type { Target } from "../../types";
 // Releases ship roughly every two months.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "26.5",
     "26.3",
     "26.1",
     "25.11",
@@ -52,6 +53,7 @@ const SUPPORTED_VERSIONS = {
     // 20.7 excluded: predates the apt repo (tarball-only releases)
   ],
   [Arch.ARM64]: [
+    "26.5",
     "26.3",
     "26.1",
     "25.11",
