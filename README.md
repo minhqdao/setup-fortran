@@ -124,6 +124,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm |
 |---------|--------------|--------------|------------------|------------------|
 | latest | ✓ | ✓ | ✓ | ✓ |
+| 26.5   | ✓ | ✓ | ✓ | ✓ |
 | 26.3   | ✓ | ✓ | ✓ | ✓ |
 | 26.1   | ✓ | ✓ | ✓ | ✓ |
 | 25.11  | ✓ | ✓ | ✓ | ✓ |
@@ -167,6 +168,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 |
 |---------|--------------|--------------|
 | latest  | ✓ | ✓ |
+| 5.2     | ✓ | ✓ |
 | 5.1     | ✓ | ✓ |
 | 5.0     | ✓ | ✓ |
 | 4.2     | ✓ | ✓ |
