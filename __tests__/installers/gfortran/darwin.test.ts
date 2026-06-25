@@ -1,13 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import { installDarwin } from "../../../src/installers/gfortran/darwin";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Target,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Target } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -32,7 +26,9 @@ describe("installDarwin (gfortran)", () => {
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "gfortran" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("GNU Fortran (Homebrew GCC 14.1.0) 14.1.0"));
+          options.listeners.stdout(
+            Buffer.from("GNU Fortran (Homebrew GCC 14.1.0) 14.1.0"),
+          );
         }
       }
       if (commandLine === "brew" && args?.[0] === "list") {
@@ -55,7 +51,11 @@ describe("installDarwin (gfortran)", () => {
   it("installs gcc via Homebrew if missing", async () => {
     await installDarwin(baseTarget);
 
-    expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "gcc@14"]);
+    expect(mockedExec).toHaveBeenCalledWith("brew", [
+      "install",
+      "--skip-post-install",
+      "gcc@14",
+    ]);
     expect(mockedExec).toHaveBeenCalledWith("ln", [
       "-sf",
       expect.stringContaining("gfortran-14"),
@@ -86,15 +86,42 @@ describe("installDarwin (gfortran)", () => {
   it("exports environment variables and SDKROOT", async () => {
     await installDarwin(baseTarget);
 
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("gfortran-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("F77", expect.stringContaining("gfortran-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("F90", expect.stringContaining("gfortran-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("gcc-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("g++-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("gfortran-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("gcc-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("g++-14"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("SDKROOT", "/path/to/SDK");
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FC",
+      expect.stringContaining("gfortran-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "F77",
+      expect.stringContaining("gfortran-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "F90",
+      expect.stringContaining("gfortran-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CC",
+      expect.stringContaining("gcc-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CXX",
+      expect.stringContaining("g++-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_FC",
+      expect.stringContaining("gfortran-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_CC",
+      expect.stringContaining("gcc-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "FPM_CXX",
+      expect.stringContaining("g++-14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "SDKROOT",
+      "/path/to/SDK",
+    );
   });
 
   it("resolves and returns the installed version", async () => {
