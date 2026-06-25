@@ -12,6 +12,10 @@ import type { Target } from "../../types";
 // specify a version, the latest will be installed by default.
 const AOCC_RELEASES = [
   {
+    version: "5.2",
+    sha256: "10e8287be61d0181caf6bf00603a15b143ec79a5010f3fb7642036cc08763cb3",
+  },
+  {
     version: "5.1",
     sha256: "42f9ed0713a8fe269d5a5b40b1992a5380ff59b4441e58d38eb9f27df5bfe6df",
   },
