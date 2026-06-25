@@ -95558,7 +95558,8 @@ async function installDarwin(target) {
             core.info(`${formula} not found in local index, running brew update...`);
             await exec.exec("brew", ["update"]);
         }
-        await exec.exec("brew", ["install", formula]);
+        // Add --skip-post-install to ensure the hook failure doesn't crash the CI
+        await exec.exec("brew", ["install", "--skip-post-install", formula]);
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
