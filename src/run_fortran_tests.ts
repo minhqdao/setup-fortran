@@ -74,6 +74,57 @@ async function run(): Promise<void> {
       );
     }
 
+    const cc = process.env.CC;
+    if (!cc) {
+      throw new Error(
+        "CC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const cxx = process.env.CXX;
+    if (!cxx) {
+      throw new Error(
+        "CXX environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputFc = process.env.OUTPUT_FC;
+    if (!outputFc) {
+      throw new Error(
+        "OUTPUT_FC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputCc = process.env.OUTPUT_CC;
+    if (!outputCc) {
+      throw new Error(
+        "OUTPUT_CC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputCxx = process.env.OUTPUT_CXX;
+    if (!outputCxx) {
+      throw new Error(
+        "OUTPUT_CXX environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    if (fc !== outputFc) {
+      throw new Error(
+        `FC environment variable (${fc}) does not match output fc (${outputFc})`,
+      );
+    }
+    if (cc !== outputCc) {
+      throw new Error(
+        `CC environment variable (${cc}) does not match output cc (${outputCc})`,
+      );
+    }
+    if (cxx !== outputCxx) {
+      throw new Error(
+        `CXX environment variable (${cxx}) does not match output cxx (${outputCxx})`,
+      );
+    }
+
     const compiler = process.env.FORTRAN_COMPILER as Compiler | undefined;
     if (!compiler) {
       throw new Error(
@@ -117,26 +168,6 @@ async function run(): Promise<void> {
     }
 
     core.info(`Starting integration tests for ${fc} in ${buildDir}...`);
-
-    const outputFc = process.env.OUTPUT_FC;
-    const outputCc = process.env.OUTPUT_CC;
-    const outputCxx = process.env.OUTPUT_CXX;
-
-    if (outputFc && process.env.FC !== outputFc) {
-      throw new Error(
-        `FC environment variable (${process.env.FC ?? ""}) does not match output fc (${outputFc})`,
-      );
-    }
-    if (outputCc && process.env.CC !== outputCc) {
-      throw new Error(
-        `CC environment variable (${process.env.CC ?? ""}) does not match output cc (${outputCc})`,
-      );
-    }
-    if (outputCxx && process.env.CXX !== outputCxx) {
-      throw new Error(
-        `CXX environment variable (${process.env.CXX ?? ""}) does not match output cxx (${outputCxx})`,
-      );
-    }
 
     const {
       module: moduleFlags,
