@@ -85,8 +85,15 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - name: Verify installed version
-        run: 'echo "Output: ${{ steps.setup.outputs.version }}"'
+      - name: Verify installation
+        run: |
+          echo "Fortran Compiler Setup:"
+          echo "  Version: ${{ steps.setup.outputs.version }}"
+          echo "  FC:      ${{ steps.setup.outputs.fc }}"
+          echo "  F77:     ${{ steps.setup.outputs.f77 }}"
+          echo "  F90:     ${{ steps.setup.outputs.f90 }}"
+          echo "  CC:      ${{ steps.setup.outputs.cc }}"
+          echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
       - name: Run Integration Tests
         run: npm run integration-test
