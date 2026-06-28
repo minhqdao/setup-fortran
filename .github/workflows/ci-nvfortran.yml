@@ -93,4 +93,8 @@ jobs:
           echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
       - name: Run Integration Tests
+        env:
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
         run: npm run integration-test

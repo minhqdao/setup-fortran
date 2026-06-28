@@ -118,6 +118,26 @@ async function run(): Promise<void> {
 
     core.info(`Starting integration tests for ${fc} in ${buildDir}...`);
 
+    const outputFc = process.env.OUTPUT_FC;
+    const outputCc = process.env.OUTPUT_CC;
+    const outputCxx = process.env.OUTPUT_CXX;
+
+    if (outputFc && process.env.FC !== outputFc) {
+      throw new Error(
+        `FC environment variable (${process.env.FC ?? ""}) does not match output fc (${outputFc})`,
+      );
+    }
+    if (outputCc && process.env.CC !== outputCc) {
+      throw new Error(
+        `CC environment variable (${process.env.CC ?? ""}) does not match output cc (${outputCc})`,
+      );
+    }
+    if (outputCxx && process.env.CXX !== outputCxx) {
+      throw new Error(
+        `CXX environment variable (${process.env.CXX ?? ""}) does not match output cxx (${outputCxx})`,
+      );
+    }
+
     const {
       module: moduleFlags,
       openmp: ompFlag,
