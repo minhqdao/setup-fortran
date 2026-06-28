@@ -105,9 +105,21 @@ export async function installDarwin(
   }
 
   core.info(`Found lfortran binary at: ${lfortranBin}`);
-  core.addPath(lfortranBinDir);
 
-  core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
+  // Fix rpath of lfortran binary to ensure it can find its shared libraries
+  // (like libxeus-zmq) when run outside of a conda environment.
+  const libDir = path.join(condaPrefix, "lib");
+  try {
+    await exec.exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+  } catch (e) {
+    core.debug(`install_name_tool failed: ${String(e)}`);
+  }
+
+  core.addPath(lfortranBinDir);
+  core.exportVariable("LFORTRAN_OMP_LIB_DIR", libDir);
+  // As an additional safety measure, set DYLD_FALLBACK_LIBRARY_PATH.
+  // Note: we use fallback to avoid overriding system libraries if possible.
+  core.exportVariable("DYLD_FALLBACK_LIBRARY_PATH", libDir);
 
   // lfortran links against system libc++ on macOS; set SDKROOT so the linker
   // can find the right SDK headers when compiling generated C/C++ code.
@@ -126,25 +138,32 @@ export async function installDarwin(
     core.warning(`Could not determine SDKROOT via xcrun: ${error}`);
   }
 
-  const resolvedVersion = await resolveInstalledVersion(lfortranBin);
+  const resolvedVersion = await resolveInstalledVersion(condaBin, condaPrefix);
   core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
   const result = {
     version: resolvedVersion,
-    fc: "lfortran",
+    fc: lfortranBin,
     cc: "clang",
     cxx: "clang++",
   };
   return result;
 }
 
-async function resolveInstalledVersion(binaryPath: string): Promise<string> {
+async function resolveInstalledVersion(
+  condaBin: string,
+  condaPrefix: string,
+): Promise<string> {
   let output = "";
-  await exec.exec(binaryPath, ["--version"], {
-    listeners: {
-      stdout: (data: Buffer) => {
-        output += data.toString();
+  await exec.exec(
+    condaBin,
+    ["run", "-p", condaPrefix, "lfortran", "--version"],
+    {
+      listeners: {
+        stdout: (data: Buffer) => {
+          output += data.toString();
+        },
       },
     },
-  });
+  );
   return output.trim();
 }

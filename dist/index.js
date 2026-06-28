@@ -98090,8 +98090,20 @@ async function lfortran_darwin_installDarwin(target) {
         throw new Error(`lfortran binary not found at expected path: ${lfortranBin}`);
     }
     core.info(`Found lfortran binary at: ${lfortranBin}`);
+    // Fix rpath of lfortran binary to ensure it can find its shared libraries
+    // (like libxeus-zmq) when run outside of a conda environment.
+    const libDir = external_path_.join(condaPrefix, "lib");
+    try {
+        await exec.exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+    }
+    catch (e) {
+        core.debug(`install_name_tool failed: ${String(e)}`);
+    }
     core.addPath(lfortranBinDir);
-    core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
+    core.exportVariable("LFORTRAN_OMP_LIB_DIR", libDir);
+    // As an additional safety measure, set DYLD_FALLBACK_LIBRARY_PATH.
+    // Note: we use fallback to avoid overriding system libraries if possible.
+    core.exportVariable("DYLD_FALLBACK_LIBRARY_PATH", libDir);
     // lfortran links against system libc++ on macOS; set SDKROOT so the linker
     // can find the right SDK headers when compiling generated C/C++ code.
     let sdkPath = "";
@@ -98110,19 +98122,19 @@ async function lfortran_darwin_installDarwin(target) {
         const error = e instanceof Error ? e.message : String(e);
         core.warning(`Could not determine SDKROOT via xcrun: ${error}`);
     }
-    const resolvedVersion = await lfortran_darwin_resolveInstalledVersion(lfortranBin);
+    const resolvedVersion = await lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix);
     core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
     const result = {
         version: resolvedVersion,
-        fc: "lfortran",
+        fc: lfortranBin,
         cc: "clang",
         cxx: "clang++",
     };
     return result;
 }
-async function lfortran_darwin_resolveInstalledVersion(binaryPath) {
+async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
     let output = "";
-    await exec.exec(binaryPath, ["--version"], {
+    await exec.exec(condaBin, ["run", "-p", condaPrefix, "lfortran", "--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();

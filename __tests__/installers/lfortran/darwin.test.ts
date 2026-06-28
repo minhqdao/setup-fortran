@@ -37,7 +37,12 @@ describe("installDarwin (LFortran)", () => {
     jest.clearAllMocks();
     mockedFs.existsSync.mockReturnValue(true);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (commandLine.includes("lfortran") && args?.[0] === "--version") {
+      if (
+        commandLine.includes("conda") &&
+        args?.[0] === "run" &&
+        args?.[3] === "lfortran" &&
+        args?.[4] === "--version"
+      ) {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("LFortran version 0.63.0"));
         }
@@ -92,7 +97,7 @@ describe("installDarwin (LFortran)", () => {
     const result = await installDarwin(baseTarget);
     expect(result).toEqual({
       version: "LFortran version 0.63.0",
-      fc: "lfortran",
+      fc: expect.stringContaining("lfortran"),
       cc: "clang",
       cxx: "clang++",
     });
