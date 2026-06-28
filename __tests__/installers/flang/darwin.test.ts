@@ -87,11 +87,7 @@ describe("installDarwin (Flang)", () => {
     await installDarwin(baseTarget);
 
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FC",
-      expect.stringContaining("flang"),
-    );
-  });
+    });
 
   it("downloads from GitHub when version is specified", async () => {
     const target = { ...baseTarget, version: "19" };
@@ -112,27 +108,6 @@ describe("installDarwin (Flang)", () => {
   it("exports environment variables", async () => {
     await installDarwin(baseTarget);
 
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.any(String));
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CC",
-      expect.stringContaining("clang"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CXX",
-      expect.stringContaining("clang++"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_FC",
-      expect.any(String),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CC",
-      expect.stringContaining("clang"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CXX",
-      expect.stringContaining("clang++"),
-    );
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "SDKROOT",
       "/path/to/SDK",

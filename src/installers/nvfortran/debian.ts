@@ -5,7 +5,6 @@ import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -282,7 +281,6 @@ export async function installDebian(
     cc: "nvc",
     cxx: "nvc++",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

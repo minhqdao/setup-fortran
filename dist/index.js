@@ -95386,29 +95386,7 @@ function githubHeaders() {
     return headers;
 }
 
-;// CONCATENATED MODULE: ./src/installation_result.ts
-
-function exportInstallationVariables(result, options = {}) {
-    core.exportVariable("FC", result.fc);
-    core.exportVariable("CC", result.cc);
-    core.exportVariable("CXX", result.cxx);
-    core.exportVariable("FPM_FC", result.fc);
-    core.exportVariable("FPM_CC", result.cc);
-    core.exportVariable("FPM_CXX", result.cxx);
-    if (options.exportFortranAliases) {
-        core.exportVariable("F77", result.fc);
-        core.exportVariable("F90", result.fc);
-    }
-}
-function setInstallationOutputs(result) {
-    core.setOutput("version", result.version);
-    core.setOutput("fc", result.fc);
-    core.setOutput("cc", result.cc);
-    core.setOutput("cxx", result.cxx);
-}
-
 ;// CONCATENATED MODULE: ./src/installers/gfortran/debian.ts
-
 
 
 
@@ -95469,8 +95447,6 @@ async function installDebian(target) {
         cc: `gcc-${version}`,
         cxx: `g++-${version}`,
     };
-    core.info(`Setting FC, F77, and F90 environment variables...`);
-    exportInstallationVariables(result, { exportFortranAliases: true });
     return result;
 }
 async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
@@ -95543,7 +95519,6 @@ async function resolveInstalledVersion() {
 var external_path_ = __nccwpck_require__(16928);
 var external_path_default = /*#__PURE__*/__nccwpck_require__.n(external_path_);
 ;// CONCATENATED MODULE: ./src/installers/gfortran/darwin.ts
-
 
 
 
@@ -95654,8 +95629,6 @@ async function installDarwin(target) {
         cc: gccBinary,
         cxx: gxxBinary,
     };
-    core.info(`Setting FC, F77, and F90 environment variables...`);
-    exportInstallationVariables(result, { exportFortranAliases: true });
     return result;
 }
 async function getBrewPrefix() {
@@ -95716,7 +95689,6 @@ function msys2PkgName(msystem, pkg) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/gfortran/win32.ts
-
 
 
 
@@ -95805,8 +95777,6 @@ async function installNative(target, version) {
         cc: gccPath,
         cxx: gxxPath,
     };
-    core.info(`Setting FC, F77, and F90 environment variables...`);
-    exportInstallationVariables(result, { exportFortranAliases: true });
     return result;
 }
 async function installMSYS2(target) {
@@ -95822,8 +95792,6 @@ async function installMSYS2(target) {
         cc: gccPath,
         cxx: gxxPath,
     };
-    core.info(`Setting FC, F77, and F90 environment variables...`);
-    exportInstallationVariables(result, { exportFortranAliases: true });
     return result;
 }
 async function win32_resolveInstalledVersion() {
@@ -95860,7 +95828,6 @@ async function installGFortran(target) {
 // EXTERNAL MODULE: external "fs"
 var external_fs_ = __nccwpck_require__(79896);
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
-
 
 
 
@@ -95985,7 +95952,6 @@ async function debian_installDebian(target) {
         cc: "icx",
         cxx: "icpx",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function debian_resolveInstalledVersion() {
@@ -96001,7 +95967,6 @@ async function debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
-
 
 
 
@@ -96209,7 +96174,6 @@ async function win32_installWin32(target) {
         cc: "icx",
         cxx: "icpx",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
@@ -96272,7 +96236,6 @@ async function installIFX(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/debian.ts
-
 
 
 
@@ -96396,7 +96359,6 @@ async function ifort_debian_installDebian(target) {
         cc: "icc",
         cxx: "icpc",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function ifort_debian_resolveInstalledVersion() {
@@ -96414,7 +96376,6 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
-
 
 
 
@@ -96551,7 +96512,6 @@ async function darwin_installDarwin(target) {
         cc: "icc",
         cxx: "icpc",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function ifort_darwin_resolveInstalledVersion() {
@@ -96568,7 +96528,6 @@ async function ifort_darwin_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
-
 
 
 
@@ -96713,7 +96672,6 @@ async function ifort_win32_installWin32(target) {
         cc: "icl",
         cxx: "icl",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function ifort_win32_resolveInstalledVersion() {
@@ -96750,7 +96708,6 @@ async function installIFort(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
-
 
 
 
@@ -96998,7 +96955,6 @@ async function nvfortran_debian_installDebian(target) {
         cc: "nvc",
         cxx: "nvc++",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function safelyFreeDiskSpace() {
@@ -97049,7 +97005,6 @@ async function installNVFortran(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/debian.ts
-
 
 
 
@@ -97177,7 +97132,6 @@ async function aocc_debian_installDebian(target) {
         cc: "clang",
         cxx: "clang++",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function aocc_debian_resolveInstalledVersion() {
@@ -97203,7 +97157,6 @@ async function installAOCC(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/debian.ts
-
 
 
 
@@ -97330,7 +97283,6 @@ async function flang_debian_installDebian(target) {
     };
     const resolvedVersion = result.version;
     core.info(`Flang ${resolvedVersion} installed successfully.`);
-    exportInstallationVariables(result);
     return result;
 }
 async function flang_debian_resolveInstalledVersion(fc) {
@@ -97346,7 +97298,6 @@ async function flang_debian_resolveInstalledVersion(fc) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/darwin.ts
-
 
 
 
@@ -97440,7 +97391,6 @@ async function installBrew(target) {
         cc: external_path_.join(llvmBinDir, "clang"),
         cxx: external_path_.join(llvmBinDir, "clang++"),
     };
-    exportInstallationVariables(result);
     return result;
 }
 // Downloads and installs a specific flang version from official LLVM GitHub
@@ -97501,7 +97451,6 @@ async function installFromGitHub(target, major, patch) {
         cc: external_path_.join(binDir, "clang"),
         cxx: external_path_.join(binDir, "clang++"),
     };
-    exportInstallationVariables(result);
     return result;
 }
 // Probes for the flang binary name in the given bin dir.
@@ -97538,7 +97487,6 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/win32.ts
-
 
 
 
@@ -97705,7 +97653,6 @@ async function win32_installNative(target) {
         cc: clangExe,
         cxx: clangPPExe,
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function win32_installMSYS2(target) {
@@ -97728,7 +97675,6 @@ async function win32_installMSYS2(target) {
         cc: clangExe,
         cxx: clangPPExe,
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function flang_win32_resolveInstalledVersion(flangExe) {
@@ -97760,7 +97706,6 @@ async function installFlang(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/debian.ts
-
 
 
 
@@ -97851,7 +97796,6 @@ async function lfortran_debian_installDebian(target) {
         cc: "clang",
         cxx: "clang++",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function lfortran_debian_resolveInstalledVersion(binaryPath) {
@@ -97867,7 +97811,6 @@ async function lfortran_debian_resolveInstalledVersion(binaryPath) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/darwin.ts
-
 
 
 
@@ -97984,7 +97927,6 @@ async function lfortran_darwin_installDarwin(target) {
         cc: "clang",
         cxx: "clang++",
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function lfortran_darwin_resolveInstalledVersion(binaryPath) {
@@ -98000,7 +97942,6 @@ async function lfortran_darwin_resolveInstalledVersion(binaryPath) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/win32.ts
-
 
 
 
@@ -98141,7 +98082,6 @@ async function installConda(target) {
         cc: external_path_.join(libraryBin, "clang.exe"),
         cxx: external_path_.join(libraryBin, "clang++.exe"),
     };
-    exportInstallationVariables(result);
     return result;
 }
 // Installs lfortran via MSYS2 (rolling release).
@@ -98162,7 +98102,6 @@ async function lfortran_win32_installMSYS2(target) {
         cc: external_path_.join(msysBin, "clang.exe"),
         cxx: external_path_.join(msysBin, "clang++.exe"),
     };
-    exportInstallationVariables(result);
     return result;
 }
 async function lfortran_win32_resolveInstalledVersion(binaryPath) {
@@ -98191,6 +98130,25 @@ async function installLFortran(target) {
         case OS.Windows:
             return await lfortran_win32_installWin32(target);
     }
+}
+
+;// CONCATENATED MODULE: ./src/installation_result.ts
+
+function exportInstallationVariables(result) {
+    core.exportVariable("FC", result.fc);
+    core.exportVariable("CC", result.cc);
+    core.exportVariable("CXX", result.cxx);
+    core.exportVariable("FPM_FC", result.fc);
+    core.exportVariable("FPM_CC", result.cc);
+    core.exportVariable("FPM_CXX", result.cxx);
+    core.exportVariable("F77", result.fc);
+    core.exportVariable("F90", result.fc);
+}
+function setInstallationOutputs(result) {
+    core.setOutput("version", result.version);
+    core.setOutput("fc", result.fc);
+    core.setOutput("cc", result.cc);
+    core.setOutput("cxx", result.cxx);
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
@@ -98241,6 +98199,7 @@ async function run() {
                 break;
         }
         setInstallationOutputs(installationResult);
+        exportInstallationVariables(installationResult);
         core.exportVariable("FORTRAN_COMPILER", target.compiler);
     }
     catch (err) {

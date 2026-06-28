@@ -5,7 +5,6 @@ import * as fs from "fs";
 import * as os from "os";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -135,7 +134,6 @@ export async function installDarwin(
     cc: "clang",
     cxx: "clang++",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

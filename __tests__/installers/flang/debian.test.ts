@@ -116,9 +116,6 @@ describe("installDebian (Flang)", () => {
     await installDebian(baseTarget);
 
     expect(core.addPath).toHaveBeenCalledWith("/usr/lib/llvm-18/bin");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang-new-18");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "clang-18");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "clang++-18");
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "LIBRARY_PATH",
       "/usr/lib/llvm-18/lib",
@@ -129,10 +126,6 @@ describe("installDebian (Flang)", () => {
     const target = { ...baseTarget, version: "20" };
     await installDebian(target);
 
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang-20");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "flang-20");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "clang-20");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "clang++-20");
   });
 
   it("resolves and returns the installed version", async () => {

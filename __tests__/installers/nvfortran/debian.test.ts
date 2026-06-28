@@ -104,11 +104,5 @@ describe("installDebian nvfortran", () => {
       cc: "nvc",
       cxx: "nvc++",
     });
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "nvfortran");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "nvc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "nvc++");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "nvfortran");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "nvc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "nvc++");
   });
 });

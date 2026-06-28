@@ -176,8 +176,5 @@ describe("installWin32 (ifx)", () => {
     );
     expect(core.exportVariable).toHaveBeenCalledWith("PATH", "C:\\bin");
     expect(core.exportVariable).toHaveBeenCalledWith("INTEL_VAR", "foo");
-    expect(core.exportVariable).toHaveBeenCalledWith("FC", "ifx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CC", "icx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CXX", "icpx");
   });
 });

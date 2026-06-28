@@ -4,7 +4,6 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -148,7 +147,6 @@ export async function installDebian(
     cc: "icc",
     cxx: "icpc",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

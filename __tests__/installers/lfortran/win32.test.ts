@@ -84,12 +84,6 @@ describe("installWin32 (LFortran)", () => {
       await installWin32(baseTarget);
 
       expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("lfortran"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("clang++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
       expect(mockedExportVariable).toHaveBeenCalledWith("LFORTRAN_LINKER", expect.stringContaining("link.exe"));
     });
   });
@@ -100,12 +94,6 @@ describe("installWin32 (LFortran)", () => {
       await installWin32(target);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["lfortran"]);
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("clang++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
     });
   });
 });

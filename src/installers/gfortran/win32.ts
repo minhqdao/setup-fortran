@@ -11,7 +11,6 @@ import {
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
-import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -121,8 +120,6 @@ async function installNative(
     cc: gccPath,
     cxx: gxxPath,
   };
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  exportInstallationVariables(result, { exportFortranAliases: true });
   return result;
 }
 
@@ -141,8 +138,6 @@ async function installMSYS2(target: Target): Promise<InstallationResult> {
     cc: gccPath,
     cxx: gxxPath,
   };
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  exportInstallationVariables(result, { exportFortranAliases: true });
   return result;
 }
 

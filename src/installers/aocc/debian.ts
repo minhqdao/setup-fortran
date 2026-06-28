@@ -6,7 +6,6 @@ import * as path from "path";
 import * as fs from "fs";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure that the "latest" version is listed first. If the user does not
@@ -154,7 +153,6 @@ export async function installDebian(
     cc: "clang",
     cxx: "clang++",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

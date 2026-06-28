@@ -113,12 +113,6 @@ describe("installDarwin (ifort)", () => {
       "ONEAPI_ROOT",
       "/opt/intel/oneapi",
     );
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "icpc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "icpc");
   });
 
   it("resolves and returns the installed version", async () => {
