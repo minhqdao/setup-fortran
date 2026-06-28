@@ -67,3 +67,12 @@ jobs:
             git diff --stat dist/
             exit 1
           fi
+
+      - name: Build dist-tests and save
+        run: npm run build:integration-test
+
+      - name: Save dist-tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-tests
+          path: dist-tests

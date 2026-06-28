@@ -1,4 +1,4 @@
-function run() {
+function run(): void {
   try {
     const fc = process.env.FC;
     const cc = process.env.CC;
@@ -14,7 +14,7 @@ function run() {
     const outputCxx = process.env.OUTPUT_CXX;
     const outputVersion = process.env.OUTPUT_VERSION;
 
-    const envs = {
+    const envs: Record<string, string | undefined> = {
       FC: fc,
       CC: cc,
       CXX: cxx,
@@ -36,35 +36,51 @@ function run() {
     }
 
     if (fc !== outputFc) {
-      throw new Error(`FC (${fc}) does not match OUTPUT_FC (${outputFc})`);
+      throw new Error(
+        `FC (${String(fc)}) does not match OUTPUT_FC (${String(outputFc)})`,
+      );
     }
     if (fpmFc !== outputFc) {
       throw new Error(
-        `FPM_FC (${fpmFc}) does not match OUTPUT_FC (${outputFc})`,
+        `FPM_FC (${String(fpmFc)}) does not match OUTPUT_FC (${String(
+          outputFc,
+        )})`,
       );
     }
     if (f77 !== outputFc) {
-      throw new Error(`F77 (${f77}) does not match OUTPUT_FC (${outputFc})`);
+      throw new Error(
+        `F77 (${String(f77)}) does not match OUTPUT_FC (${String(outputFc)})`,
+      );
     }
     if (f90 !== outputFc) {
-      throw new Error(`F90 (${f90}) does not match OUTPUT_FC (${outputFc})`);
+      throw new Error(
+        `F90 (${String(f90)}) does not match OUTPUT_FC (${String(outputFc)})`,
+      );
     }
 
     if (cc !== outputCc) {
-      throw new Error(`CC (${cc}) does not match OUTPUT_CC (${outputCc})`);
+      throw new Error(
+        `CC (${String(cc)}) does not match OUTPUT_CC (${String(outputCc)})`,
+      );
     }
     if (fpmCc !== outputCc) {
       throw new Error(
-        `FPM_CC (${fpmCc}) does not match OUTPUT_CC (${outputCc})`,
+        `FPM_CC (${String(fpmCc)}) does not match OUTPUT_CC (${String(
+          outputCc,
+        )})`,
       );
     }
 
     if (cxx !== outputCxx) {
-      throw new Error(`CXX (${cxx}) does not match OUTPUT_CXX (${outputCxx})`);
+      throw new Error(
+        `CXX (${String(cxx)}) does not match OUTPUT_CXX (${String(outputCxx)})`,
+      );
     }
     if (fpmCxx !== outputCxx) {
       throw new Error(
-        `FPM_CXX (${fpmCxx}) does not match OUTPUT_CXX (${outputCxx})`,
+        `FPM_CXX (${String(fpmCxx)}) does not match OUTPUT_CXX (${String(
+          outputCxx,
+        )})`,
       );
     }
 
