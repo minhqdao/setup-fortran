@@ -20,12 +20,11 @@
   "main": "index.js",
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map",
-    "build:integration-test": "ncc build src/run_fortran_tests.ts -o dist-tests --source-map",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
-    "integration-test": "node dist-tests/index.js",
+    "integration-test": "npx ts-node fortran_tests/run_tests.ts",
     "all": "npm run format && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

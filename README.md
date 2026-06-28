@@ -287,8 +287,6 @@ jobs:
 
 GitHub Actions run the code straight from the `dist` folder. To bundle the content from the `src` into the `dist` folder including dependencies, run `npm run bundle`. Then commit the entire `dist` folder.
 
-The integration tests are bundled, cached and executed in the CI, so you do not need to run `npm run build:integration-test` locally.
-
 You can run `npm run all` to format, lint, run unit tests and bundle the code into the `dist` folder in one go.
 
 ## Reporting
