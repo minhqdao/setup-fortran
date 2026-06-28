@@ -4,7 +4,6 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import * as fs from "fs";
 import path from "path";
 
@@ -175,7 +174,6 @@ export async function installDarwin(
     cc: "icc",
     cxx: "icpc",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

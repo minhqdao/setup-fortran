@@ -4,7 +4,6 @@ import * as path from "path";
 import * as fs from "fs";
 import * as tc from "@actions/tool-cache";
 import { Arch, LATEST, type InstallationResult } from "../../types";
-import { exportInstallationVariables } from "../../installation_result";
 import {
   resolveVersion,
   parseMajorOrPatch,
@@ -120,7 +119,6 @@ async function installBrew(target: Target): Promise<InstallationResult> {
     cc: path.join(llvmBinDir, "clang"),
     cxx: path.join(llvmBinDir, "clang++"),
   };
-  exportInstallationVariables(result);
   return result;
 }
 
@@ -203,7 +201,6 @@ async function installFromGitHub(
     cc: path.join(binDir, "clang"),
     cxx: path.join(binDir, "clang++"),
   };
-  exportInstallationVariables(result);
   return result;
 }
 

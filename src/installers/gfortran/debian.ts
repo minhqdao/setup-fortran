@@ -3,7 +3,6 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -69,8 +68,6 @@ export async function installDebian(
     cc: `gcc-${version}`,
     cxx: `g++-${version}`,
   };
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  exportInstallationVariables(result, { exportFortranAliases: true });
   return result;
 }
 

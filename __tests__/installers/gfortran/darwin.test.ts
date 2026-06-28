@@ -87,38 +87,6 @@ describe("installDarwin (gfortran)", () => {
     await installDarwin(baseTarget);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FC",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "F77",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "F90",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CC",
-      expect.stringContaining("gcc-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CXX",
-      expect.stringContaining("g++-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_FC",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CC",
-      expect.stringContaining("gcc-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CXX",
-      expect.stringContaining("g++-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
       "SDKROOT",
       "/path/to/SDK",
     );

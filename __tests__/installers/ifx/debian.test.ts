@@ -159,11 +159,5 @@ describe("installDebian ifx", () => {
   it("exports environment variables including FPM flags", async () => {
     await installDebian(baseTarget);
 
-    expect(core.exportVariable).toHaveBeenCalledWith("FC", "ifx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CC", "icx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CXX", "icpx");
-    expect(core.exportVariable).toHaveBeenCalledWith("FPM_FC", "ifx");
-    expect(core.exportVariable).toHaveBeenCalledWith("FPM_CC", "icx");
-    expect(core.exportVariable).toHaveBeenCalledWith("FPM_CXX", "icpx");
   });
 });

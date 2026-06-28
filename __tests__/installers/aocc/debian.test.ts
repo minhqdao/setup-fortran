@@ -115,13 +115,6 @@ describe("installDebian (AOCC)", () => {
 
     expect(mockedExportVariable).toHaveBeenCalledWith("PATH", "/opt/AMD/aocc/bin:/usr/bin");
     expect(mockedExportVariable).toHaveBeenCalledWith("LD_LIBRARY_PATH", "/opt/AMD/aocc/lib");
-    expect(mockedExportVariable).toHaveBeenCalledWith("AOCC_DIR", "/opt/AMD/aocc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "clang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "clang++");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "flang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "clang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "clang++");
   });
 
   it("resolves and returns the installed version", async () => {

@@ -1,21 +1,15 @@
 import * as core from "@actions/core";
 import type { InstallationResult } from "./types";
 
-export function exportInstallationVariables(
-  result: InstallationResult,
-  options: { exportFortranAliases?: boolean } = {},
-): void {
+export function exportInstallationVariables(result: InstallationResult): void {
   core.exportVariable("FC", result.fc);
   core.exportVariable("CC", result.cc);
   core.exportVariable("CXX", result.cxx);
   core.exportVariable("FPM_FC", result.fc);
   core.exportVariable("FPM_CC", result.cc);
   core.exportVariable("FPM_CXX", result.cxx);
-
-  if (options.exportFortranAliases) {
-    core.exportVariable("F77", result.fc);
-    core.exportVariable("F90", result.fc);
-  }
+  core.exportVariable("F77", result.fc);
+  core.exportVariable("F90", result.fc);
 }
 
 export function setInstallationOutputs(result: InstallationResult): void {

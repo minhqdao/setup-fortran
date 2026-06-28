@@ -98,7 +98,6 @@ describe("installWin32 (Flang)", () => {
 
       await installWin32(baseTarget);
 
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("flang.exe"));
       expect(mockedExportVariable).toHaveBeenCalledWith("LIB", expect.stringContaining("Cache"));
     });
   });
@@ -109,10 +108,6 @@ describe("installWin32 (Flang)", () => {
       await installWin32(target);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["flang"]);
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("flang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("flang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
     });
   });
 });

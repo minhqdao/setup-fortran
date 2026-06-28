@@ -8,7 +8,10 @@ import { installNVFortran } from "./installers/nvfortran";
 import { installAOCC } from "./installers/aocc";
 import { installFlang } from "./installers/flang";
 import { installLFortran } from "./installers/lfortran";
-import { setInstallationOutputs } from "./installation_result";
+import {
+  exportInstallationVariables,
+  setInstallationOutputs,
+} from "./installation_result";
 
 async function run(): Promise<void> {
   try {
@@ -51,6 +54,7 @@ async function run(): Promise<void> {
     }
 
     setInstallationOutputs(installationResult);
+    exportInstallationVariables(installationResult);
 
     core.exportVariable("FORTRAN_COMPILER", target.compiler);
   } catch (err) {

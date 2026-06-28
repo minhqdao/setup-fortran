@@ -28,7 +28,7 @@ describe("installation result helpers", () => {
     expect(core.setOutput).toHaveBeenCalledWith("cxx", "cxx");
   });
 
-  it("exports compiler and fpm variables from the installation result", () => {
+  it("exports compiler, fpm, and alias variables from the installation result", () => {
     exportInstallationVariables(result);
 
     expect(core.exportVariable).toHaveBeenCalledWith("FC", "fortran");
@@ -37,11 +37,6 @@ describe("installation result helpers", () => {
     expect(core.exportVariable).toHaveBeenCalledWith("FPM_FC", "fortran");
     expect(core.exportVariable).toHaveBeenCalledWith("FPM_CC", "c");
     expect(core.exportVariable).toHaveBeenCalledWith("FPM_CXX", "cxx");
-  });
-
-  it("exports F77 and F90 aliases when requested", () => {
-    exportInstallationVariables(result, { exportFortranAliases: true });
-
     expect(core.exportVariable).toHaveBeenCalledWith("F77", "fortran");
     expect(core.exportVariable).toHaveBeenCalledWith("F90", "fortran");
   });

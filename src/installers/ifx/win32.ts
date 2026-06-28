@@ -10,7 +10,6 @@ import {
   type Target,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
-import { exportInstallationVariables } from "../../installation_result";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
@@ -247,7 +246,6 @@ export async function installWin32(
     cc: "icx",
     cxx: "icpx",
   };
-  exportInstallationVariables(result);
   return result;
 }
 

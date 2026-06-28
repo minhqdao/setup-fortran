@@ -65,14 +65,6 @@ describe("installWin32 (gfortran)", () => {
 
       await installWin32(baseTarget);
 
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("F77", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("F90", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("gcc.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("g++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("gcc.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("g++.exe"));
     });
   });
 
@@ -82,14 +74,6 @@ describe("installWin32 (gfortran)", () => {
       await installWin32(target);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["gcc-fortran"]);
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("F77", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("F90", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("gcc.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("g++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("gfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("gcc.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("g++.exe"));
     });
   });
 });

@@ -11,7 +11,6 @@ import {
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
-import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -174,7 +173,6 @@ async function installConda(target: Target): Promise<InstallationResult> {
     cc: path.join(libraryBin, "clang.exe"),
     cxx: path.join(libraryBin, "clang++.exe"),
   };
-  exportInstallationVariables(result);
   return result;
 }
 
@@ -208,7 +206,6 @@ async function installMSYS2(target: Target): Promise<InstallationResult> {
     cc: path.join(msysBin, "clang.exe"),
     cxx: path.join(msysBin, "clang++.exe"),
   };
-  exportInstallationVariables(result);
   return result;
 }
 

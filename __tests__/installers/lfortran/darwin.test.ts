@@ -85,12 +85,6 @@ describe("installDarwin (LFortran)", () => {
     await installDarwin(baseTarget);
 
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "lfortran");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "clang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "clang++");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "lfortran");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "clang");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "clang++");
     expect(mockedExportVariable).toHaveBeenCalledWith("SDKROOT", "/path/to/SDK");
   });
 

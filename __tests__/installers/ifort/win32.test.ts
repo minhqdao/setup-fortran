@@ -102,12 +102,6 @@ describe("installWin32 (ifort)", () => {
       "ONEAPI_ROOT",
       "C:\\Program Files (x86)\\Intel\\oneAPI",
     );
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "icl");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "icl");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "icl");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "icl");
   });
 
   it("resolves and returns the installed version", async () => {
