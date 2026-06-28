@@ -118,6 +118,71 @@ async function run(): Promise<void> {
 
     core.info(`Starting integration tests for ${fc} in ${buildDir}...`);
 
+    // Verify absolute paths for Fortran environment variables
+    const isAbsolutePath = (p: string): boolean => {
+      if (isWindows) {
+        return /^[a-zA-Z]:\\/.test(p) || p.startsWith("\\\\");
+      }
+      return p.startsWith("/");
+    };
+
+    const fortranEnvVars = ["FC", "F77", "F90", "FPM_FC"];
+    for (const v of fortranEnvVars) {
+      const val = process.env[v];
+      if (!val) {
+        throw new Error(`${v} environment variable is not set.`);
+      }
+      if (!isAbsolutePath(val)) {
+        throw new Error(`${v} is not an absolute path: ${val}`);
+      }
+      core.info(`${v} is set to absolute path: ${val}`);
+    }
+
+    // CC and CXX should exist (can be command names or paths)
+    const otherEnvVars = [
+      "CC",
+      "CXX",
+      "FPM_CC",
+      "FPM_CXX",
+      "FORTRAN_COMPILER",
+    ];
+    for (const v of otherEnvVars) {
+      const val = process.env[v];
+      if (!val) {
+        throw new Error(`${v} environment variable is not set.`);
+      }
+      core.info(`${v} is set to: ${val}`);
+    }
+
+    // Verify outputs passed as environment variables
+    const outputsToVerify = [
+      "OUTPUT_FC",
+      "OUTPUT_F77",
+      "OUTPUT_F90",
+      "OUTPUT_CC",
+      "OUTPUT_CXX",
+      "OUTPUT_VERSION",
+    ];
+    for (const v of outputsToVerify) {
+      const val = process.env[v];
+      if (!val) {
+        throw new Error(`${v} environment variable (setup output) is not set.`);
+      }
+      if (v.startsWith("OUTPUT_F") && v !== "OUTPUT_FC" && v !== "OUTPUT_F77" && v !== "OUTPUT_F90") {
+          // just skip if any other starts with F
+      } else if (v === "OUTPUT_FC" || v === "OUTPUT_F77" || v === "OUTPUT_F90") {
+          if (!isAbsolutePath(val)) {
+              throw new Error(`${v} output is not an absolute path: ${val}`);
+          }
+      }
+      core.info(`${v} output is set to: ${val}`);
+    }
+
+    // Check that FC environment variable matches FC output
+    if (process.env.FC !== process.env.OUTPUT_FC) {
+        throw new Error(`FC env var (${process.env.FC}) does not match FC output (${process.env.OUTPUT_FC})`);
+    }
+
     const {
       module: moduleFlags,
       openmp: ompFlag,

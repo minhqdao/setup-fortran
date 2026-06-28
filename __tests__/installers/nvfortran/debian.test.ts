@@ -42,20 +42,36 @@ describe("installDebian nvfortran", () => {
       }
       return 0;
     });
-    (exec.getExecOutput as jest.Mock).mockResolvedValue({
-      stdout: "install ok installed install ok installed",
-      exitCode: 0,
+    (exec.getExecOutput as jest.Mock).mockImplementation(async (commandLine, args) => {
+      if (commandLine === "which" || commandLine === "where") {
+        return {
+          stdout: "/usr/bin/nvfortran",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout: "install ok installed install ok installed",
+        exitCode: 0,
+      };
     });
   });
 
   it("calls curl with retry for legacy ncurses", async () => {
     // Version <= 24.3 triggers ncurses check
     const target = { ...baseTarget, version: "24.3" };
-    
+
     // Simulate ncurses not installed
-    (exec.getExecOutput as jest.Mock).mockResolvedValue({
-      stdout: "",
-      exitCode: 0,
+    (exec.getExecOutput as jest.Mock).mockImplementation(async (commandLine, args) => {
+      if (commandLine === "which" || commandLine === "where") {
+        return {
+          stdout: "/usr/bin/nvfortran",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout: "",
+        exitCode: 0,
+      };
     });
 
     await installDebian(target);
@@ -68,11 +84,19 @@ describe("installDebian nvfortran", () => {
 
   it("skips ncurses install if already present", async () => {
     const target = { ...baseTarget, version: "24.3" };
-    
+
     // Already installed
-    (exec.getExecOutput as jest.Mock).mockResolvedValue({
-      stdout: "install ok installed install ok installed",
-      exitCode: 0,
+    (exec.getExecOutput as jest.Mock).mockImplementation(async (commandLine, args) => {
+      if (commandLine === "which" || commandLine === "where") {
+        return {
+          stdout: "/usr/bin/nvfortran",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout: "install ok installed install ok installed",
+        exitCode: 0,
+      };
     });
 
     await installDebian(target);
@@ -100,7 +124,7 @@ describe("installDebian nvfortran", () => {
 
     expect(result).toEqual({
       version: "nvfortran 24.1-0",
-      fc: "nvfortran",
+      fc: "/usr/bin/nvfortran",
       cc: "nvc",
       cxx: "nvc++",
     });

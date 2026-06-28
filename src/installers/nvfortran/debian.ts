@@ -5,6 +5,7 @@ import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { which } from "../../utils";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -277,7 +278,7 @@ export async function installDebian(
   core.info(`nvfortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "nvfortran",
+    fc: await which("nvfortran"),
     cc: "nvc",
     cxx: "nvc++",
   };

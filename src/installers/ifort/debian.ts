@@ -4,6 +4,7 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { which } from "../../utils";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -143,7 +144,7 @@ export async function installDebian(
   core.info(`ifort ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "ifort",
+    fc: await which("ifort"),
     cc: "icc",
     cxx: "icpc",
   };

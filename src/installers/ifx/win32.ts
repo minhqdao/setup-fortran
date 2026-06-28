@@ -10,6 +10,7 @@ import {
   type Target,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
+import { which } from "../../utils";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
@@ -242,7 +243,7 @@ export async function installWin32(
   core.info(`ifx ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "ifx",
+    fc: await which("ifx.exe"),
     cc: "icx",
     cxx: "icpx",
   };

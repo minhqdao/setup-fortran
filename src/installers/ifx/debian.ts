@@ -4,6 +4,7 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { which } from "../../utils";
 
 // The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
@@ -138,7 +139,7 @@ export async function installDebian(
   core.info(`ifx ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "ifx",
+    fc: await which("ifx"),
     cc: "icx",
     cxx: "icpx",
   };

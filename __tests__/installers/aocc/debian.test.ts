@@ -47,6 +47,10 @@ describe("installDebian (AOCC)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "/usr/bin/flang",
+      exitCode: 0,
+    });
     mockedFs.existsSync.mockReturnValue(false); // Assume not installed
     mockedCache.restoreCache.mockResolvedValue(undefined); // Cache miss
     mockedExec.mockImplementation(async (commandLine, args, options) => {
@@ -121,7 +125,7 @@ describe("installDebian (AOCC)", () => {
     const result = await installDebian(baseTarget);
     expect(result).toEqual({
       version: "AOCC flang version 5.1.0",
-      fc: "flang",
+      fc: "/usr/bin/flang",
       cc: "clang",
       cxx: "clang++",
     });

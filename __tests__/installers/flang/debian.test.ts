@@ -132,7 +132,7 @@ describe("installDebian (Flang)", () => {
     const result = await installDebian(baseTarget);
     expect(result).toEqual({
       version: "flang version 18.1.0",
-      fc: "flang-new-18",
+      fc: "/usr/lib/llvm-18/bin/flang-new",
       cc: "clang-18",
       cxx: "clang++-18",
     });

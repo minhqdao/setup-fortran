@@ -107,7 +107,7 @@ export async function installDebian(
   core.info(`LFortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "lfortran",
+    fc: lfortranBin,
     cc: "clang",
     cxx: "clang++",
   };

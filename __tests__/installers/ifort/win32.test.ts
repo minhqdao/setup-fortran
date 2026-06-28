@@ -43,6 +43,10 @@ describe("installWin32 (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\windows\\bin\\ifort.exe",
+      exitCode: 0,
+    });
     mockedFs.existsSync.mockReturnValue(true);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifort" && args?.[0] === "/what") {
@@ -108,7 +112,7 @@ describe("installWin32 (ifort)", () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
     const result = await installWin32(baseTarget);
     expect(result).toMatchObject({
-      fc: "ifort",
+      fc: "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\windows\\bin\\ifort.exe",
       cc: "icl",
       cxx: "icl",
     });

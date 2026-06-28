@@ -39,6 +39,10 @@ describe("installDebian (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "/opt/intel/oneapi/compiler/latest/linux/bin/ifort",
+      exitCode: 0,
+    });
     mockedFs.existsSync.mockReturnValue(true);
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
@@ -155,7 +159,7 @@ describe("installDebian (ifort)", () => {
     const result = await installDebian(baseTarget);
     expect(result).toEqual({
       version: "ifort (IFORT) 2021.10.0 20230609",
-      fc: "ifort",
+      fc: "/opt/intel/oneapi/compiler/latest/linux/bin/ifort",
       cc: "icc",
       cxx: "icpc",
     });

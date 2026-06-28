@@ -97,9 +97,10 @@ describe("installDebian (LFortran)", () => {
     const result = await installDebian(baseTarget);
     expect(result).toEqual({
       version: "LFortran version 0.63.0",
-      fc: "lfortran",
+      fc: expect.stringContaining("lfortran"),
       cc: "clang",
       cxx: "clang++",
     });
+    expect(result.fc).toMatch(/^\/.*lfortran$/);
   });
 });

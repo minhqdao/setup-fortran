@@ -24,6 +24,8 @@ describe("installation result helpers", () => {
 
     expect(core.setOutput).toHaveBeenCalledWith("version", "compiler version");
     expect(core.setOutput).toHaveBeenCalledWith("fc", "fortran");
+    expect(core.setOutput).toHaveBeenCalledWith("f77", "fortran");
+    expect(core.setOutput).toHaveBeenCalledWith("f90", "fortran");
     expect(core.setOutput).toHaveBeenCalledWith("cc", "c");
     expect(core.setOutput).toHaveBeenCalledWith("cxx", "cxx");
   });

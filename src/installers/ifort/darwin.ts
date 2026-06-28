@@ -4,6 +4,7 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { which } from "../../utils";
 import * as fs from "fs";
 import path from "path";
 
@@ -170,7 +171,7 @@ export async function installDarwin(
   core.info(`ifort ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: "ifort",
+    fc: await which("ifort"),
     cc: "icc",
     cxx: "icpc",
   };

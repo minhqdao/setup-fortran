@@ -95386,7 +95386,37 @@ function githubHeaders() {
     return headers;
 }
 
+;// CONCATENATED MODULE: ./src/utils.ts
+
+/**
+ * Finds the absolute path of a binary.
+ * @param tool The name of the binary to find.
+ * @returns The absolute path of the binary.
+ */
+async function which(tool) {
+    const whichCommand = process.platform === "win32" ? "where" : "which";
+    try {
+        const output = await exec.getExecOutput(whichCommand, [tool], {
+            silent: true,
+        });
+        if (output.exitCode !== 0) {
+            throw new Error(`Tool '${tool}' not found (exit code ${output.exitCode})`);
+        }
+        // 'where' on Windows can return multiple lines, take the first one.
+        // 'which' on Unix returns one line.
+        const result = output.stdout.trim().split(/\r?\n/)[0].trim();
+        if (!result) {
+            throw new Error(`Tool '${tool}' not found (empty output)`);
+        }
+        return result;
+    }
+    catch (err) {
+        throw new Error(`Failed to resolve path for tool '${tool}': ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/installers/gfortran/debian.ts
+
 
 
 
@@ -95443,7 +95473,7 @@ async function installDebian(target) {
     core.info(`GFortran ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: `gfortran-${version}`,
+        fc: await which(`gfortran-${version}`),
         cc: `gcc-${version}`,
         cxx: `g++-${version}`,
     };
@@ -95834,6 +95864,7 @@ var external_fs_ = __nccwpck_require__(79896);
 
 
 
+
 // The first entry is used as the default when LATEST is requested.
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const debian_SUPPORTED_VERSIONS = {
@@ -95948,7 +95979,7 @@ async function debian_installDebian(target) {
     core.info(`ifx ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "ifx",
+        fc: await which("ifx"),
         cc: "icx",
         cxx: "icpx",
     };
@@ -95967,6 +95998,7 @@ async function debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+
 
 
 
@@ -96170,7 +96202,7 @@ async function win32_installWin32(target) {
     core.info(`ifx ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "ifx",
+        fc: await which("ifx.exe"),
         cc: "icx",
         cxx: "icpx",
     };
@@ -96236,6 +96268,7 @@ async function installIFX(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/debian.ts
+
 
 
 
@@ -96355,7 +96388,7 @@ async function ifort_debian_installDebian(target) {
     core.info(`ifort ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "ifort",
+        fc: await which("ifort"),
         cc: "icc",
         cxx: "icpc",
     };
@@ -96376,6 +96409,7 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
+
 
 
 
@@ -96508,7 +96542,7 @@ async function darwin_installDarwin(target) {
     core.info(`ifort ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "ifort",
+        fc: await which("ifort"),
         cc: "icc",
         cxx: "icpc",
     };
@@ -96528,6 +96562,7 @@ async function ifort_darwin_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
+
 
 
 
@@ -96668,7 +96703,7 @@ async function ifort_win32_installWin32(target) {
     core.info(`ifort ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "ifort",
+        fc: await which("ifort.exe"),
         cc: "icl",
         cxx: "icl",
     };
@@ -96708,6 +96743,7 @@ async function installIFort(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
+
 
 
 
@@ -96951,7 +96987,7 @@ async function nvfortran_debian_installDebian(target) {
     core.info(`nvfortran ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "nvfortran",
+        fc: await which("nvfortran"),
         cc: "nvc",
         cxx: "nvc++",
     };
@@ -97005,6 +97041,7 @@ async function installNVFortran(target) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/debian.ts
+
 
 
 
@@ -97128,7 +97165,7 @@ async function aocc_debian_installDebian(target) {
     const resolvedVersion = await aocc_debian_resolveInstalledVersion();
     const result = {
         version: resolvedVersion,
-        fc: "flang",
+        fc: await which("flang"),
         cc: "clang",
         cxx: "clang++",
     };
@@ -97277,7 +97314,7 @@ async function flang_debian_installDebian(target) {
     }
     const result = {
         version: await flang_debian_resolveInstalledVersion(`${flangBinaryName(major)}-${version}`),
-        fc: `${flangBinaryName(major)}-${version}`,
+        fc: binaryPath,
         cc: `clang-${version}`,
         cxx: `clang++-${version}`,
     };
@@ -97792,7 +97829,7 @@ async function lfortran_debian_installDebian(target) {
     core.info(`LFortran ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
-        fc: "lfortran",
+        fc: lfortranBin,
         cc: "clang",
         cxx: "clang++",
     };
@@ -97923,7 +97960,7 @@ async function lfortran_darwin_installDarwin(target) {
     core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
     const result = {
         version: resolvedVersion,
-        fc: "lfortran",
+        fc: lfortranBin,
         cc: "clang",
         cxx: "clang++",
     };
@@ -98147,6 +98184,8 @@ function exportInstallationVariables(result) {
 function setInstallationOutputs(result) {
     core.setOutput("version", result.version);
     core.setOutput("fc", result.fc);
+    core.setOutput("f77", result.fc);
+    core.setOutput("f90", result.fc);
     core.setOutput("cc", result.cc);
     core.setOutput("cxx", result.cxx);
 }

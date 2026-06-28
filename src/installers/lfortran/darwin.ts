@@ -130,7 +130,7 @@ export async function installDarwin(
   core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
   const result = {
     version: resolvedVersion,
-    fc: "lfortran",
+    fc: lfortranBin,
     cc: "clang",
     cxx: "clang++",
   };

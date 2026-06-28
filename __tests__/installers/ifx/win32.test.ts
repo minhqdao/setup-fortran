@@ -48,6 +48,10 @@ describe("installWin32 (ifx)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\windows\\bin\\ifx.exe",
+      exitCode: 0,
+    });
     mockedFs.existsSync.mockReturnValue(true);
     mockedOs.tmpdir.mockReturnValue("C:\\Temp");
     mockedExec.mockImplementation(async (commandLine, args, options) => {

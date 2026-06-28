@@ -15,6 +15,8 @@ export function exportInstallationVariables(result: InstallationResult): void {
 export function setInstallationOutputs(result: InstallationResult): void {
   core.setOutput("version", result.version);
   core.setOutput("fc", result.fc);
+  core.setOutput("f77", result.fc);
+  core.setOutput("f90", result.fc);
   core.setOutput("cc", result.cc);
   core.setOutput("cxx", result.cxx);
 }

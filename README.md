@@ -271,17 +271,26 @@ jobs:
 | Output | Description |
 |--------|-------------|
 | `version` | Resolved version of the installed compiler |
+| `fc` | Path to the Fortran compiler |
+| `f77` | Path to the Fortran 77 compiler |
+| `f90` | Path to the Fortran 90 compiler |
+| `cc` | Command or path to the C compiler |
+| `cxx` | Command or path to the C++ compiler |
+
+> **Note:** Fortran compiler variables and outputs (`fc`, `f77`, `f90`) provide the absolute path to the binary. C and C++ variables typically provide command names unless the path is unambiguously known.
 
 ## Environment variables set
 
 | Variable | Description |
 |----------|-------------|
 | `FC` | Path to the Fortran compiler |
-| `CC` | Path to the C compiler |
-| `CXX` | Path to the C++ compiler |
+| `F77` | Path to the Fortran compiler (alias for `FC`) |
+| `F90` | Path to the Fortran compiler (alias for `FC`) |
+| `CC` | Command or path to the C compiler |
+| `CXX` | Command or path to the C++ compiler |
 | `FPM_FC` | Path to the Fortran compiler for fpm |
-| `FPM_CC` | Path to the C compiler for fpm |
-| `FPM_CXX` | Path to the C++ compiler for fpm |
+| `FPM_CC` | Command or path to the C compiler for fpm |
+| `FPM_CXX` | Command or path to the C++ compiler for fpm |
 
 ## Development
 

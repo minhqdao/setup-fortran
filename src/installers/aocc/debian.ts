@@ -6,6 +6,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { which } from "../../utils";
 import type { Target } from "../../types";
 
 // Make sure that the "latest" version is listed first. If the user does not
@@ -149,7 +150,7 @@ export async function installDebian(
   const resolvedVersion = await resolveInstalledVersion();
   const result = {
     version: resolvedVersion,
-    fc: "flang",
+    fc: await which("flang"),
     cc: "clang",
     cxx: "clang++",
   };

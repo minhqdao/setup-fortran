@@ -33,6 +33,10 @@ describe("GFortran Debian Installer", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "/usr/bin/gfortran-14",
+      exitCode: 0,
+    });
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "gfortran" && args?.[0] === "--version") {
@@ -232,8 +236,8 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("exports environment variables", async () => {
-      await installDebian(baseTarget);
-
+      const result = await installDebian(baseTarget);
+      expect(result.fc).toBe("/usr/bin/gfortran-14");
     });
   });
 });

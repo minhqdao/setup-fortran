@@ -36,6 +36,10 @@ describe("installDebian ifx", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "/opt/intel/oneapi/compiler/latest/linux/bin/ifx",
+      exitCode: 0,
+    });
     mockedFs.existsSync.mockReturnValue(true);
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {

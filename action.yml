@@ -23,7 +23,11 @@ outputs:
   version:
     description: The installed compiler version
   fc:
-    description: The Fortran compiler command or path
+    description: The Fortran compiler path
+  f77:
+    description: The Fortran 77 compiler path
+  f90:
+    description: The Fortran 90 compiler path
   cc:
     description: The C compiler command or path
   cxx:

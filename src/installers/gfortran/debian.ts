@@ -4,6 +4,7 @@ import * as cache from "@actions/cache";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Target } from "../../types";
+import { which } from "../../utils";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -64,7 +65,7 @@ export async function installDebian(
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
-    fc: `gfortran-${version}`,
+    fc: await which(`gfortran-${version}`),
     cc: `gcc-${version}`,
     cxx: `g++-${version}`,
   };

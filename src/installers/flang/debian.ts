@@ -148,7 +148,7 @@ export async function installDebian(
     version: await resolveInstalledVersion(
       `${flangBinaryName(major)}-${version}`,
     ),
-    fc: `${flangBinaryName(major)}-${version}`,
+    fc: binaryPath,
     cc: `clang-${version}`,
     cxx: `clang++-${version}`,
   };
