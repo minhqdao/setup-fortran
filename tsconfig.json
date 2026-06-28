@@ -15,7 +15,8 @@
     },
     "include": [
         "src/**/*",
-        "__tests__/**/*"
+        "__tests__/**/*",
+        "fortran_tests/**/*"
     ],
     "exclude": [
         "node_modules",
