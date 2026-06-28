@@ -74,6 +74,57 @@ async function run(): Promise<void> {
       );
     }
 
+    const cc = process.env.CC;
+    if (!cc) {
+      throw new Error(
+        "CC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const cxx = process.env.CXX;
+    if (!cxx) {
+      throw new Error(
+        "CXX environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputFc = process.env.OUTPUT_FC;
+    if (!outputFc) {
+      throw new Error(
+        "OUTPUT_FC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputCc = process.env.OUTPUT_CC;
+    if (!outputCc) {
+      throw new Error(
+        "OUTPUT_CC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const outputCxx = process.env.OUTPUT_CXX;
+    if (!outputCxx) {
+      throw new Error(
+        "OUTPUT_CXX environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    if (fc !== outputFc) {
+      throw new Error(
+        `FC environment variable (${fc}) does not match output fc (${outputFc})`,
+      );
+    }
+    if (cc !== outputCc) {
+      throw new Error(
+        `CC environment variable (${cc}) does not match output cc (${outputCc})`,
+      );
+    }
+    if (cxx !== outputCxx) {
+      throw new Error(
+        `CXX environment variable (${cxx}) does not match output cxx (${outputCxx})`,
+      );
+    }
+
     const compiler = process.env.FORTRAN_COMPILER as Compiler | undefined;
     if (!compiler) {
       throw new Error(
