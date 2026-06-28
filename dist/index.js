@@ -96906,6 +96906,7 @@ async function installIFort(target) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 // Version scheme: YY.M (e.g. "26.1" = January 2026).
@@ -97103,7 +97104,7 @@ async function nvfortran_debian_installDebian(target) {
             "-o",
             "Acquire::Retries=3",
         ]);
-        core.info("Checking if ");
+        core.info("Checking if legacy ncurses5 libs are needed...");
         if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
             (await needsLegacyNcursesInstall())) {
             core.info(`nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`);
@@ -97165,6 +97166,14 @@ async function safelyFreeDiskSpace() {
         ignoreReturnCode: true,
         silent: true,
     });
+    // 3. Remove large unused toolkits to free up significant space (~10GB+)
+    const toolkits = ["/usr/local/lib/android", "/opt/ghc"];
+    for (const toolkit of toolkits) {
+        if (external_fs_.existsSync(toolkit)) {
+            core.info(`Removing large toolkit: ${toolkit}`);
+            await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+        }
+    }
     output = "";
     await exec.exec("df", ["--output=avail", "-BG", "/"], {
         listeners: { stdout: (data) => (output += data.toString()) },
@@ -97418,19 +97427,23 @@ async function flang_debian_installDebian(target) {
         "/etc/apt/sources.list",
     ]);
     core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
+    // Force IPv4 (-4) to avoid transient connection issues on some runners
     await exec.exec("bash", [
         "-c",
         [
-            `curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
+            `curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
             `| sudo bash -s -- ${version}`,
         ].join(" "),
     ]);
     const pkgName = `flang-${version}`;
     core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
+    // Force IPv4 to avoid transient connection issues with apt.llvm.org
     await exec.exec("sudo", [
         "apt-get",
         "install",
         "-y",
+        "-o",
+        "Acquire::ForceIPv4=true",
         pkgName,
         `libomp-${version}-dev`,
     ]);

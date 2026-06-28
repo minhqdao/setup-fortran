@@ -83,10 +83,11 @@ export async function installDebian(
   ]);
 
   core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
+  // Force IPv4 (-4) to avoid transient connection issues on some runners
   await exec.exec("bash", [
     "-c",
     [
-      `curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
+      `curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
       `| sudo bash -s -- ${version}`,
     ].join(" "),
   ]);
@@ -94,10 +95,13 @@ export async function installDebian(
   const pkgName = `flang-${version}`;
 
   core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
+  // Force IPv4 to avoid transient connection issues with apt.llvm.org
   await exec.exec("sudo", [
     "apt-get",
     "install",
     "-y",
+    "-o",
+    "Acquire::ForceIPv4=true",
     pkgName,
     `libomp-${version}-dev`,
   ]);

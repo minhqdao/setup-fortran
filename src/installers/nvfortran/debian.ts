@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
@@ -224,7 +225,7 @@ export async function installDebian(
       "Acquire::Retries=3",
     ]);
 
-    core.info("Checking if ");
+    core.info("Checking if legacy ncurses5 libs are needed...");
 
     if (
       compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
@@ -304,6 +305,15 @@ async function safelyFreeDiskSpace(): Promise<void> {
     ignoreReturnCode: true,
     silent: true,
   });
+
+  // 3. Remove large unused toolkits to free up significant space (~10GB+)
+  const toolkits = ["/usr/local/lib/android", "/opt/ghc"];
+  for (const toolkit of toolkits) {
+    if (fs.existsSync(toolkit)) {
+      core.info(`Removing large toolkit: ${toolkit}`);
+      await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+    }
+  }
 
   output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {
