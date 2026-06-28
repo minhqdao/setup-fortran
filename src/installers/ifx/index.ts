@@ -1,8 +1,8 @@
-import { OS, type Target } from "../../types";
+import { type InstallationResult, OS, type Target } from "../../types";
 import { installDebian } from "./debian";
 import { installWin32 } from "./win32";
 
-export async function installIFX(target: Target): Promise<string> {
+export async function installIFX(target: Target): Promise<InstallationResult> {
   switch (target.os) {
     case OS.Linux:
       return await installDebian(target);

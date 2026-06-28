@@ -136,8 +136,13 @@ describe("installDebian (Flang)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("flang version 18.1.0");
+    const result = await installDebian(baseTarget);
+    expect(result).toEqual({
+      version: "flang version 18.1.0",
+      fc: "flang-new-18",
+      cc: "clang-18",
+      cxx: "clang++-18",
+    });
   });
 
   it("falls back to versioned symlink if primary binary is missing", async () => {

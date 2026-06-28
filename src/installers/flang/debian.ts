@@ -1,8 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -66,7 +67,9 @@ function resolveFlangBinaryPath(major: number, version: string): string {
   );
 }
 
-export async function installDebian(target: Target): Promise<string> {
+export async function installDebian(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
 
@@ -127,12 +130,6 @@ export async function installDebian(target: Target): Promise<string> {
     core.addPath(llvmBinDir);
   }
 
-  core.exportVariable("FC", `${flangBinaryName(major)}-${version}`);
-  core.exportVariable("CC", `clang-${version}`);
-  core.exportVariable("CXX", `clang++-${version}`);
-  core.exportVariable("FPM_FC", `${flangBinaryName(major)}-${version}`);
-  core.exportVariable("FPM_CC", `clang-${version}`);
-  core.exportVariable("FPM_CXX", `clang++-${version}`);
   core.exportVariable("FLANG_VERSION", major);
 
   // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
@@ -148,14 +145,21 @@ export async function installDebian(target: Target): Promise<string> {
     );
   }
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: await resolveInstalledVersion(
+      `${flangBinaryName(major)}-${version}`,
+    ),
+    fc: `${flangBinaryName(major)}-${version}`,
+    cc: `clang-${version}`,
+    cxx: `clang++-${version}`,
+  };
+  const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  exportInstallationVariables(result);
+  return result;
 }
 
-async function resolveInstalledVersion(): Promise<string> {
-  const fc = process.env.FC;
-  if (!fc) throw new Error("FC is not set");
+async function resolveInstalledVersion(fc: string): Promise<string> {
   let output = "";
   await exec.exec(fc, ["--version"], {
     listeners: {

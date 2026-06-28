@@ -112,7 +112,14 @@ describe("installWin32 (ifort)", () => {
 
   it("resolves and returns the installed version", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    const version = await installWin32(baseTarget);
-    expect(version).toContain("Intel(R) Fortran Intel(R) 64 Compiler Classic");
+    const result = await installWin32(baseTarget);
+    expect(result).toMatchObject({
+      fc: "ifort",
+      cc: "icl",
+      cxx: "icl",
+    });
+    expect(result.version).toContain(
+      "Intel(R) Fortran Intel(R) 64 Compiler Classic",
+    );
   });
 });

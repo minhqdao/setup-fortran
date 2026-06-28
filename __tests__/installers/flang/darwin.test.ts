@@ -140,7 +140,12 @@ describe("installDarwin (Flang)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDarwin(baseTarget);
-    expect(version).toBe("flang version 18.1.0");
+    const result = await installDarwin(baseTarget);
+    expect(result).toEqual({
+      version: "flang version 18.1.0",
+      fc: "/usr/local/opt/flang/bin/flang",
+      cc: "/usr/local/opt/llvm/bin/clang",
+      cxx: "/usr/local/opt/llvm/bin/clang++",
+    });
   });
 });

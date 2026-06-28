@@ -20,6 +20,9 @@ describe("installDebian nvfortran", () => {
     typeof exec.getExecOutput
   >;
   const mockedCache = cache as jest.Mocked<typeof cache>;
+  const mockedExportVariable = core.exportVariable as jest.MockedFunction<
+    typeof core.exportVariable
+  >;
 
   const baseTarget: Target = {
     compiler: Compiler.NVFortran,
@@ -33,7 +36,12 @@ describe("installDebian nvfortran", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedCache.restoreCache.mockResolvedValue(undefined);
-    mockedExec.mockResolvedValue(0);
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 24.1-0"));
+      }
+      return 0;
+    });
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
       stdout: "install ok installed install ok installed",
       exitCode: 0,
@@ -85,5 +93,22 @@ describe("installDebian nvfortran", () => {
       "curl",
       expect.arrayContaining(["--retry", "5"]),
     );
+  });
+
+  it("exports compiler variables and returns the installation result", async () => {
+    const result = await installDebian(baseTarget);
+
+    expect(result).toEqual({
+      version: "nvfortran 24.1-0",
+      fc: "nvfortran",
+      cc: "nvc",
+      cxx: "nvc++",
+    });
+    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "nvfortran");
+    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "nvc");
+    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "nvc++");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "nvfortran");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "nvc");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "nvc++");
   });
 });

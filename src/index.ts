@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import { parseInputs } from "./parse_inputs";
-import { Compiler, OS } from "./types";
+import { Compiler, type InstallationResult, OS } from "./types";
 import { installGFortran } from "./installers/gfortran";
 import { installIFX } from "./installers/ifx";
 import { installIFort } from "./installers/ifort";
@@ -8,6 +8,7 @@ import { installNVFortran } from "./installers/nvfortran";
 import { installAOCC } from "./installers/aocc";
 import { installFlang } from "./installers/flang";
 import { installLFortran } from "./installers/lfortran";
+import { setInstallationOutputs } from "./installation_result";
 
 async function run(): Promise<void> {
   try {
@@ -23,33 +24,33 @@ async function run(): Promise<void> {
       core.info(`Windows env : ${target.msystem}`);
     }
 
-    let installedVersion: string;
+    let installationResult: InstallationResult;
 
     switch (target.compiler) {
       case Compiler.GFortran:
-        installedVersion = await installGFortran(target);
+        installationResult = await installGFortran(target);
         break;
       case Compiler.IFX:
-        installedVersion = await installIFX(target);
+        installationResult = await installIFX(target);
         break;
       case Compiler.IFort:
-        installedVersion = await installIFort(target);
+        installationResult = await installIFort(target);
         break;
       case Compiler.NVFortran:
-        installedVersion = await installNVFortran(target);
+        installationResult = await installNVFortran(target);
         break;
       case Compiler.AOCC:
-        installedVersion = await installAOCC(target);
+        installationResult = await installAOCC(target);
         break;
       case Compiler.Flang:
-        installedVersion = await installFlang(target);
+        installationResult = await installFlang(target);
         break;
       case Compiler.LFortran:
-        installedVersion = await installLFortran(target);
+        installationResult = await installLFortran(target);
         break;
     }
 
-    core.setOutput("version", installedVersion);
+    setInstallationOutputs(installationResult);
 
     core.exportVariable("FORTRAN_COMPILER", target.compiler);
   } catch (err) {

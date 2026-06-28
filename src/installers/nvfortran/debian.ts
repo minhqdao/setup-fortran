@@ -3,8 +3,9 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as os from "os";
 import * as path from "path";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -180,7 +181,9 @@ async function installLegacyNcurses(target: Target): Promise<void> {
   }
 }
 
-export async function installDebian(target: Target): Promise<string> {
+export async function installDebian(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   const aptArch = APT_ARCH[target.arch];
   const nvArch = NV_ARCH[target.arch];
@@ -263,13 +266,6 @@ export async function installDebian(target: Target): Promise<string> {
   core.info(`Adding ${binDir} to PATH...`);
   core.addPath(binDir);
 
-  core.exportVariable("FC", "nvfortran");
-  core.exportVariable("CC", "nvc");
-  core.exportVariable("CXX", "nvc++");
-  core.exportVariable("FPM_FC", "nvfortran");
-  core.exportVariable("FPM_CC", "nvc");
-  core.exportVariable("FPM_CXX", "nvc++");
-
   // Make the bundled math/comm libraries findable at runtime.
   const libDir = `${installDir}/compilers/lib`;
   const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
@@ -280,7 +276,14 @@ export async function installDebian(target: Target): Promise<string> {
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`nvfortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "nvfortran",
+    cc: "nvc",
+    cxx: "nvc++",
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function safelyFreeDiskSpace(): Promise<void> {

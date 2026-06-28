@@ -3,8 +3,9 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -33,7 +34,9 @@ const SUPPORTED_VERSIONS = {
 //
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
-export async function installDebian(target: Target): Promise<string> {
+export async function installDebian(
+  target: Target,
+): Promise<InstallationResult> {
   if (target.arch === Arch.ARM64) {
     throw new Error(
       `LFortran is not available for Linux ARM64 on conda-forge. ` +
@@ -99,17 +102,18 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.addPath(lfortranBinDir);
 
-  core.exportVariable("FC", "lfortran");
-  core.exportVariable("CC", "clang");
-  core.exportVariable("CXX", "clang++");
-  core.exportVariable("FPM_FC", "lfortran");
-  core.exportVariable("FPM_CC", "clang");
-  core.exportVariable("FPM_CXX", "clang++");
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);
   core.info(`LFortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "lfortran",
+    cc: "clang",
+    cxx: "clang++",
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(binaryPath: string): Promise<string> {

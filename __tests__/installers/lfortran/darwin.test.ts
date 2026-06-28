@@ -95,7 +95,12 @@ describe("installDarwin (LFortran)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDarwin(baseTarget);
-    expect(version).toBe("LFortran version 0.63.0");
+    const result = await installDarwin(baseTarget);
+    expect(result).toEqual({
+      version: "LFortran version 0.63.0",
+      fc: "lfortran",
+      cc: "clang",
+      cxx: "clang++",
+    });
   });
 });

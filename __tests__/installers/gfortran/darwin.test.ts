@@ -125,7 +125,12 @@ describe("installDarwin (gfortran)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDarwin(baseTarget);
-    expect(version).toContain("14.1.0");
+    const result = await installDarwin(baseTarget);
+    expect(result).toMatchObject({
+      fc: expect.stringContaining("gfortran-14"),
+      cc: expect.stringContaining("gcc-14"),
+      cxx: expect.stringContaining("g++-14"),
+    });
+    expect(result.version).toContain("14.1.0");
   });
 });

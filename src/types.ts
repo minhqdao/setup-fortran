@@ -40,3 +40,10 @@ export interface Target {
 
 export const LATEST = "latest" as const;
 export type Latest = typeof LATEST;
+
+export interface InstallationResult {
+  version: string;
+  fc: string;
+  cc: string;
+  cxx: string;
+}

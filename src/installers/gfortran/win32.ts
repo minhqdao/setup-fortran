@@ -2,9 +2,16 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as tc from "@actions/tool-cache";
-import { Arch, LATEST, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  LATEST,
+  Msystem,
+  type InstallationResult,
+  type Target,
+} from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -51,7 +58,9 @@ const SUPPORTED_VERSIONS = {
   Record<Msystem, readonly string[] | undefined>
 >;
 
-export async function installWin32(target: Target): Promise<string> {
+export async function installWin32(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
   switch (target.msystem) {
@@ -68,7 +77,10 @@ export async function installWin32(target: Target): Promise<string> {
   }
 }
 
-async function installNative(target: Target, version: string): Promise<string> {
+async function installNative(
+  target: Target,
+  version: string,
+): Promise<InstallationResult> {
   const release = GCC_RELEASES.find((r) => r.version === version);
   if (!release) {
     throw new Error(`Unsupported GFortran version: ${version}`);
@@ -98,24 +110,23 @@ async function installNative(target: Target, version: string): Promise<string> {
   const binPath = path.join(toolRoot, "bin");
   core.addPath(binPath);
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
   const gfortranPath = path.join(binPath, "gfortran.exe");
   const gccPath = path.join(binPath, "gcc.exe");
   const gxxPath = path.join(binPath, "g++.exe");
 
-  core.exportVariable("FC", gfortranPath);
-  core.exportVariable("F77", gfortranPath);
-  core.exportVariable("F90", gfortranPath);
-  core.exportVariable("CC", gccPath);
-  core.exportVariable("CXX", gxxPath);
-  core.exportVariable("FPM_FC", gfortranPath);
-  core.exportVariable("FPM_CC", gccPath);
-  core.exportVariable("FPM_CXX", gxxPath);
-
-  return await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: resolvedVersion,
+    fc: gfortranPath,
+    cc: gccPath,
+    cxx: gxxPath,
+  };
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  exportInstallationVariables(result, { exportFortranAliases: true });
+  return result;
 }
 
-async function installMSYS2(target: Target): Promise<string> {
+async function installMSYS2(target: Target): Promise<InstallationResult> {
   await setupMSYS2(target.msystem, ["gcc-fortran"]);
 
   const msysBin = path.join("C:\\msys64", target.msystem, "bin");
@@ -123,17 +134,16 @@ async function installMSYS2(target: Target): Promise<string> {
   const gccPath = path.join(msysBin, "gcc.exe");
   const gxxPath = path.join(msysBin, "g++.exe");
 
+  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: resolvedVersion,
+    fc: gfortranPath,
+    cc: gccPath,
+    cxx: gxxPath,
+  };
   core.info(`Setting FC, F77, and F90 environment variables...`);
-  core.exportVariable("FC", gfortranPath);
-  core.exportVariable("F77", gfortranPath);
-  core.exportVariable("F90", gfortranPath);
-  core.exportVariable("CC", gccPath);
-  core.exportVariable("CXX", gxxPath);
-  core.exportVariable("FPM_FC", gfortranPath);
-  core.exportVariable("FPM_CC", gccPath);
-  core.exportVariable("FPM_CXX", gxxPath);
-
-  return await resolveInstalledVersion();
+  exportInstallationVariables(result, { exportFortranAliases: true });
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

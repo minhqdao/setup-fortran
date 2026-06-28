@@ -2,9 +2,16 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
-import { Arch, LATEST, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  LATEST,
+  Msystem,
+  type InstallationResult,
+  type Target,
+} from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -42,7 +49,9 @@ const SUPPORTED_VERSIONS = {
   Record<Msystem, readonly string[] | undefined>
 >;
 
-export async function installWin32(target: Target): Promise<string> {
+export async function installWin32(
+  target: Target,
+): Promise<InstallationResult> {
   switch (target.msystem) {
     case Msystem.Native:
       return await installConda(target);
@@ -59,7 +68,7 @@ export async function installWin32(target: Target): Promise<string> {
 //   lfortran.exe lives in <prefix>\ (the prefix root itself), not bin\.
 //   Scripts\ holds Python entry-point wrappers; Library\bin\ holds DLLs.
 //   All three need to be on PATH for the toolchain to work correctly.
-async function installConda(target: Target): Promise<string> {
+async function installConda(target: Target): Promise<InstallationResult> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
 
   const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
@@ -150,12 +159,6 @@ async function installConda(target: Target): Promise<string> {
     );
   }
 
-  core.exportVariable("FC", lfortranExe);
-  core.exportVariable("CC", path.join(libraryBin, "clang.exe"));
-  core.exportVariable("CXX", path.join(libraryBin, "clang++.exe"));
-  core.exportVariable("FPM_FC", lfortranExe);
-  core.exportVariable("FPM_CC", path.join(libraryBin, "clang.exe"));
-  core.exportVariable("FPM_CXX", path.join(libraryBin, "clang++.exe"));
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
     path.join(envPrefix, "Library", "lib"),
@@ -165,12 +168,19 @@ async function installConda(target: Target): Promise<string> {
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (conda).`,
   );
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: lfortranExe,
+    cc: path.join(libraryBin, "clang.exe"),
+    cxx: path.join(libraryBin, "clang++.exe"),
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
-async function installMSYS2(target: Target): Promise<string> {
+async function installMSYS2(target: Target): Promise<InstallationResult> {
   core.info(
     `Installing LFortran on Windows (MSYS2/${target.msystem}, rolling release)...`,
   );
@@ -182,12 +192,6 @@ async function installMSYS2(target: Target): Promise<string> {
 
   core.addPath(msysBin);
 
-  core.exportVariable("FC", lfortranExe);
-  core.exportVariable("CC", path.join(msysBin, "clang.exe"));
-  core.exportVariable("CXX", path.join(msysBin, "clang++.exe"));
-  core.exportVariable("FPM_FC", lfortranExe);
-  core.exportVariable("FPM_CC", path.join(msysBin, "clang.exe"));
-  core.exportVariable("FPM_CXX", path.join(msysBin, "clang++.exe"));
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
     path.join("C:\\msys64", target.msystem, "lib"),
@@ -198,7 +202,14 @@ async function installMSYS2(target: Target): Promise<string> {
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${target.msystem}).`,
   );
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: lfortranExe,
+    cc: path.join(msysBin, "clang.exe"),
+    cxx: path.join(msysBin, "clang++.exe"),
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(binaryPath: string): Promise<string> {

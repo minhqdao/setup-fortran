@@ -2,8 +2,9 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
-import { Arch, type Target } from "../../types";
+import { Arch, type InstallationResult, type Target } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import * as fs from "fs";
 import path from "path";
 
@@ -55,7 +56,9 @@ const SUPPORTED_VERSIONS = {
 const ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${ONEAPI_ROOT}/setvars.sh`;
 
-export async function installDarwin(target: Target): Promise<string> {
+export async function installDarwin(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
 
   const release = IFORT_RELEASES.find((r) => r.version === version);
@@ -164,16 +167,16 @@ export async function installDarwin(target: Target): Promise<string> {
     }
   }
 
-  core.exportVariable("FC", "ifort");
-  core.exportVariable("CC", "icc");
-  core.exportVariable("CXX", "icpc");
-  core.exportVariable("FPM_FC", "ifort");
-  core.exportVariable("FPM_CC", "icc");
-  core.exportVariable("FPM_CXX", "icpc");
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "ifort",
+    cc: "icc",
+    cxx: "icpc",
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

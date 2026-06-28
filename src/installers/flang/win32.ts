@@ -3,7 +3,13 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as tc from "@actions/tool-cache";
-import { Arch, LATEST, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  LATEST,
+  Msystem,
+  type InstallationResult,
+  type Target,
+} from "../../types";
 import {
   resolveWindowsVersion,
   parseMajorOrPatch,
@@ -11,6 +17,7 @@ import {
   verifyAssetExists,
 } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { exportInstallationVariables } from "../../installation_result";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -138,7 +145,9 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
   core.exportVariable("LIB", existing ? `${libDirs};${existing}` : libDirs);
 }
 
-export async function installWin32(target: Target): Promise<string> {
+export async function installWin32(
+  target: Target,
+): Promise<InstallationResult> {
   switch (target.msystem) {
     case Msystem.Native:
       return await installNative(target);
@@ -148,7 +157,7 @@ export async function installWin32(target: Target): Promise<string> {
   }
 }
 
-async function installNative(target: Target): Promise<string> {
+async function installNative(target: Target): Promise<InstallationResult> {
   // resolveWindowsVersion handles patch versions internally via resolveVersion.
   // Use its return value — not target.version — so that LATEST is expanded to
   // the first supported version before parseMajorOrPatch sees it.
@@ -204,13 +213,6 @@ async function installNative(target: Target): Promise<string> {
   const clangExe = path.join(binDir, "clang.exe");
   const clangPPExe = path.join(binDir, "clang++.exe");
 
-  core.exportVariable("FC", flangExe);
-  core.exportVariable("CC", clangExe);
-  core.exportVariable("CXX", clangPPExe);
-  core.exportVariable("FPM_FC", flangExe);
-  core.exportVariable("FPM_CC", clangExe);
-  core.exportVariable("FPM_CXX", clangPPExe);
-
   // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
   // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
   const flangLibDir = path.join(toolRoot, "lib");
@@ -224,10 +226,17 @@ async function installNative(target: Target): Promise<string> {
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangExe,
+    cc: clangExe,
+    cxx: clangPPExe,
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
-async function installMSYS2(target: Target): Promise<string> {
+async function installMSYS2(target: Target): Promise<InstallationResult> {
   const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
   core.info(
     `Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`,
@@ -244,17 +253,18 @@ async function installMSYS2(target: Target): Promise<string> {
 
   core.addPath(msysBin);
 
-  core.exportVariable("FC", flangExe);
-  core.exportVariable("CC", clangExe);
-  core.exportVariable("CXX", clangPPExe);
-  core.exportVariable("FPM_FC", flangExe);
-  core.exportVariable("FPM_CC", clangExe);
-  core.exportVariable("FPM_CXX", clangPPExe);
   core.exportVariable("WINDOWS_ENV", target.msystem);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangExe,
+    cc: clangExe,
+    cxx: clangPPExe,
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(flangExe: string): Promise<string> {

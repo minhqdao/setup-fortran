@@ -3,8 +3,9 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -47,7 +48,9 @@ function condaArch(arch: Arch): string {
   }
 }
 
-export async function installDarwin(target: Target): Promise<string> {
+export async function installDarwin(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
 
   core.info(`Installing LFortran ${version} on macOS (${target.arch})...`);
@@ -105,12 +108,6 @@ export async function installDarwin(target: Target): Promise<string> {
   core.info(`Found lfortran binary at: ${lfortranBin}`);
   core.addPath(lfortranBinDir);
 
-  core.exportVariable("FC", "lfortran");
-  core.exportVariable("CC", "clang");
-  core.exportVariable("CXX", "clang++");
-  core.exportVariable("FPM_FC", "lfortran");
-  core.exportVariable("FPM_CC", "clang");
-  core.exportVariable("FPM_CXX", "clang++");
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   // lfortran links against system libc++ on macOS; set SDKROOT so the linker
@@ -132,7 +129,14 @@ export async function installDarwin(target: Target): Promise<string> {
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);
   core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "lfortran",
+    cc: "clang",
+    cxx: "clang++",
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(binaryPath: string): Promise<string> {

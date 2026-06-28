@@ -1,8 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -18,7 +19,9 @@ function aptCacheKey(version: string, osVersion: string): string {
   return `apt-gfortran-${osVersion}-${version}`;
 }
 
-export async function installDebian(target: Target): Promise<string> {
+export async function installDebian(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
 
@@ -58,19 +61,17 @@ export async function installDebian(target: Target): Promise<string> {
     `/usr/bin/gfortran-${version}`,
   ]);
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  core.exportVariable("FC", `gfortran-${version}`);
-  core.exportVariable("F77", `gfortran-${version}`);
-  core.exportVariable("F90", `gfortran-${version}`);
-  core.exportVariable("CC", `gcc-${version}`);
-  core.exportVariable("CXX", `g++-${version}`);
-  core.exportVariable("FPM_FC", `gfortran-${version}`);
-  core.exportVariable("FPM_CC", `gcc-${version}`);
-  core.exportVariable("FPM_CXX", `g++-${version}`);
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: `gfortran-${version}`,
+    cc: `gcc-${version}`,
+    cxx: `g++-${version}`,
+  };
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  exportInstallationVariables(result, { exportFortranAliases: true });
+  return result;
 }
 
 async function aptGetInstallWithRetry(

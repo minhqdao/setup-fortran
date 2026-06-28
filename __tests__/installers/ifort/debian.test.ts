@@ -158,7 +158,12 @@ describe("installDebian (ifort)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("ifort (IFORT) 2021.10.0 20230609");
+    const result = await installDebian(baseTarget);
+    expect(result).toEqual({
+      version: "ifort (IFORT) 2021.10.0 20230609",
+      fc: "ifort",
+      cc: "icc",
+      cxx: "icpc",
+    });
   });
 });

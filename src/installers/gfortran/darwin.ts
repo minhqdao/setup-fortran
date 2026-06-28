@@ -1,8 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -12,7 +13,9 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 } as const satisfies Record<Arch, readonly string[]>;
 
-export async function installDarwin(target: Target): Promise<string> {
+export async function installDarwin(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   core.info(
     `Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`,
@@ -119,22 +122,20 @@ export async function installDarwin(target: Target): Promise<string> {
     core.warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
   }
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  core.exportVariable("FC", gfortranBinary);
-  core.exportVariable("F77", gfortranBinary);
-  core.exportVariable("F90", gfortranBinary);
-
   const gccBinary = path.join(binDir, `gcc-${version}`);
   const gxxBinary = path.join(binDir, `g++-${version}`);
-  core.exportVariable("CC", gccBinary);
-  core.exportVariable("CXX", gxxBinary);
-  core.exportVariable("FPM_FC", gfortranBinary);
-  core.exportVariable("FPM_CC", gccBinary);
-  core.exportVariable("FPM_CXX", gxxBinary);
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: gfortranBinary,
+    cc: gccBinary,
+    cxx: gxxBinary,
+  };
+  core.info(`Setting FC, F77, and F90 environment variables...`);
+  exportInstallationVariables(result, { exportFortranAliases: true });
+  return result;
 }
 
 async function getBrewPrefix(): Promise<string> {

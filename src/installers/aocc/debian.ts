@@ -4,8 +4,9 @@ import * as cache from "@actions/cache";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { exportInstallationVariables } from "../../installation_result";
 import type { Target } from "../../types";
 
 // Make sure that the "latest" version is listed first. If the user does not
@@ -64,7 +65,9 @@ function getReleaseMetadata(version: string): AoccMetadata {
   };
 }
 
-export async function installDebian(target: Target): Promise<string> {
+export async function installDebian(
+  target: Target,
+): Promise<InstallationResult> {
   const version = resolveVersion(target, SUPPORTED_VERSIONS);
   const metadata = getReleaseMetadata(version);
 
@@ -143,14 +146,16 @@ export async function installDebian(target: Target): Promise<string> {
   }
 
   core.addPath(path.join(metadata.installDir, "bin"));
-  core.exportVariable("FC", "flang");
-  core.exportVariable("CC", "clang");
-  core.exportVariable("CXX", "clang++");
-  core.exportVariable("FPM_FC", "flang");
-  core.exportVariable("FPM_CC", "clang");
-  core.exportVariable("FPM_CXX", "clang++");
 
-  return await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: resolvedVersion,
+    fc: "flang",
+    cc: "clang",
+    cxx: "clang++",
+  };
+  exportInstallationVariables(result);
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

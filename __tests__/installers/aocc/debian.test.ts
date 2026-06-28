@@ -117,10 +117,20 @@ describe("installDebian (AOCC)", () => {
     expect(mockedExportVariable).toHaveBeenCalledWith("LD_LIBRARY_PATH", "/opt/AMD/aocc/lib");
     expect(mockedExportVariable).toHaveBeenCalledWith("AOCC_DIR", "/opt/AMD/aocc");
     expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang");
+    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "clang");
+    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "clang++");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "flang");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "clang");
+    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "clang++");
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("AOCC flang version 5.1.0");
+    const result = await installDebian(baseTarget);
+    expect(result).toEqual({
+      version: "AOCC flang version 5.1.0",
+      fc: "flang",
+      cc: "clang",
+      cxx: "clang++",
+    });
   });
 });

@@ -123,7 +123,12 @@ describe("installDarwin (ifort)", () => {
 
   it("resolves and returns the installed version", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    const version = await installDarwin(baseTarget);
-    expect(version).toBe("ifort (IFORT) 2021.10.0 20230609");
+    const result = await installDarwin(baseTarget);
+    expect(result).toEqual({
+      version: "ifort (IFORT) 2021.10.0 20230609",
+      fc: "ifort",
+      cc: "icc",
+      cxx: "icpc",
+    });
   });
 });

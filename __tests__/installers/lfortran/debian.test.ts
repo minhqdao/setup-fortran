@@ -100,7 +100,12 @@ describe("installDebian (LFortran)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("LFortran version 0.63.0");
+    const result = await installDebian(baseTarget);
+    expect(result).toEqual({
+      version: "LFortran version 0.63.0",
+      fc: "lfortran",
+      cc: "clang",
+      cxx: "clang++",
+    });
   });
 });

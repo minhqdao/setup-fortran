@@ -1,9 +1,11 @@
-import { OS, type Target } from "../../types";
+import { type InstallationResult, OS, type Target } from "../../types";
 import { installDebian } from "./debian";
 import { installDarwin } from "./darwin";
 import { installWin32 } from "./win32";
 
-export async function installGFortran(target: Target): Promise<string> {
+export async function installGFortran(
+  target: Target,
+): Promise<InstallationResult> {
   switch (target.os) {
     case OS.Linux:
       return await installDebian(target);
