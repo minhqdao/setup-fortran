@@ -199,7 +199,7 @@ export async function installDebian(
   if (cacheHit) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
-    if (inputs.cleanupDisk) await safelyFreeDiskSpace();
+    if (inputs.cleanupDisk) await cleanupDisk();
     // Add NVIDIA's apt repo.
     // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
     // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -285,7 +285,7 @@ export async function installDebian(
   return result;
 }
 
-async function safelyFreeDiskSpace(): Promise<void> {
+async function cleanupDisk(): Promise<void> {
   let output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {
     listeners: { stdout: (data) => (output += data.toString()) },
@@ -307,11 +307,21 @@ async function safelyFreeDiskSpace(): Promise<void> {
   });
 
   // 3. Remove large unused toolkits to free up significant space (~10GB+)
-  const toolkits = ["/usr/local/lib/android", "/opt/ghc"];
-  for (const toolkit of toolkits) {
+  const toolkitsToRemove = [
+    "/usr/local/lib/android",
+    "/opt/ghc",
+    "/usr/share/dotnet",
+    "/opt/hostedtoolcache",
+  ];
+
+  for (const toolkit of toolkitsToRemove) {
     if (fs.existsSync(toolkit)) {
-      core.info(`Removing large toolkit: ${toolkit}`);
-      await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+      core.info(`Removing ${toolkit} to free up disk space...`);
+      try {
+        await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+      } catch (e) {
+        core.debug(`Failed to remove ${toolkit}: ${String(e)}`);
+      }
     }
   }
 
