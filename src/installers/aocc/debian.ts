@@ -6,7 +6,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure that the "latest" version is listed first. If the user does not
 // specify a version, the latest will be installed by default.
@@ -65,14 +65,14 @@ function getReleaseMetadata(version: string): AoccMetadata {
 }
 
 export async function installDebian(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const metadata = getReleaseMetadata(version);
 
-  core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
+  core.info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
 
-  const cacheKey = `aocc-${version}-${target.arch}-${target.osVersion}`;
+  const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
   const tempInstallDir = path.join(os.homedir(), ".aocc-cache");
   const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
 

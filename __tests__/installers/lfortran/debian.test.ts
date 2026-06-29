@@ -7,7 +7,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -24,12 +24,13 @@ describe("installDebian (LFortran)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
     version: "0.63.0",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -47,7 +48,7 @@ describe("installDebian (LFortran)", () => {
   });
 
   it("downloads and installs Miniforge", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("curl", [
       "-fsSL",
@@ -68,7 +69,7 @@ describe("installDebian (LFortran)", () => {
   });
 
   it("installs lfortran via conda", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith(
       expect.stringContaining("conda"),
@@ -77,14 +78,14 @@ describe("installDebian (LFortran)", () => {
   });
 
   it("throws error on ARM64", async () => {
-    const target = { ...baseTarget, arch: Arch.ARM64 };
-    await expect(installDebian(target)).rejects.toThrow(
+    const inputs = { ...baseInputs, arch: Arch.ARM64 };
+    await expect(installDebian(inputs)).rejects.toThrow(
       "LFortran is not available for Linux ARM64 on conda-forge",
     );
   });
 
   it("exports environment variables", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
     expect(mockedExportVariable).toHaveBeenCalledWith(
@@ -94,7 +95,7 @@ describe("installDebian (LFortran)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const result = await installDebian(baseTarget);
+    const result = await installDebian(baseInputs);
     expect(result).toEqual({
       version: "LFortran version 0.63.0",
       fc: "lfortran",

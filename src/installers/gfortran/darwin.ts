@@ -3,7 +3,7 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -13,11 +13,11 @@ const SUPPORTED_VERSIONS = {
 } as const satisfies Record<Arch, readonly string[]>;
 
 export async function installDarwin(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   core.info(
-    `Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`,
+    `Installing GFortran ${version} on macOS (${inputs.arch}) via Homebrew...`,
   );
 
   const formula = `gcc@${version}`;

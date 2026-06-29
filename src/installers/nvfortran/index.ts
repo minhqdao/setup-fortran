@@ -1,11 +1,11 @@
-import { OS, type InstallationResult, type Target } from "../../types";
+import { OS, type InstallationResult, type Inputs } from "../../types";
 import { installDebian } from "./debian";
 
 export async function installNVFortran(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  if (target.os !== OS.Linux) {
-    throw new Error(`NVFortran is only supported on Linux (got: ${target.os})`);
+  if (inputs.os !== OS.Linux) {
+    throw new Error(`NVFortran is only supported on Linux (got: ${inputs.os})`);
   }
-  return await installDebian(target);
+  return await installDebian(inputs);
 }

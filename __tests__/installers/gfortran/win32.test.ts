@@ -8,7 +8,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -24,12 +24,13 @@ describe("installWin32 (gfortran)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.GFortran,
     version: "14",
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -52,7 +53,7 @@ describe("installWin32 (gfortran)", () => {
       mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
       mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\gfortran");
 
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
       expect(mockedTc.downloadTool).toHaveBeenCalled();
       expect(mockedTc.extractZip).toHaveBeenCalledWith("C:\\Temp\\gcc.zip");
@@ -63,15 +64,15 @@ describe("installWin32 (gfortran)", () => {
     it("exports environment variables", async () => {
       mockedTc.find.mockReturnValue("C:\\Cache\\gfortran");
 
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const target = { ...baseTarget, version: "latest", msystem: Msystem.UCRT64 };
-      await installWin32(target);
+      const inputs = { ...baseInputs, version: "latest", msystem: Msystem.UCRT64 };
+      await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["gcc-fortran"]);
     });

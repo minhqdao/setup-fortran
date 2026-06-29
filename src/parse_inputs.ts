@@ -1,11 +1,12 @@
 import * as core from "@actions/core";
 import * as os from "os";
-import { Compiler, OS, Arch, Msystem, LATEST, type Target } from "./types";
+import { Compiler, OS, Arch, Msystem, LATEST, type Inputs } from "./types";
 
 const DEFAULTS = {
   compiler: Compiler.GFortran,
   version: LATEST,
   msystem: Msystem.Native,
+  cleanupDisk: false,
 } as const;
 
 function detectOS(): OS {
@@ -94,22 +95,25 @@ function parseMsystem(raw: string): Msystem {
   );
 }
 
-export function parseInputs(): Target {
+export function parseInputs(): Inputs {
   const rawCompiler = core.getInput("compiler").trim() || DEFAULTS.compiler;
   const rawVersion = core.getInput("version").trim() || DEFAULTS.version;
   const rawMsystem = core.getInput("msystem").trim();
+  const cleanupDisk =
+    core.getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
 
   const compiler = parseCompiler(rawCompiler);
   const detectedOS = detectOS();
 
-  const target: Target = {
+  const inputs: Inputs = {
     compiler,
     version: rawVersion,
     os: detectedOS,
     osVersion: process.env.ImageOS ?? os.release(),
     arch: detectArch(),
     msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
+    cleanupDisk,
   };
 
-  return target;
+  return inputs;
 }

@@ -7,7 +7,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core", () => ({
@@ -30,12 +30,13 @@ describe("installDebian (Flang)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.Flang,
     version: "18",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -64,29 +65,31 @@ describe("installDebian (Flang)", () => {
   });
 
   it("calls llvm.sh with the correct version", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
-      "curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
+      "curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
     ]);
   });
 
   it("installs the correct flang package", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
       "install",
       "-y",
+      "-o",
+      "Acquire::ForceIPv4=true",
       "flang-18",
       "libomp-18-dev",
     ]);
   });
 
   it("configures update-alternatives for flang-new (15 <= major < 20)", async () => {
-    const target = { ...baseTarget, version: "17" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "17" };
+    await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "update-alternatives",
@@ -99,8 +102,8 @@ describe("installDebian (Flang)", () => {
   });
 
   it("configures update-alternatives for flang (major >= 20)", async () => {
-    const target = { ...baseTarget, version: "20" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "20" };
+    await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "update-alternatives",
@@ -113,7 +116,7 @@ describe("installDebian (Flang)", () => {
   });
 
   it("exports environment variables and adds to PATH", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(core.addPath).toHaveBeenCalledWith("/usr/lib/llvm-18/bin");
     expect(mockedExportVariable).toHaveBeenCalledWith(
@@ -123,13 +126,13 @@ describe("installDebian (Flang)", () => {
   });
 
   it("exports flang-20 for FC when version is 20", async () => {
-    const target = { ...baseTarget, version: "20" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "20" };
+    await installDebian(inputs);
 
   });
 
   it("resolves and returns the installed version", async () => {
-    const result = await installDebian(baseTarget);
+    const result = await installDebian(baseInputs);
     expect(result).toEqual({
       version: "flang version 18.1.0",
       fc: "flang-new-18",
@@ -145,7 +148,7 @@ describe("installDebian (Flang)", () => {
       return true;
     });
 
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "update-alternatives",
@@ -166,7 +169,7 @@ describe("installDebian (Flang)", () => {
       return true;
     });
 
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
       "update-alternatives",
@@ -181,7 +184,7 @@ describe("installDebian (Flang)", () => {
   it("throws error if no flang binary is found", async () => {
     mockedFs.existsSync.mockReturnValue(false);
 
-    await expect(installDebian(baseTarget)).rejects.toThrow(
+    await expect(installDebian(baseInputs)).rejects.toThrow(
       /Flang binary not found/,
     );
   });

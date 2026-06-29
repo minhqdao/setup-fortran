@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
-import { Arch, type InstallationResult, type Target } from "../../types";
+import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
 import path from "path";
@@ -56,25 +56,25 @@ const ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${ONEAPI_ROOT}/setvars.sh`;
 
 export async function installDarwin(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
   const release = IFORT_RELEASES.find((r) => r.version === version);
   if (!release) {
     throw new Error(`No installer URL found for ifort ${version} on macOS.`);
   }
 
-  core.info(`Installing ifort ${version} on macOS (${target.arch})...`);
+  core.info(`Installing ifort ${version} on macOS (${inputs.arch})...`);
 
-  if (target.arch === Arch.ARM64) {
+  if (inputs.arch === Arch.ARM64) {
     throw new Error(
       "Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
         "Please ensure your workflow uses the 'macos-13' runner.",
     );
   }
 
-  const cacheKey = `ifort-darwin-${target.arch}-${version}`;
+  const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {

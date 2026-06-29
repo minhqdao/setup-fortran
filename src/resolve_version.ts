@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { LATEST, type Msystem, type Target } from "./types";
+import { LATEST, type Msystem, type Inputs } from "./types";
 
 // ==========================================
 // Reusable Network Helper (Upgraded)
@@ -105,26 +105,26 @@ async function fetchJsonWithRetry<T>(
 // ==========================================
 
 export function resolveVersion<T extends readonly string[]>(
-  target: Target,
+  inputs: Inputs,
   supportedVersions: Record<string, T | undefined>,
   {
     matchMajorIfPatch = false,
     resolveMinorToLatestPatch = false,
   }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
 ): string {
-  const versions = supportedVersions[target.arch];
+  const versions = supportedVersions[inputs.arch];
 
   if (!versions) {
     throw new Error(
-      `No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`,
+      `No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`,
     );
   }
 
-  const version = target.version === LATEST ? versions[0] : target.version;
+  const version = inputs.version === LATEST ? versions[0] : inputs.version;
 
   if (!version) {
     throw new Error(
-      `No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`,
+      `No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`,
     );
   }
 
@@ -147,7 +147,7 @@ export function resolveVersion<T extends readonly string[]>(
     }
 
     throw new Error(
-      `${target.compiler} ${version} is not supported on ${target.os} (${target.arch}). ` +
+      `${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
         `Supported versions: ${versions.join(", ")}`,
     );
   }
@@ -156,7 +156,7 @@ export function resolveVersion<T extends readonly string[]>(
 }
 
 export function resolveWindowsVersion(
-  target: Target,
+  inputs: Inputs,
   supportedVersions: Record<
     string,
     Record<Msystem, readonly string[] | undefined> | undefined
@@ -166,24 +166,24 @@ export function resolveWindowsVersion(
     resolveMinorToLatestPatch = false,
   }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
 ): string {
-  const archVersions = supportedVersions[target.arch];
+  const archVersions = supportedVersions[inputs.arch];
   if (!archVersions) {
     throw new Error(
-      `Architecture "${target.arch}" is not supported for ${target.compiler} on Windows.`,
+      `Architecture "${inputs.arch}" is not supported for ${inputs.compiler} on Windows.`,
     );
   }
 
-  const msystem = target.msystem;
+  const msystem = inputs.msystem;
   const versions = archVersions[msystem];
   if (!versions) {
     throw new Error(
-      `The environment "${msystem}" is not supported or implemented for Windows ${target.arch}.`,
+      `The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`,
     );
   }
 
   return resolveVersion(
-    target,
-    { [target.arch]: versions },
+    inputs,
+    { [inputs.arch]: versions },
     { matchMajorIfPatch, resolveMinorToLatestPatch },
   );
 }

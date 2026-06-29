@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
-import { Arch, type InstallationResult, type Target } from "../../types";
+import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -31,9 +31,9 @@ const SUPPORTED_VERSIONS = {
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 export async function installDebian(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
   const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
   if (!entry) {

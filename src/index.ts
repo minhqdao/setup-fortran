@@ -15,48 +15,48 @@ import {
 
 async function run(): Promise<void> {
   try {
-    const target = parseInputs();
+    const inputs = parseInputs();
 
-    core.info(`Compiler  : ${target.compiler}`);
-    core.info(`Version   : ${target.version}`);
-    core.info(`OS        : ${target.os}`);
-    core.info(`OS Version: ${target.osVersion}`);
-    core.info(`Arch      : ${target.arch}`);
+    core.info(`Compiler  : ${inputs.compiler}`);
+    core.info(`Version   : ${inputs.version}`);
+    core.info(`OS        : ${inputs.os}`);
+    core.info(`OS Version: ${inputs.osVersion}`);
+    core.info(`Arch      : ${inputs.arch}`);
 
-    if (target.os === OS.Windows) {
-      core.info(`Windows env : ${target.msystem}`);
+    if (inputs.os === OS.Windows) {
+      core.info(`Windows env : ${inputs.msystem}`);
     }
 
     let installationResult: InstallationResult;
 
-    switch (target.compiler) {
+    switch (inputs.compiler) {
       case Compiler.GFortran:
-        installationResult = await installGFortran(target);
+        installationResult = await installGFortran(inputs);
         break;
       case Compiler.IFX:
-        installationResult = await installIFX(target);
+        installationResult = await installIFX(inputs);
         break;
       case Compiler.IFort:
-        installationResult = await installIFort(target);
+        installationResult = await installIFort(inputs);
         break;
       case Compiler.NVFortran:
-        installationResult = await installNVFortran(target);
+        installationResult = await installNVFortran(inputs);
         break;
       case Compiler.AOCC:
-        installationResult = await installAOCC(target);
+        installationResult = await installAOCC(inputs);
         break;
       case Compiler.Flang:
-        installationResult = await installFlang(target);
+        installationResult = await installFlang(inputs);
         break;
       case Compiler.LFortran:
-        installationResult = await installLFortran(target);
+        installationResult = await installLFortran(inputs);
         break;
     }
 
     setInstallationOutputs(installationResult);
     exportInstallationVariables(installationResult);
 
-    core.exportVariable("FORTRAN_COMPILER", target.compiler);
+    core.exportVariable("FORTRAN_COMPILER", inputs.compiler);
   } catch (err) {
     core.setFailed(err instanceof Error ? err.message : String(err));
   }

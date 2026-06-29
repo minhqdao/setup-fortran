@@ -7,7 +7,7 @@ import {
   LATEST,
   Msystem,
   type InstallationResult,
-  type Target,
+  type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
@@ -58,15 +58,15 @@ const SUPPORTED_VERSIONS = {
 >;
 
 export async function installWin32(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
 
-  switch (target.msystem) {
+  switch (inputs.msystem) {
     case Msystem.Native:
-      return await installNative(target, version);
+      return await installNative(inputs, version);
     case Msystem.UCRT64:
-      return await installMSYS2(target);
+      return await installMSYS2(inputs);
     case Msystem.Clang64:
       throw new Error(
         `Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
@@ -77,7 +77,7 @@ export async function installWin32(
 }
 
 async function installNative(
-  target: Target,
+  inputs: Inputs,
   version: string,
 ): Promise<InstallationResult> {
   const release = GCC_RELEASES.find((r) => r.version === version);
@@ -86,7 +86,7 @@ async function installNative(
   }
   const downloadUrl = release.url;
 
-  let toolRoot = tc.find(`gfortran-${target.msystem}`, version, target.arch);
+  let toolRoot = tc.find(`gfortran-${inputs.msystem}`, version, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading GFortran ${version} from ${downloadUrl}`);
@@ -100,9 +100,9 @@ async function installNative(
     core.info(`Caching GFortran ${version} in ${actualToolDir}...`);
     toolRoot = await tc.cacheDir(
       actualToolDir,
-      `gfortran-${target.msystem}`,
+      `gfortran-${inputs.msystem}`,
       version,
-      target.arch,
+      inputs.arch,
     );
   }
 
@@ -123,10 +123,10 @@ async function installNative(
   return result;
 }
 
-async function installMSYS2(target: Target): Promise<InstallationResult> {
-  await setupMSYS2(target.msystem, ["gcc-fortran"]);
+async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
+  await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
 
-  const msysBin = path.join("C:\\msys64", target.msystem, "bin");
+  const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
   const gfortranPath = path.join(msysBin, "gfortran.exe");
   const gccPath = path.join(msysBin, "gcc.exe");
   const gxxPath = path.join(msysBin, "g++.exe");

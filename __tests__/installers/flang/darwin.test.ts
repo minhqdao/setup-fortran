@@ -8,7 +8,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
   LATEST,
 } from "../../../src/types";
 
@@ -51,12 +51,13 @@ describe("installDarwin (Flang)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.Flang,
     version: LATEST,
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -84,19 +85,19 @@ describe("installDarwin (Flang)", () => {
   });
 
   it("installs via Homebrew when version is LATEST", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
     });
 
   it("downloads from GitHub when version is specified", async () => {
-    const target = { ...baseTarget, version: "19" };
+    const inputs = { ...baseInputs, version: "19" };
     mockedTc.find.mockReturnValue("");
     mockedTc.downloadTool.mockResolvedValue("/tmp/llvm.tar.xz");
     mockedTc.extractTar.mockResolvedValue("/tmp/llvm-extracted");
     mockedTc.cacheDir.mockResolvedValue("/cache/llvm");
 
-    await installDarwin(target);
+    await installDarwin(inputs);
 
     expect(mockedTc.downloadTool).toHaveBeenCalledWith(
       expect.stringContaining("github.com/llvm/llvm-project/releases/download"),
@@ -106,7 +107,7 @@ describe("installDarwin (Flang)", () => {
   });
 
   it("exports environment variables", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "SDKROOT",
@@ -115,7 +116,7 @@ describe("installDarwin (Flang)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const result = await installDarwin(baseTarget);
+    const result = await installDarwin(baseInputs);
     expect(result).toEqual({
       version: "flang version 18.1.0",
       fc: "/usr/local/opt/flang/bin/flang",

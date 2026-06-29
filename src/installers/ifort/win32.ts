@@ -6,7 +6,7 @@ import {
   Arch,
   Msystem,
   type InstallationResult,
-  type Target,
+  type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
@@ -68,9 +68,9 @@ const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
 export async function installWin32(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
 
   const release = IFORT_RELEASES.find((r) => r.version === version);
   if (!release) {
@@ -80,9 +80,9 @@ export async function installWin32(
     );
   }
 
-  core.info(`Installing ifort ${version} on Windows (${target.arch})...`);
+  core.info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifort-win32-${target.arch}-${version}`;
+  const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {

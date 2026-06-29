@@ -29,13 +29,14 @@ export const Msystem = {
 } as const;
 export type Msystem = (typeof Msystem)[keyof typeof Msystem];
 
-export interface Target {
+export interface Inputs {
   compiler: Compiler;
   version: string;
   os: OS;
   osVersion: string;
   arch: Arch;
   msystem: Msystem;
+  cleanupDisk: boolean;
 }
 
 export const LATEST = "latest" as const;

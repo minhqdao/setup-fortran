@@ -72,7 +72,13 @@ jobs:
           msystem: ${{ matrix.toolchain.msystem }}
 
       - name: Verify installation
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
         run: |
+          npm run verify-installation
           echo "Fortran Compiler Setup:"
           echo "  Version: ${{ steps.setup.outputs.version }}"
           echo "  FC:      ${{ steps.setup.outputs.fc }}"
@@ -80,8 +86,4 @@ jobs:
           echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
       - name: Run Integration Tests
-        env:
-          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
-          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
-          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
         run: npm run integration-test
