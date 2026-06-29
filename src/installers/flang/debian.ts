@@ -3,7 +3,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -67,12 +67,12 @@ function resolveFlangBinaryPath(major: number, version: string): string {
 }
 
 export async function installDebian(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
 
-  core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
+  core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
 
   core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
   await exec.exec("sudo", [

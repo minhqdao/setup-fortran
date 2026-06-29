@@ -6,7 +6,7 @@ import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -147,9 +147,9 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
  * Must be called before installing the nvhpc apt package.
  * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
  */
-async function installLegacyNcurses(target: Target): Promise<void> {
-  const base = NCURSES_ARCHIVE_BASE[target.arch];
-  const debArch = APT_ARCH[target.arch];
+async function installLegacyNcurses(inputs: Inputs): Promise<void> {
+  const base = NCURSES_ARCHIVE_BASE[inputs.arch];
+  const debArch = APT_ARCH[inputs.arch];
   const poolPath = "pool/universe/n/ncurses";
 
   // libtinfo5 must be installed before libncursesw5 (dependency order).
@@ -182,24 +182,24 @@ async function installLegacyNcurses(target: Target): Promise<void> {
 }
 
 export async function installDebian(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  const aptArch = APT_ARCH[target.arch];
-  const nvArch = NV_ARCH[target.arch];
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const aptArch = APT_ARCH[inputs.arch];
+  const nvArch = NV_ARCH[inputs.arch];
 
-  core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
+  core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
 
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
-  const cacheKey = `nvhpc-${version}-${target.arch}-${target.osVersion}`;
+  const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   // --- Cache restore ---
   const cacheHit = await cache.restoreCache([installDir], cacheKey);
   if (cacheHit) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
-    await freeDiskSpace();
+    if (inputs.cleanupDisk) await safelyFreeDiskSpace();
     // Add NVIDIA's apt repo.
     // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
     // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -234,7 +234,7 @@ export async function installDebian(
       core.info(
         `nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`,
       );
-      await installLegacyNcurses(target);
+      await installLegacyNcurses(inputs);
     }
 
     // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
@@ -285,7 +285,7 @@ export async function installDebian(
   return result;
 }
 
-async function freeDiskSpace(): Promise<void> {
+async function safelyFreeDiskSpace(): Promise<void> {
   let output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {
     listeners: { stdout: (data) => (output += data.toString()) },
@@ -307,21 +307,11 @@ async function freeDiskSpace(): Promise<void> {
   });
 
   // 3. Remove large unused toolkits to free up significant space (~10GB+)
-  const toolkitsToRemove = [
-    "/usr/local/lib/android",
-    "/opt/ghc",
-    "/usr/share/dotnet",
-    "/opt/hostedtoolcache",
-  ];
-
-  for (const toolkit of toolkitsToRemove) {
+  const toolkits = ["/usr/local/lib/android", "/opt/ghc"];
+  for (const toolkit of toolkits) {
     if (fs.existsSync(toolkit)) {
-      core.info(`Removing ${toolkit} to free up disk space...`);
-      try {
-        await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
-      } catch (e) {
-        core.debug(`Failed to remove ${toolkit}: ${String(e)}`);
-      }
+      core.info(`Removing large toolkit: ${toolkit}`);
+      await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
     }
   }
 

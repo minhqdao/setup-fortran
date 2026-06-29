@@ -8,7 +8,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -25,12 +25,13 @@ describe("installDebian ifx", () => {
   const mockedCache = cache as jest.Mocked<typeof cache>;
   const mockedFs = fs as jest.Mocked<typeof fs>;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.IFX,
     version: "2023.2.4",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -58,8 +59,8 @@ describe("installDebian ifx", () => {
   });
 
   it("installs the correct versioned packages and saves to cache on miss", async () => {
-    const target = { ...baseTarget, version: "2023.2.0" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "2023.2.0" };
+    await installDebian(inputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
@@ -81,8 +82,8 @@ describe("installDebian ifx", () => {
 
   it("skips installation and restores from cache on hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    const target = { ...baseTarget, version: "2023.2.0" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "2023.2.0" };
+    await installDebian(inputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -105,8 +106,8 @@ describe("installDebian ifx", () => {
   });
 
   it("maps 2-digit version 2025.2 to 2025.2", async () => {
-    const target = { ...baseTarget, version: "2025.2" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "2025.2" };
+    await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -119,8 +120,8 @@ describe("installDebian ifx", () => {
   });
 
   it("resolves 2023.2 to the latest patch 2023.2.4 using resolveMinorToLatestPatch", async () => {
-    const target = { ...baseTarget, version: "2023.2" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "2023.2" };
+    await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -133,7 +134,7 @@ describe("installDebian ifx", () => {
   });
 
   it("adds the Intel repository on cache miss", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -157,7 +158,7 @@ describe("installDebian ifx", () => {
   });
 
   it("exports environment variables including FPM flags", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
   });
 });

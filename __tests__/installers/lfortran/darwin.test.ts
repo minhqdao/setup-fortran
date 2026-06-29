@@ -7,7 +7,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -24,12 +24,13 @@ describe("installDarwin (LFortran)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
     version: "0.63.0",
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -57,7 +58,7 @@ describe("installDarwin (LFortran)", () => {
   });
 
   it("downloads and installs Miniforge", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("curl", [
       "-fsSL",
@@ -78,7 +79,7 @@ describe("installDarwin (LFortran)", () => {
   });
 
   it("installs lfortran via conda", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith(
       expect.stringContaining("conda"),
@@ -87,14 +88,14 @@ describe("installDarwin (LFortran)", () => {
   });
 
   it("exports environment variables and SDKROOT", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
     expect(mockedExportVariable).toHaveBeenCalledWith("SDKROOT", "/path/to/SDK");
   });
 
   it("resolves and returns the installed version", async () => {
-    const result = await installDarwin(baseTarget);
+    const result = await installDarwin(baseInputs);
     expect(result).toEqual({
       version: "LFortran version 0.63.0",
       fc: expect.stringContaining("lfortran"),

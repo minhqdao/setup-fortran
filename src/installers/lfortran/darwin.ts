@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as os from "os";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -48,17 +48,17 @@ function condaArch(arch: Arch): string {
 }
 
 export async function installDarwin(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
-  core.info(`Installing LFortran ${version} on macOS (${target.arch})...`);
+  core.info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
 
   // Install Miniforge into a dedicated prefix under the runner's temp dir to
   // avoid interfering with any pre-existing conda installation on the runner.
   const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
   const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
-  const arch = condaArch(target.arch);
+  const arch = condaArch(inputs.arch);
 
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
 

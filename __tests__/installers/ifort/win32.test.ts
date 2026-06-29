@@ -9,7 +9,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -32,12 +32,13 @@ describe("installWin32 (ifort)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.IFort,
     version: "2021.10",
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -68,7 +69,7 @@ describe("installWin32 (ifort)", () => {
   it("restores from cache if available", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalled();
     expect(mockedTc.downloadTool).not.toHaveBeenCalled();
@@ -78,7 +79,7 @@ describe("installWin32 (ifort)", () => {
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\ifort.exe");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedTc.downloadTool).toHaveBeenCalled();
     expect(mockedExec).toHaveBeenCalledWith('"C:\\Temp\\ifort.exe"', [
@@ -96,7 +97,7 @@ describe("installWin32 (ifort)", () => {
   it("exports environment variables", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "ONEAPI_ROOT",
@@ -106,7 +107,7 @@ describe("installWin32 (ifort)", () => {
 
   it("resolves and returns the installed version", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    const result = await installWin32(baseTarget);
+    const result = await installWin32(baseInputs);
     expect(result).toMatchObject({
       fc: "ifort",
       cc: "icl",

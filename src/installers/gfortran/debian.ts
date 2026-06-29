@@ -3,7 +3,7 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -19,12 +19,12 @@ function aptCacheKey(version: string, osVersion: string): string {
 }
 
 export async function installDebian(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  core.info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
 
-  const cacheKey = aptCacheKey(version, target.osVersion);
+  const cacheKey = aptCacheKey(version, inputs.osVersion);
   const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
 
   if (cacheHit) {
@@ -39,7 +39,7 @@ export async function installDebian(
       `gfortran-${version}`,
     ]);
   } else {
-    if (needsPpa(version, target.osVersion)) {
+    if (needsPpa(version, inputs.osVersion)) {
       core.info(`Adding PPA for GFortran ${version}...`);
       await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }

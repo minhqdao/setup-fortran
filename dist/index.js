@@ -95303,6 +95303,7 @@ const DEFAULTS = {
     compiler: Compiler.GFortran,
     version: LATEST,
     msystem: Msystem.Native,
+    cleanupDisk: false,
 };
 function detectOS() {
     switch (process.platform) {
@@ -95388,17 +95389,19 @@ function parseInputs() {
     const rawCompiler = core.getInput("compiler").trim() || DEFAULTS.compiler;
     const rawVersion = core.getInput("version").trim() || DEFAULTS.version;
     const rawMsystem = core.getInput("msystem").trim();
+    const cleanupDisk = core.getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
-    const target = {
+    const inputs = {
         compiler,
         version: rawVersion,
         os: detectedOS,
         osVersion: process.env.ImageOS ?? external_os_.release(),
         arch: detectArch(),
         msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
+        cleanupDisk,
     };
-    return target;
+    return inputs;
 }
 
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
@@ -95471,14 +95474,14 @@ async function fetchJsonWithRetry(url, options = {}) {
 // ==========================================
 // Exported Core Functions
 // ==========================================
-function resolveVersion(target, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
-    const versions = supportedVersions[target.arch];
+function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+    const versions = supportedVersions[inputs.arch];
     if (!versions) {
-        throw new Error(`No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`);
+        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
-    const version = target.version === LATEST ? versions[0] : target.version;
+    const version = inputs.version === LATEST ? versions[0] : inputs.version;
     if (!version) {
-        throw new Error(`No supported versions found for ${target.compiler} on ${target.os} (${target.arch}).`);
+        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
     const versionList = versions;
     if (!versionList.includes(version)) {
@@ -95496,22 +95499,22 @@ function resolveVersion(target, supportedVersions, { matchMajorIfPatch = false, 
                 return match;
             }
         }
-        throw new Error(`${target.compiler} ${version} is not supported on ${target.os} (${target.arch}). ` +
+        throw new Error(`${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
             `Supported versions: ${versions.join(", ")}`);
     }
     return version;
 }
-function resolveWindowsVersion(target, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
-    const archVersions = supportedVersions[target.arch];
+function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+    const archVersions = supportedVersions[inputs.arch];
     if (!archVersions) {
-        throw new Error(`Architecture "${target.arch}" is not supported for ${target.compiler} on Windows.`);
+        throw new Error(`Architecture "${inputs.arch}" is not supported for ${inputs.compiler} on Windows.`);
     }
-    const msystem = target.msystem;
+    const msystem = inputs.msystem;
     const versions = archVersions[msystem];
     if (!versions) {
-        throw new Error(`The environment "${msystem}" is not supported or implemented for Windows ${target.arch}.`);
+        throw new Error(`The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`);
     }
-    return resolveVersion(target, { [target.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
+    return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
 }
 // FIX: Handles string segmentation gracefully for minor versions (length === 2)
 function parseMajorOrPatch(input) {
@@ -95593,10 +95596,10 @@ const CACHE_PATHS = ["/var/cache/apt/archives"];
 function aptCacheKey(version, osVersion) {
     return `apt-gfortran-${osVersion}-${version}`;
 }
-async function installDebian(target) {
-    const version = resolveVersion(target, SUPPORTED_VERSIONS);
-    core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
-    const cacheKey = aptCacheKey(version, target.osVersion);
+async function installDebian(inputs) {
+    const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+    core.info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
+    const cacheKey = aptCacheKey(version, inputs.osVersion);
     const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
     if (cacheHit) {
         core.info(`Cache hit for ${cacheKey}, installing from cache...`);
@@ -95611,7 +95614,7 @@ async function installDebian(target) {
         ]);
     }
     else {
-        if (needsPpa(version, target.osVersion)) {
+        if (needsPpa(version, inputs.osVersion)) {
             core.info(`Adding PPA for GFortran ${version}...`);
             await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
         }
@@ -95721,9 +95724,9 @@ const darwin_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
     [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
-async function installDarwin(target) {
-    const version = resolveVersion(target, darwin_SUPPORTED_VERSIONS);
-    core.info(`Installing GFortran ${version} on macOS (${target.arch}) via Homebrew...`);
+async function installDarwin(inputs) {
+    const version = resolveVersion(inputs, darwin_SUPPORTED_VERSIONS);
+    core.info(`Installing GFortran ${version} on macOS (${inputs.arch}) via Homebrew...`);
     const formula = `gcc@${version}`;
     let listOutput = "";
     await exec.exec("brew", ["list", "--versions", formula], {
@@ -95927,26 +95930,26 @@ const win32_SUPPORTED_VERSIONS = {
         [Msystem.Clang64]: undefined,
     },
 };
-async function installWin32(target) {
-    const version = resolveWindowsVersion(target, win32_SUPPORTED_VERSIONS);
-    switch (target.msystem) {
+async function installWin32(inputs) {
+    const version = resolveWindowsVersion(inputs, win32_SUPPORTED_VERSIONS);
+    switch (inputs.msystem) {
         case Msystem.Native:
-            return await installNative(target, version);
+            return await installNative(inputs, version);
         case Msystem.UCRT64:
-            return await installMSYS2(target);
+            return await installMSYS2(inputs);
         case Msystem.Clang64:
             throw new Error(`Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
                 `Please use the "native" msystem to install the latest gfortran via conda-forge, or ` +
                 `use MSYS2 with msystem "ucrt64" for a rolling-release version of gfortran.`);
     }
 }
-async function installNative(target, version) {
+async function installNative(inputs, version) {
     const release = GCC_RELEASES.find((r) => r.version === version);
     if (!release) {
         throw new Error(`Unsupported GFortran version: ${version}`);
     }
     const downloadUrl = release.url;
-    let toolRoot = tool_cache.find(`gfortran-${target.msystem}`, version, target.arch);
+    let toolRoot = tool_cache.find(`gfortran-${inputs.msystem}`, version, inputs.arch);
     if (!toolRoot) {
         core.info(`Downloading GFortran ${version} from ${downloadUrl}`);
         const downloadPath = await tool_cache.downloadTool(downloadUrl);
@@ -95954,7 +95957,7 @@ async function installNative(target, version) {
         const extractPath = await tool_cache.extractZip(downloadPath);
         const actualToolDir = external_path_.join(extractPath, "mingw64");
         core.info(`Caching GFortran ${version} in ${actualToolDir}...`);
-        toolRoot = await tool_cache.cacheDir(actualToolDir, `gfortran-${target.msystem}`, version, target.arch);
+        toolRoot = await tool_cache.cacheDir(actualToolDir, `gfortran-${inputs.msystem}`, version, inputs.arch);
     }
     const binPath = external_path_.join(toolRoot, "bin");
     core.addPath(binPath);
@@ -95970,9 +95973,9 @@ async function installNative(target, version) {
     };
     return result;
 }
-async function installMSYS2(target) {
-    await setupMSYS2(target.msystem, ["gcc-fortran"]);
-    const msysBin = external_path_.join("C:\\msys64", target.msystem, "bin");
+async function installMSYS2(inputs) {
+    await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
+    const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
     const gfortranPath = external_path_.join(msysBin, "gfortran.exe");
     const gccPath = external_path_.join(msysBin, "gcc.exe");
     const gxxPath = external_path_.join(msysBin, "g++.exe");
@@ -96005,14 +96008,14 @@ async function win32_resolveInstalledVersion() {
 
 
 
-async function installGFortran(target) {
-    switch (target.os) {
+async function installGFortran(inputs) {
+    switch (inputs.os) {
         case OS.Linux:
-            return await installDebian(target);
+            return await installDebian(inputs);
         case OS.MacOS:
-            return await installDarwin(target);
+            return await installDarwin(inputs);
         case OS.Windows:
-            return await installWin32(target);
+            return await installWin32(inputs);
     }
 }
 
@@ -96057,11 +96060,11 @@ const debian_SUPPORTED_VERSIONS = {
     ],
     [Arch.ARM64]: undefined,
 };
-async function debian_installDebian(target) {
-    const version = resolveVersion(target, debian_SUPPORTED_VERSIONS, {
+async function debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, debian_SUPPORTED_VERSIONS, {
         resolveMinorToLatestPatch: true,
     });
-    core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
+    core.info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
     const ONEAPI_ROOT = "/opt/intel/oneapi";
     const cacheKey = `oneapi-ifx-${version}`;
     const cachePaths = [ONEAPI_ROOT];
@@ -96273,8 +96276,8 @@ const ifx_win32_SUPPORTED_VERSIONS = {
 };
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
-async function win32_installWin32(target) {
-    const version = resolveWindowsVersion(target, ifx_win32_SUPPORTED_VERSIONS, {
+async function win32_installWin32(inputs) {
+    const version = resolveWindowsVersion(inputs, ifx_win32_SUPPORTED_VERSIONS, {
         resolveMinorToLatestPatch: true,
     });
     const release = IFX_RELEASES.find((r) => r.version === version);
@@ -96282,8 +96285,8 @@ async function win32_installWin32(target) {
         throw new Error(`No installer URL found for ifx ${version} on Windows. ` +
             `This is a bug — please open an issue.`);
     }
-    core.info(`Installing ifx ${version} on Windows (${target.arch})...`);
-    const cacheKey = `ifx-win32-${target.arch}-${version}`;
+    core.info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
+    const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
@@ -96415,14 +96418,14 @@ async function ifx_win32_resolveInstalledVersion() {
 
 
 
-async function installIFX(target) {
-    switch (target.os) {
+async function installIFX(inputs) {
+    switch (inputs.os) {
         case OS.Linux:
-            return await debian_installDebian(target);
+            return await debian_installDebian(inputs);
         case OS.MacOS:
             throw new Error(`IFX is not supported on macOS`);
         case OS.Windows:
-            return await win32_installWin32(target);
+            return await win32_installWin32(inputs);
     }
 }
 
@@ -96456,8 +96459,8 @@ const ifort_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
     [Arch.ARM64]: undefined,
 };
-async function ifort_debian_installDebian(target) {
-    const version = resolveVersion(target, ifort_debian_SUPPORTED_VERSIONS);
+async function ifort_debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, ifort_debian_SUPPORTED_VERSIONS);
     const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
     if (!entry) {
         throw new Error(`Unsupported ifort version: ${version}`);
@@ -96620,18 +96623,18 @@ const ifort_darwin_SUPPORTED_VERSIONS = {
 };
 const darwin_ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${darwin_ONEAPI_ROOT}/setvars.sh`;
-async function darwin_installDarwin(target) {
-    const version = resolveVersion(target, ifort_darwin_SUPPORTED_VERSIONS);
+async function darwin_installDarwin(inputs) {
+    const version = resolveVersion(inputs, ifort_darwin_SUPPORTED_VERSIONS);
     const release = IFORT_RELEASES.find((r) => r.version === version);
     if (!release) {
         throw new Error(`No installer URL found for ifort ${version} on macOS.`);
     }
-    core.info(`Installing ifort ${version} on macOS (${target.arch})...`);
-    if (target.arch === Arch.ARM64) {
+    core.info(`Installing ifort ${version} on macOS (${inputs.arch})...`);
+    if (inputs.arch === Arch.ARM64) {
         throw new Error("Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
             "Please ensure your workflow uses the 'macos-13' runner.");
     }
-    const cacheKey = `ifort-darwin-${target.arch}-${version}`;
+    const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
     if (!external_fs_.existsSync(darwin_ONEAPI_ROOT)) {
         await exec.exec("sudo", ["mkdir", "-p", darwin_ONEAPI_ROOT]);
@@ -96779,15 +96782,15 @@ const ifort_win32_SUPPORTED_VERSIONS = {
 };
 const win32_ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const win32_SETVARS_BAT = `${win32_ONEAPI_ROOT}\\setvars.bat`;
-async function ifort_win32_installWin32(target) {
-    const version = resolveWindowsVersion(target, ifort_win32_SUPPORTED_VERSIONS);
+async function ifort_win32_installWin32(inputs) {
+    const version = resolveWindowsVersion(inputs, ifort_win32_SUPPORTED_VERSIONS);
     const release = win32_IFORT_RELEASES.find((r) => r.version === version);
     if (!release) {
         throw new Error(`No installer URL found for ifort ${version} on Windows. ` +
             `This is likely a legacy version issue — please check release compatibility.`);
     }
-    core.info(`Installing ifort ${version} on Windows (${target.arch})...`);
-    const cacheKey = `ifort-win32-${target.arch}-${version}`;
+    core.info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
+    const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
     const cachePaths = [win32_ONEAPI_ROOT];
     if (!external_fs_.existsSync(win32_ONEAPI_ROOT)) {
         external_fs_.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
@@ -96887,14 +96890,14 @@ async function ifort_win32_resolveInstalledVersion() {
 
 
 
-async function installIFort(target) {
-    switch (target.os) {
+async function installIFort(inputs) {
+    switch (inputs.os) {
         case OS.Linux:
-            return await ifort_debian_installDebian(target);
+            return await ifort_debian_installDebian(inputs);
         case OS.MacOS:
-            return await darwin_installDarwin(target);
+            return await darwin_installDarwin(inputs);
         case OS.Windows:
-            return await ifort_win32_installWin32(target);
+            return await ifort_win32_installWin32(inputs);
     }
 }
 
@@ -97034,9 +97037,9 @@ async function needsLegacyNcursesInstall() {
  * Must be called before installing the nvhpc apt package.
  * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
  */
-async function installLegacyNcurses(target) {
-    const base = NCURSES_ARCHIVE_BASE[target.arch];
-    const debArch = APT_ARCH[target.arch];
+async function installLegacyNcurses(inputs) {
+    const base = NCURSES_ARCHIVE_BASE[inputs.arch];
+    const debArch = APT_ARCH[inputs.arch];
     const poolPath = "pool/universe/n/ncurses";
     // libtinfo5 must be installed before libncursesw5 (dependency order).
     const debs = [
@@ -97065,21 +97068,22 @@ async function installLegacyNcurses(target) {
         await exec.exec("sudo", ["dpkg", "-i", dest]);
     }
 }
-async function nvfortran_debian_installDebian(target) {
-    const version = resolveVersion(target, nvfortran_debian_SUPPORTED_VERSIONS);
-    const aptArch = APT_ARCH[target.arch];
-    const nvArch = NV_ARCH[target.arch];
-    core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
+async function nvfortran_debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, nvfortran_debian_SUPPORTED_VERSIONS);
+    const aptArch = APT_ARCH[inputs.arch];
+    const nvArch = NV_ARCH[inputs.arch];
+    core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
     const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
     const binDir = `${installDir}/compilers/bin`;
-    const cacheKey = `nvhpc-${version}-${target.arch}-${target.osVersion}`;
+    const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
     // --- Cache restore ---
     const cacheHit = await cache.restoreCache([installDir], cacheKey);
     if (cacheHit) {
         core.info(`Restored nvhpc ${version} from cache.`);
     }
     else {
-        await safelyFreeDiskSpace();
+        if (inputs.cleanupDisk)
+            await safelyFreeDiskSpace();
         // Add NVIDIA's apt repo.
         // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
         // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -97108,7 +97112,7 @@ async function nvfortran_debian_installDebian(target) {
         if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
             (await needsLegacyNcursesInstall())) {
             core.info(`nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`);
-            await installLegacyNcurses(target);
+            await installLegacyNcurses(inputs);
         }
         // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
         const pkgName = `nvhpc-${version.replace(".", "-")}`;
@@ -97197,11 +97201,11 @@ async function nvfortran_debian_resolveInstalledVersion() {
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/index.ts
 
 
-async function installNVFortran(target) {
-    if (target.os !== OS.Linux) {
-        throw new Error(`NVFortran is only supported on Linux (got: ${target.os})`);
+async function installNVFortran(inputs) {
+    if (inputs.os !== OS.Linux) {
+        throw new Error(`NVFortran is only supported on Linux (got: ${inputs.os})`);
     }
-    return await nvfortran_debian_installDebian(target);
+    return await nvfortran_debian_installDebian(inputs);
 }
 
 ;// CONCATENATED MODULE: ./src/installers/aocc/debian.ts
@@ -97256,11 +97260,11 @@ function getReleaseMetadata(version) {
         installDir: `/opt/AMD/aocc-compiler-${fullVersion}`,
     };
 }
-async function aocc_debian_installDebian(target) {
-    const version = resolveVersion(target, aocc_debian_SUPPORTED_VERSIONS);
+async function aocc_debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, aocc_debian_SUPPORTED_VERSIONS);
     const metadata = getReleaseMetadata(version);
-    core.info(`Installing AOCC ${version} on Linux (${target.arch})...`);
-    const cacheKey = `aocc-${version}-${target.arch}-${target.osVersion}`;
+    core.info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
+    const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
     const tempInstallDir = external_path_.join(external_os_.homedir(), ".aocc-cache");
     const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
     if (cacheHit) {
@@ -97349,11 +97353,11 @@ async function aocc_debian_resolveInstalledVersion() {
 ;// CONCATENATED MODULE: ./src/installers/aocc/index.ts
 
 
-async function installAOCC(target) {
-    if (target.os !== OS.Linux) {
-        throw new Error(`AOCC is only supported on Linux (got: ${target.os})`);
+async function installAOCC(inputs) {
+    if (inputs.os !== OS.Linux) {
+        throw new Error(`AOCC is only supported on Linux (got: ${inputs.os})`);
     }
-    return await aocc_debian_installDebian(target);
+    return await aocc_debian_installDebian(inputs);
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/debian.ts
@@ -97415,10 +97419,10 @@ function resolveFlangBinaryPath(major, version) {
     throw new Error(`Flang binary not found in any expected location for LLVM ${version}. Checked:\n` +
         candidates.map((c) => `  ${c}`).join("\n"));
 }
-async function flang_debian_installDebian(target) {
-    const version = resolveVersion(target, flang_debian_SUPPORTED_VERSIONS);
+async function flang_debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
     const major = parseInt(version, 10);
-    core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
+    core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
     await exec.exec("sudo", [
         "sed",
@@ -97529,31 +97533,31 @@ const MACOS_ASSET_SUFFIX = {
     [Arch.X64]: "macOS-X64",
     [Arch.ARM64]: "macOS-ARM64",
 };
-async function flang_darwin_installDarwin(target) {
-    const resolved = resolveVersion(target, flang_darwin_SUPPORTED_VERSIONS, {
+async function flang_darwin_installDarwin(inputs) {
+    const resolved = resolveVersion(inputs, flang_darwin_SUPPORTED_VERSIONS, {
         matchMajorIfPatch: true,
     });
     if (resolved === LATEST) {
-        return await installBrew(target);
+        return await installBrew(inputs);
     }
     // User specified a major or full patch version — use GitHub releases.
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
     let patch;
     if (userPatch !== undefined) {
-        const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[target.arch]}.tar.xz`;
+        const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
         await verifyAssetExists("llvm/llvm-project", userPatch, filename);
         patch = userPatch;
     }
     else {
         patch = await resolveLatestPatch("llvm/llvm-project", major);
     }
-    return await installFromGitHub(target, major, patch);
+    return await installFromGitHub(inputs, major, patch);
 }
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
 // tracks the latest LLVM release. Any version input that resolved to LATEST
 // ends up here.
-async function installBrew(target) {
-    core.info(`Installing Flang on macOS (${target.arch}) via Homebrew...`);
+async function installBrew(inputs) {
+    core.info(`Installing Flang on macOS (${inputs.arch}) via Homebrew...`);
     core.info(`Note: the Homebrew flang formula is unversioned — the latest available ` +
         `release will be installed regardless of any version input.`);
     await exec.exec("brew", ["install", "flang"]);
@@ -97599,14 +97603,14 @@ async function installBrew(target) {
 }
 // Downloads and installs a specific flang version from official LLVM GitHub
 // releases as a .tar.xz archive.
-async function installFromGitHub(target, major, patch) {
-    const suffix = MACOS_ASSET_SUFFIX[target.arch];
+async function installFromGitHub(inputs, major, patch) {
+    const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
     const filename = `LLVM-${patch}-${suffix}.tar.xz`;
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
-    core.info(`Installing Flang ${major} (${patch}) on macOS (${target.arch})...`);
+    core.info(`Installing Flang ${major} (${patch}) on macOS (${inputs.arch})...`);
     // Key the cache on the full patch version so a new patch release always
     // triggers a fresh download rather than serving a stale cached binary.
-    let toolRoot = tool_cache.find("flang", patch, target.arch);
+    let toolRoot = tool_cache.find("flang", patch, inputs.arch);
     if (!toolRoot) {
         core.info(`Downloading ${filename}...`);
         const downloadPath = await tool_cache.downloadTool(downloadUrl);
@@ -97618,7 +97622,7 @@ async function installFromGitHub(target, major, patch) {
             "--strip-components=1",
         ]);
         core.info("Caching...");
-        toolRoot = await tool_cache.cacheDir(extractPath, "flang", patch, target.arch);
+        toolRoot = await tool_cache.cacheDir(extractPath, "flang", patch, inputs.arch);
     }
     else {
         core.info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
@@ -97795,37 +97799,37 @@ async function setupMsvcLibs(arch) {
         .join(";");
     core.exportVariable("LIB", existing ? `${libDirs};${existing}` : libDirs);
 }
-async function flang_win32_installWin32(target) {
-    switch (target.msystem) {
+async function flang_win32_installWin32(inputs) {
+    switch (inputs.msystem) {
         case Msystem.Native:
-            return await win32_installNative(target);
+            return await win32_installNative(inputs);
         case Msystem.UCRT64:
         case Msystem.Clang64:
-            return await win32_installMSYS2(target);
+            return await win32_installMSYS2(inputs);
     }
 }
-async function win32_installNative(target) {
+async function win32_installNative(inputs) {
     // resolveWindowsVersion handles patch versions internally via resolveVersion.
-    // Use its return value — not target.version — so that LATEST is expanded to
+    // Use its return value — not inputs.version — so that LATEST is expanded to
     // the first supported version before parseMajorOrPatch sees it.
-    const resolved = resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS, {
+    const resolved = resolveWindowsVersion(inputs, flang_win32_SUPPORTED_VERSIONS, {
         matchMajorIfPatch: true,
     });
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
     let patch;
     if (userPatch !== undefined) {
-        const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[target.arch]}.exe`;
+        const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[inputs.arch]}.exe`;
         await verifyAssetExists("llvm/llvm-project", userPatch, filename);
         patch = userPatch;
     }
     else {
         patch = await resolveLatestPatch("llvm/llvm-project", major);
     }
-    const suffix = WINDOWS_INSTALLER_SUFFIX[target.arch];
+    const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
     const filename = `LLVM-${patch}-${suffix}.exe`;
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
-    core.info(`Installing Flang ${major} (${patch}) on Windows (${target.arch})...`);
-    let toolRoot = tool_cache.find("flang", patch, target.arch);
+    core.info(`Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`);
+    let toolRoot = tool_cache.find("flang", patch, inputs.arch);
     if (!toolRoot) {
         core.info(`Downloading ${filename}...`);
         const downloadPath = await tool_cache.downloadTool(downloadUrl);
@@ -97833,7 +97837,7 @@ async function win32_installNative(target) {
         external_fs_.mkdirSync(tempExtractDir, { recursive: true });
         await extractExe(downloadPath, tempExtractDir);
         core.info("Caching...");
-        toolRoot = await tool_cache.cacheDir(tempExtractDir, "flang", patch, target.arch);
+        toolRoot = await tool_cache.cacheDir(tempExtractDir, "flang", patch, inputs.arch);
     }
     else {
         core.info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
@@ -97848,7 +97852,7 @@ async function win32_installNative(target) {
     const flangLibDir = external_path_.join(toolRoot, "lib");
     const existingLib = process.env.LIB ?? "";
     core.exportVariable("LIB", existingLib ? `${flangLibDir};${existingLib}` : flangLibDir);
-    await setupMsvcLibs(target.arch);
+    await setupMsvcLibs(inputs.arch);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
     core.info(`Flang ${resolvedVersion} installed successfully.`);
     const result = {
@@ -97859,18 +97863,18 @@ async function win32_installNative(target) {
     };
     return result;
 }
-async function win32_installMSYS2(target) {
-    const version = resolveWindowsVersion(target, flang_win32_SUPPORTED_VERSIONS);
+async function win32_installMSYS2(inputs) {
+    const version = resolveWindowsVersion(inputs, flang_win32_SUPPORTED_VERSIONS);
     core.info(`Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`);
     // The MSYS2 package for flang in the UCRT64 environment.
-    await setupMSYS2(target.msystem, ["flang"]);
-    const msysRoot = external_path_.join("C:\\msys64", target.msystem);
+    await setupMSYS2(inputs.msystem, ["flang"]);
+    const msysRoot = external_path_.join("C:\\msys64", inputs.msystem);
     const msysBin = external_path_.join(msysRoot, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");
     const clangExe = external_path_.join(msysBin, "clang.exe");
     const clangPPExe = external_path_.join(msysBin, "clang++.exe");
     core.addPath(msysBin);
-    core.exportVariable("WINDOWS_ENV", target.msystem);
+    core.exportVariable("WINDOWS_ENV", inputs.msystem);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
     core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
     const result = {
@@ -97898,14 +97902,14 @@ async function flang_win32_resolveInstalledVersion(flangExe) {
 
 
 
-async function installFlang(target) {
-    switch (target.os) {
+async function installFlang(inputs) {
+    switch (inputs.os) {
         case OS.Linux:
-            return await flang_debian_installDebian(target);
+            return await flang_debian_installDebian(inputs);
         case OS.MacOS:
-            return await flang_darwin_installDarwin(target);
+            return await flang_darwin_installDarwin(inputs);
         case OS.Windows:
-            return await flang_win32_installWin32(target);
+            return await flang_win32_installWin32(inputs);
     }
 }
 
@@ -97942,13 +97946,13 @@ const lfortran_debian_SUPPORTED_VERSIONS = {
 //
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
-async function lfortran_debian_installDebian(target) {
-    if (target.arch === Arch.ARM64) {
+async function lfortran_debian_installDebian(inputs) {
+    if (inputs.arch === Arch.ARM64) {
         throw new Error(`LFortran is not available for Linux ARM64 on conda-forge. ` +
             `See https://anaconda.org/conda-forge/lfortran for supported platforms.`);
     }
-    const version = resolveVersion(target, lfortran_debian_SUPPORTED_VERSIONS);
-    core.info(`Installing LFortran ${version} on Linux (${target.arch})...`);
+    const version = resolveVersion(inputs, lfortran_debian_SUPPORTED_VERSIONS);
+    core.info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
     // Install Miniforge into a dedicated prefix under the runner's temp dir.
     // Using a fixed path makes it easy to add to PATH later.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
@@ -98060,14 +98064,14 @@ function condaArch(arch) {
             return "arm64";
     }
 }
-async function lfortran_darwin_installDarwin(target) {
-    const version = resolveVersion(target, lfortran_darwin_SUPPORTED_VERSIONS);
-    core.info(`Installing LFortran ${version} on macOS (${target.arch})...`);
+async function lfortran_darwin_installDarwin(inputs) {
+    const version = resolveVersion(inputs, lfortran_darwin_SUPPORTED_VERSIONS);
+    core.info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
     // Install Miniforge into a dedicated prefix under the runner's temp dir to
     // avoid interfering with any pre-existing conda installation on the runner.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const arch = condaArch(target.arch);
+    const arch = condaArch(inputs.arch);
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
     core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
     await exec.exec("curl", [
@@ -98197,13 +98201,13 @@ const lfortran_win32_SUPPORTED_VERSIONS = {
         [Msystem.Clang64]: undefined,
     },
 };
-async function lfortran_win32_installWin32(target) {
-    switch (target.msystem) {
+async function lfortran_win32_installWin32(inputs) {
+    switch (inputs.msystem) {
         case Msystem.Native:
-            return await installConda(target);
+            return await installConda(inputs);
         case Msystem.UCRT64:
         case Msystem.Clang64:
-            return await lfortran_win32_installMSYS2(target);
+            return await lfortran_win32_installMSYS2(inputs);
     }
 }
 // Installs lfortran via Miniforge/conda-forge. This is the only install path
@@ -98213,8 +98217,8 @@ async function lfortran_win32_installWin32(target) {
 //   lfortran.exe lives in <prefix>\ (the prefix root itself), not bin\.
 //   Scripts\ holds Python entry-point wrappers; Library\bin\ holds DLLs.
 //   All three need to be on PATH for the toolchain to work correctly.
-async function installConda(target) {
-    const version = resolveWindowsVersion(target, lfortran_win32_SUPPORTED_VERSIONS);
+async function installConda(inputs) {
+    const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
     const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
     if (external_fs_.existsSync(gitLink)) {
         core.info("Moving conflicting Git link.exe to link.exe.bak...");
@@ -98226,10 +98230,10 @@ async function installConda(target) {
             core.warning(`Could not move Git link.exe: ${message}`);
         }
     }
-    core.info(`Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`);
+    core.info(`Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`);
     const condaPrefix = "C:\\lfortran-conda";
     const miniforgeInstaller = "C:\\miniforge-install.exe";
-    const arch = target.arch === Arch.ARM64 ? "arm64" : "x86_64";
+    const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
     core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
     await exec.exec("curl", [
@@ -98302,16 +98306,16 @@ async function installConda(target) {
 }
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
-async function lfortran_win32_installMSYS2(target) {
-    core.info(`Installing LFortran on Windows (MSYS2/${target.msystem}, rolling release)...`);
-    await setupMSYS2(target.msystem, ["lfortran"]);
-    const msysBin = external_path_.join("C:\\msys64", target.msystem, "bin");
+async function lfortran_win32_installMSYS2(inputs) {
+    core.info(`Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
+    await setupMSYS2(inputs.msystem, ["lfortran"]);
+    const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
     core.addPath(msysBin);
-    core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", target.msystem, "lib"));
-    core.exportVariable("WINDOWS_ENV", target.msystem);
+    core.exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", inputs.msystem, "lib"));
+    core.exportVariable("WINDOWS_ENV", inputs.msystem);
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
-    core.info(`LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${target.msystem}).`);
+    core.info(`LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${inputs.msystem}).`);
     const result = {
         version: resolvedVersion,
         fc: lfortranExe,
@@ -98337,14 +98341,14 @@ async function lfortran_win32_resolveInstalledVersion(binaryPath) {
 
 
 
-async function installLFortran(target) {
-    switch (target.os) {
+async function installLFortran(inputs) {
+    switch (inputs.os) {
         case OS.Linux:
-            return await lfortran_debian_installDebian(target);
+            return await lfortran_debian_installDebian(inputs);
         case OS.MacOS:
-            return await lfortran_darwin_installDarwin(target);
+            return await lfortran_darwin_installDarwin(inputs);
         case OS.Windows:
-            return await lfortran_win32_installWin32(target);
+            return await lfortran_win32_installWin32(inputs);
     }
 }
 
@@ -98381,42 +98385,42 @@ function setInstallationOutputs(result) {
 
 async function run() {
     try {
-        const target = parseInputs();
-        core.info(`Compiler  : ${target.compiler}`);
-        core.info(`Version   : ${target.version}`);
-        core.info(`OS        : ${target.os}`);
-        core.info(`OS Version: ${target.osVersion}`);
-        core.info(`Arch      : ${target.arch}`);
-        if (target.os === OS.Windows) {
-            core.info(`Windows env : ${target.msystem}`);
+        const inputs = parseInputs();
+        core.info(`Compiler  : ${inputs.compiler}`);
+        core.info(`Version   : ${inputs.version}`);
+        core.info(`OS        : ${inputs.os}`);
+        core.info(`OS Version: ${inputs.osVersion}`);
+        core.info(`Arch      : ${inputs.arch}`);
+        if (inputs.os === OS.Windows) {
+            core.info(`Windows env : ${inputs.msystem}`);
         }
         let installationResult;
-        switch (target.compiler) {
+        switch (inputs.compiler) {
             case Compiler.GFortran:
-                installationResult = await installGFortran(target);
+                installationResult = await installGFortran(inputs);
                 break;
             case Compiler.IFX:
-                installationResult = await installIFX(target);
+                installationResult = await installIFX(inputs);
                 break;
             case Compiler.IFort:
-                installationResult = await installIFort(target);
+                installationResult = await installIFort(inputs);
                 break;
             case Compiler.NVFortran:
-                installationResult = await installNVFortran(target);
+                installationResult = await installNVFortran(inputs);
                 break;
             case Compiler.AOCC:
-                installationResult = await installAOCC(target);
+                installationResult = await installAOCC(inputs);
                 break;
             case Compiler.Flang:
-                installationResult = await installFlang(target);
+                installationResult = await installFlang(inputs);
                 break;
             case Compiler.LFortran:
-                installationResult = await installLFortran(target);
+                installationResult = await installLFortran(inputs);
                 break;
         }
         setInstallationOutputs(installationResult);
         exportInstallationVariables(installationResult);
-        core.exportVariable("FORTRAN_COMPILER", target.compiler);
+        core.exportVariable("FORTRAN_COMPILER", inputs.compiler);
     }
     catch (err) {
         core.setFailed(err instanceof Error ? err.message : String(err));

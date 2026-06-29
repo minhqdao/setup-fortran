@@ -18,6 +18,10 @@ inputs:
       non-Windows runners.
     required: false
     default: native
+  cleanup-disk:
+    description: 'Free up disk space by removing large pre-installed toolkits'
+    required: false
+    default: 'false'
 
 outputs:
   version:

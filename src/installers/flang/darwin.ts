@@ -10,7 +10,7 @@ import {
   resolveLatestPatch,
   verifyAssetExists,
 } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -35,14 +35,14 @@ const MACOS_ASSET_SUFFIX: Record<Arch, string> = {
 };
 
 export async function installDarwin(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  const resolved = resolveVersion(target, SUPPORTED_VERSIONS, {
+  const resolved = resolveVersion(inputs, SUPPORTED_VERSIONS, {
     matchMajorIfPatch: true,
   });
 
   if (resolved === LATEST) {
-    return await installBrew(target);
+    return await installBrew(inputs);
   }
 
   // User specified a major or full patch version — use GitHub releases.
@@ -50,21 +50,21 @@ export async function installDarwin(
 
   let patch: string;
   if (userPatch !== undefined) {
-    const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[target.arch]}.tar.xz`;
+    const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
     await verifyAssetExists("llvm/llvm-project", userPatch, filename);
     patch = userPatch;
   } else {
     patch = await resolveLatestPatch("llvm/llvm-project", major);
   }
 
-  return await installFromGitHub(target, major, patch);
+  return await installFromGitHub(inputs, major, patch);
 }
 
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
 // tracks the latest LLVM release. Any version input that resolved to LATEST
 // ends up here.
-async function installBrew(target: Target): Promise<InstallationResult> {
-  core.info(`Installing Flang on macOS (${target.arch}) via Homebrew...`);
+async function installBrew(inputs: Inputs): Promise<InstallationResult> {
+  core.info(`Installing Flang on macOS (${inputs.arch}) via Homebrew...`);
   core.info(
     `Note: the Homebrew flang formula is unversioned — the latest available ` +
       `release will be installed regardless of any version input.`,
@@ -125,21 +125,21 @@ async function installBrew(target: Target): Promise<InstallationResult> {
 // Downloads and installs a specific flang version from official LLVM GitHub
 // releases as a .tar.xz archive.
 async function installFromGitHub(
-  target: Target,
+  inputs: Inputs,
   major: string,
   patch: string,
 ): Promise<InstallationResult> {
-  const suffix = MACOS_ASSET_SUFFIX[target.arch];
+  const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
   const filename = `LLVM-${patch}-${suffix}.tar.xz`;
   const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
 
   core.info(
-    `Installing Flang ${major} (${patch}) on macOS (${target.arch})...`,
+    `Installing Flang ${major} (${patch}) on macOS (${inputs.arch})...`,
   );
 
   // Key the cache on the full patch version so a new patch release always
   // triggers a fresh download rather than serving a stale cached binary.
-  let toolRoot = tc.find("flang", patch, target.arch);
+  let toolRoot = tc.find("flang", patch, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
@@ -154,7 +154,7 @@ async function installFromGitHub(
     ]);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(extractPath, "flang", patch, target.arch);
+    toolRoot = await tc.cacheDir(extractPath, "flang", patch, inputs.arch);
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,

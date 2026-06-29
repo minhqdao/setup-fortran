@@ -7,7 +7,7 @@ import {
   LATEST,
   Msystem,
   type InstallationResult,
-  type Target,
+  type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
@@ -49,14 +49,14 @@ const SUPPORTED_VERSIONS = {
 >;
 
 export async function installWin32(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  switch (target.msystem) {
+  switch (inputs.msystem) {
     case Msystem.Native:
-      return await installConda(target);
+      return await installConda(inputs);
     case Msystem.UCRT64:
     case Msystem.Clang64:
-      return await installMSYS2(target);
+      return await installMSYS2(inputs);
   }
 }
 
@@ -67,8 +67,8 @@ export async function installWin32(
 //   lfortran.exe lives in <prefix>\ (the prefix root itself), not bin\.
 //   Scripts\ holds Python entry-point wrappers; Library\bin\ holds DLLs.
 //   All three need to be on PATH for the toolchain to work correctly.
-async function installConda(target: Target): Promise<InstallationResult> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+async function installConda(inputs: Inputs): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
 
   const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
   if (fs.existsSync(gitLink)) {
@@ -82,13 +82,13 @@ async function installConda(target: Target): Promise<InstallationResult> {
   }
 
   core.info(
-    `Installing LFortran ${version} on Windows (${target.arch}) via conda-forge...`,
+    `Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`,
   );
 
   const condaPrefix = "C:\\lfortran-conda";
   const miniforgeInstaller = "C:\\miniforge-install.exe";
 
-  const arch = target.arch === Arch.ARM64 ? "arm64" : "x86_64";
+  const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
 
   core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
@@ -178,27 +178,27 @@ async function installConda(target: Target): Promise<InstallationResult> {
 
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
-async function installMSYS2(target: Target): Promise<InstallationResult> {
+async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   core.info(
-    `Installing LFortran on Windows (MSYS2/${target.msystem}, rolling release)...`,
+    `Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
-  await setupMSYS2(target.msystem, ["lfortran"]);
+  await setupMSYS2(inputs.msystem, ["lfortran"]);
 
-  const msysBin = path.join("C:\\msys64", target.msystem, "bin");
+  const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
   const lfortranExe = path.join(msysBin, "lfortran.exe");
 
   core.addPath(msysBin);
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join("C:\\msys64", target.msystem, "lib"),
+    path.join("C:\\msys64", inputs.msystem, "lib"),
   );
-  core.exportVariable("WINDOWS_ENV", target.msystem);
+  core.exportVariable("WINDOWS_ENV", inputs.msystem);
 
   const resolvedVersion = await resolveInstalledVersion(lfortranExe);
   core.info(
-    `LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${target.msystem}).`,
+    `LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${inputs.msystem}).`,
   );
   const result = {
     version: resolvedVersion,

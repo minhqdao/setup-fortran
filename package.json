@@ -26,7 +26,7 @@
     "lint": "eslint src/**/*.ts",
     "test": "jest",
     "integration-test": "node dist-tests/index.js",
-    "verify-installation": "npx ts-node src/verify_installation.ts",
+    "verify-installation": "node --experimental-strip-types src/verify_installation.ts",
     "all": "npm run format && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

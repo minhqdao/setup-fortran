@@ -1,17 +1,17 @@
-import { OS, type InstallationResult, type Target } from "../../types";
+import { OS, type InstallationResult, type Inputs } from "../../types";
 import { installDebian } from "./debian";
 import { installDarwin } from "./darwin";
 import { installWin32 } from "./win32";
 
 export async function installFlang(
-  target: Target,
+  inputs: Inputs,
 ): Promise<InstallationResult> {
-  switch (target.os) {
+  switch (inputs.os) {
     case OS.Linux:
-      return await installDebian(target);
+      return await installDebian(inputs);
     case OS.MacOS:
-      return await installDarwin(target);
+      return await installDarwin(inputs);
     case OS.Windows:
-      return await installWin32(target);
+      return await installWin32(inputs);
   }
 }
