@@ -1,11 +1,12 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -146,9 +147,9 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
  * Must be called before installing the nvhpc apt package.
  * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
  */
-async function installLegacyNcurses(target: Target): Promise<void> {
-  const base = NCURSES_ARCHIVE_BASE[target.arch];
-  const debArch = APT_ARCH[target.arch];
+async function installLegacyNcurses(inputs: Inputs): Promise<void> {
+  const base = NCURSES_ARCHIVE_BASE[inputs.arch];
+  const debArch = APT_ARCH[inputs.arch];
   const poolPath = "pool/universe/n/ncurses";
 
   // libtinfo5 must be installed before libncursesw5 (dependency order).
@@ -180,23 +181,25 @@ async function installLegacyNcurses(target: Target): Promise<void> {
   }
 }
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  const aptArch = APT_ARCH[target.arch];
-  const nvArch = NV_ARCH[target.arch];
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const aptArch = APT_ARCH[inputs.arch];
+  const nvArch = NV_ARCH[inputs.arch];
 
-  core.info(`Installing nvfortran ${version} on Linux (${target.arch})...`);
+  core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
 
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
-  const cacheKey = `nvhpc-${version}-${target.arch}-${target.osVersion}`;
+  const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   // --- Cache restore ---
   const cacheHit = await cache.restoreCache([installDir], cacheKey);
   if (cacheHit) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
-    await safelyFreeDiskSpace();
+    if (inputs.cleanupDisk) await cleanupDisk();
     // Add NVIDIA's apt repo.
     // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
     // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
@@ -222,7 +225,7 @@ export async function installDebian(target: Target): Promise<string> {
       "Acquire::Retries=3",
     ]);
 
-    core.info("Checking if ");
+    core.info("Checking if legacy ncurses5 libs are needed...");
 
     if (
       compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
@@ -231,7 +234,7 @@ export async function installDebian(target: Target): Promise<string> {
       core.info(
         `nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`,
       );
-      await installLegacyNcurses(target);
+      await installLegacyNcurses(inputs);
     }
 
     // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
@@ -263,13 +266,6 @@ export async function installDebian(target: Target): Promise<string> {
   core.info(`Adding ${binDir} to PATH...`);
   core.addPath(binDir);
 
-  core.exportVariable("FC", "nvfortran");
-  core.exportVariable("CC", "nvc");
-  core.exportVariable("CXX", "nvc++");
-  core.exportVariable("FPM_FC", "nvfortran");
-  core.exportVariable("FPM_CC", "nvc");
-  core.exportVariable("FPM_CXX", "nvc++");
-
   // Make the bundled math/comm libraries findable at runtime.
   const libDir = `${installDir}/compilers/lib`;
   const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
@@ -280,10 +276,16 @@ export async function installDebian(target: Target): Promise<string> {
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`nvfortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "nvfortran",
+    cc: "nvc",
+    cxx: "nvc++",
+  };
+  return result;
 }
 
-async function safelyFreeDiskSpace(): Promise<void> {
+async function cleanupDisk(): Promise<void> {
   let output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {
     listeners: { stdout: (data) => (output += data.toString()) },
@@ -303,6 +305,25 @@ async function safelyFreeDiskSpace(): Promise<void> {
     ignoreReturnCode: true,
     silent: true,
   });
+
+  // 3. Remove large unused toolkits to free up significant space (~10GB+)
+  const toolkitsToRemove = [
+    "/usr/local/lib/android",
+    "/opt/ghc",
+    "/usr/share/dotnet",
+    "/opt/hostedtoolcache",
+  ];
+
+  for (const toolkit of toolkitsToRemove) {
+    if (fs.existsSync(toolkit)) {
+      core.info(`Removing ${toolkit} to free up disk space...`);
+      try {
+        await exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+      } catch (e) {
+        core.debug(`Failed to remove ${toolkit}: ${String(e)}`);
+      }
+    }
+  }
 
   output = "";
   await exec.exec("df", ["--output=avail", "-BG", "/"], {

@@ -53,6 +53,7 @@ describe("parseInputs", () => {
       osVersion: "5.15.0",
       arch: Arch.X64,
       msystem: Msystem.Native,
+      cleanupDisk: false,
     });
   });
 
@@ -66,6 +67,7 @@ describe("parseInputs", () => {
       osVersion: "5.15.0",
       arch: Arch.X64,
       msystem: Msystem.Native,
+      cleanupDisk: false,
     });
   });
 

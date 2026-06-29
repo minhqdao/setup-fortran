@@ -3,9 +3,9 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -47,16 +47,18 @@ function condaArch(arch: Arch): string {
   }
 }
 
-export async function installDarwin(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+export async function installDarwin(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
-  core.info(`Installing LFortran ${version} on macOS (${target.arch})...`);
+  core.info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
 
   // Install Miniforge into a dedicated prefix under the runner's temp dir to
   // avoid interfering with any pre-existing conda installation on the runner.
   const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
   const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
-  const arch = condaArch(target.arch);
+  const arch = condaArch(inputs.arch);
 
   const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
 
@@ -103,15 +105,21 @@ export async function installDarwin(target: Target): Promise<string> {
   }
 
   core.info(`Found lfortran binary at: ${lfortranBin}`);
-  core.addPath(lfortranBinDir);
 
-  core.exportVariable("FC", "lfortran");
-  core.exportVariable("CC", "clang");
-  core.exportVariable("CXX", "clang++");
-  core.exportVariable("FPM_FC", "lfortran");
-  core.exportVariable("FPM_CC", "clang");
-  core.exportVariable("FPM_CXX", "clang++");
-  core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
+  // Fix rpath of lfortran binary to ensure it can find its shared libraries
+  // (like libxeus-zmq) when run outside of a conda environment.
+  const libDir = path.join(condaPrefix, "lib");
+  try {
+    await exec.exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+  } catch (e) {
+    core.debug(`install_name_tool failed: ${String(e)}`);
+  }
+
+  core.addPath(lfortranBinDir);
+  core.exportVariable("LFORTRAN_OMP_LIB_DIR", libDir);
+  // As an additional safety measure, set DYLD_FALLBACK_LIBRARY_PATH.
+  // Note: we use fallback to avoid overriding system libraries if possible.
+  core.exportVariable("DYLD_FALLBACK_LIBRARY_PATH", libDir);
 
   // lfortran links against system libc++ on macOS; set SDKROOT so the linker
   // can find the right SDK headers when compiling generated C/C++ code.
@@ -130,19 +138,32 @@ export async function installDarwin(target: Target): Promise<string> {
     core.warning(`Could not determine SDKROOT via xcrun: ${error}`);
   }
 
-  const resolvedVersion = await resolveInstalledVersion(lfortranBin);
+  const resolvedVersion = await resolveInstalledVersion(condaBin, condaPrefix);
   core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: lfortranBin,
+    cc: "clang",
+    cxx: "clang++",
+  };
+  return result;
 }
 
-async function resolveInstalledVersion(binaryPath: string): Promise<string> {
+async function resolveInstalledVersion(
+  condaBin: string,
+  condaPrefix: string,
+): Promise<string> {
   let output = "";
-  await exec.exec(binaryPath, ["--version"], {
-    listeners: {
-      stdout: (data: Buffer) => {
-        output += data.toString();
+  await exec.exec(
+    condaBin,
+    ["run", "-p", condaPrefix, "lfortran", "--version"],
+    {
+      listeners: {
+        stdout: (data: Buffer) => {
+          output += data.toString();
+        },
       },
     },
-  });
+  );
   return output.trim();
 }

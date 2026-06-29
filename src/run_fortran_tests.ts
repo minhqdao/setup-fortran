@@ -74,6 +74,20 @@ async function run(): Promise<void> {
       );
     }
 
+    const cc = process.env.CC;
+    if (!cc) {
+      throw new Error(
+        "CC environment variable is not set. Please fix the installer.",
+      );
+    }
+
+    const cxx = process.env.CXX;
+    if (!cxx) {
+      throw new Error(
+        "CXX environment variable is not set. Please fix the installer.",
+      );
+    }
+
     const compiler = process.env.FORTRAN_COMPILER as Compiler | undefined;
     if (!compiler) {
       throw new Error(

@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
-import { Arch, type Target } from "../../types";
+import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
 // The first entry is used as the default when LATEST is requested.
@@ -38,11 +38,13 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS, {
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
     resolveMinorToLatestPatch: true,
   });
-  core.info(`Installing ifx ${version} on Linux (${target.arch})...`);
+  core.info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
 
   const ONEAPI_ROOT = "/opt/intel/oneapi";
   const cacheKey = `oneapi-ifx-${version}`;
@@ -132,16 +134,15 @@ export async function installDebian(target: Target): Promise<string> {
     }
   }
 
-  core.exportVariable("FC", "ifx");
-  core.exportVariable("CC", "icx");
-  core.exportVariable("CXX", "icpx");
-  core.exportVariable("FPM_FC", "ifx");
-  core.exportVariable("FPM_CC", "icx");
-  core.exportVariable("FPM_CXX", "icpx");
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "ifx",
+    cc: "icx",
+    cxx: "icpx",
+  };
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

@@ -2,7 +2,13 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
-import { Arch, OS, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  OS,
+  Msystem,
+  type InstallationResult,
+  type Inputs,
+} from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
@@ -117,8 +123,10 @@ const SUPPORTED_VERSIONS = {
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
-export async function installWin32(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS, {
+export async function installWin32(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS, {
     resolveMinorToLatestPatch: true,
   });
 
@@ -130,9 +138,9 @@ export async function installWin32(target: Target): Promise<string> {
     );
   }
 
-  core.info(`Installing ifx ${version} on Windows (${target.arch})...`);
+  core.info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifx-win32-${target.arch}-${version}`;
+  const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -230,16 +238,15 @@ export async function installWin32(target: Target): Promise<string> {
     }
   }
 
-  core.exportVariable("FC", "ifx");
-  core.exportVariable("CC", "icx");
-  core.exportVariable("CXX", "icpx");
-  core.exportVariable("FPM_FC", "ifx");
-  core.exportVariable("FPM_CC", "icx");
-  core.exportVariable("FPM_CXX", "icpx");
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "ifx",
+    cc: "icx",
+    cxx: "icpx",
+  };
+  return result;
 }
 
 async function runInstallerWithRetry(

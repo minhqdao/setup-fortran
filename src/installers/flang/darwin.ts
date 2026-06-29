@@ -3,14 +3,14 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as tc from "@actions/tool-cache";
-import { Arch, LATEST } from "../../types";
+import { Arch, LATEST, type InstallationResult } from "../../types";
 import {
   resolveVersion,
   parseMajorOrPatch,
   resolveLatestPatch,
   verifyAssetExists,
 } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -34,13 +34,15 @@ const MACOS_ASSET_SUFFIX: Record<Arch, string> = {
   [Arch.ARM64]: "macOS-ARM64",
 };
 
-export async function installDarwin(target: Target): Promise<string> {
-  const resolved = resolveVersion(target, SUPPORTED_VERSIONS, {
+export async function installDarwin(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const resolved = resolveVersion(inputs, SUPPORTED_VERSIONS, {
     matchMajorIfPatch: true,
   });
 
   if (resolved === LATEST) {
-    return await installBrew(target);
+    return await installBrew(inputs);
   }
 
   // User specified a major or full patch version — use GitHub releases.
@@ -48,21 +50,21 @@ export async function installDarwin(target: Target): Promise<string> {
 
   let patch: string;
   if (userPatch !== undefined) {
-    const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[target.arch]}.tar.xz`;
+    const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
     await verifyAssetExists("llvm/llvm-project", userPatch, filename);
     patch = userPatch;
   } else {
     patch = await resolveLatestPatch("llvm/llvm-project", major);
   }
 
-  return await installFromGitHub(target, major, patch);
+  return await installFromGitHub(inputs, major, patch);
 }
 
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
 // tracks the latest LLVM release. Any version input that resolved to LATEST
 // ends up here.
-async function installBrew(target: Target): Promise<string> {
-  core.info(`Installing Flang on macOS (${target.arch}) via Homebrew...`);
+async function installBrew(inputs: Inputs): Promise<InstallationResult> {
+  core.info(`Installing Flang on macOS (${inputs.arch}) via Homebrew...`);
   core.info(
     `Note: the Homebrew flang formula is unversioned — the latest available ` +
       `release will be installed regardless of any version input.`,
@@ -80,12 +82,6 @@ async function installBrew(target: Target): Promise<string> {
   core.info(`Using flang binary: ${flangBin}`);
 
   const llvmBinDir = path.join(brewPrefix, "opt", "llvm", "bin");
-  core.exportVariable("FC", flangBin);
-  core.exportVariable("CC", path.join(llvmBinDir, "clang"));
-  core.exportVariable("CXX", path.join(llvmBinDir, "clang++"));
-  core.exportVariable("FPM_FC", flangBin);
-  core.exportVariable("FPM_CC", path.join(llvmBinDir, "clang"));
-  core.exportVariable("FPM_CXX", path.join(llvmBinDir, "clang++"));
   core.exportVariable("FLANG_VERSION", LATEST);
 
   // libomp.dylib lives in the llvm formula's lib dir, not a standalone formula.
@@ -117,27 +113,33 @@ async function installBrew(target: Target): Promise<string> {
   core.info(
     `Flang ${resolvedVersion} installed successfully on macOS (Homebrew).`,
   );
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangBin,
+    cc: path.join(llvmBinDir, "clang"),
+    cxx: path.join(llvmBinDir, "clang++"),
+  };
+  return result;
 }
 
 // Downloads and installs a specific flang version from official LLVM GitHub
 // releases as a .tar.xz archive.
 async function installFromGitHub(
-  target: Target,
+  inputs: Inputs,
   major: string,
   patch: string,
-): Promise<string> {
-  const suffix = MACOS_ASSET_SUFFIX[target.arch];
+): Promise<InstallationResult> {
+  const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
   const filename = `LLVM-${patch}-${suffix}.tar.xz`;
   const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
 
   core.info(
-    `Installing Flang ${major} (${patch}) on macOS (${target.arch})...`,
+    `Installing Flang ${major} (${patch}) on macOS (${inputs.arch})...`,
   );
 
   // Key the cache on the full patch version so a new patch release always
   // triggers a fresh download rather than serving a stale cached binary.
-  let toolRoot = tc.find("flang", patch, target.arch);
+  let toolRoot = tc.find("flang", patch, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
@@ -152,7 +154,7 @@ async function installFromGitHub(
     ]);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(extractPath, "flang", patch, target.arch);
+    toolRoot = await tc.cacheDir(extractPath, "flang", patch, inputs.arch);
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,
@@ -172,12 +174,6 @@ async function installFromGitHub(
     existingLibPath ? `${libDir}:${existingLibPath}` : libDir,
   );
 
-  core.exportVariable("FC", flangBin);
-  core.exportVariable("CC", path.join(binDir, "clang"));
-  core.exportVariable("CXX", path.join(binDir, "clang++"));
-  core.exportVariable("FPM_FC", flangBin);
-  core.exportVariable("FPM_CC", path.join(binDir, "clang"));
-  core.exportVariable("FPM_CXX", path.join(binDir, "clang++"));
   core.exportVariable("FLANG_VERSION", major);
 
   let sdkPath = "";
@@ -199,7 +195,13 @@ async function installFromGitHub(
   core.info(
     `Flang ${resolvedVersion} installed successfully on macOS (GitHub releases).`,
   );
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangBin,
+    cc: path.join(binDir, "clang"),
+    cxx: path.join(binDir, "clang++"),
+  };
+  return result;
 }
 
 // Probes for the flang binary name in the given bin dir.

@@ -11,7 +11,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -37,12 +37,13 @@ describe("installWin32 (ifx)", () => {
   const mockedFs = fs as jest.Mocked<typeof fs>;
   const mockedOs = os as jest.Mocked<typeof os>;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.IFX,
     version: "2026.0.0",
     os: OS.Windows,
     osVersion: "10.0.19045",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -67,7 +68,7 @@ describe("installWin32 (ifx)", () => {
   it("restores from cache if available", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedRestoreCache).toHaveBeenCalled();
     expect(mockedDownloadTool).not.toHaveBeenCalled();
@@ -77,7 +78,7 @@ describe("installWin32 (ifx)", () => {
     mockedRestoreCache.mockResolvedValue(undefined);
     mockedDownloadTool.mockResolvedValue("C:\\Temp\\installer.exe");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedDownloadTool).toHaveBeenCalled();
     expect(mockedExec).toHaveBeenCalledWith(
@@ -103,7 +104,7 @@ describe("installWin32 (ifx)", () => {
     });
 
     jest.useFakeTimers();
-    const installPromise = installWin32(baseTarget);
+    const installPromise = installWin32(baseInputs);
 
     // Flush microtasks
     for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -146,7 +147,7 @@ describe("installWin32 (ifx)", () => {
       return 0;
     });
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(installerCalls).toBe(1);
     expect(core.info).toHaveBeenCalledWith(
@@ -156,8 +157,8 @@ describe("installWin32 (ifx)", () => {
 
   it("resolves 2025.3 to 2025.3.3 using resolveMinorToLatestPatch", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
-    const target = { ...baseTarget, version: "2025.3" };
-    await installWin32(target);
+    const inputs = { ...baseInputs, version: "2025.3" };
+    await installWin32(inputs);
 
     expect(mockedRestoreCache).toHaveBeenCalledWith(
       expect.anything(),
@@ -168,7 +169,7 @@ describe("installWin32 (ifx)", () => {
   it("exports environment variables from setvars", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
 
-    await installWin32(baseTarget);
+    await installWin32(baseInputs);
 
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       expect.stringContaining("setvars_and_dump.bat"),
@@ -176,8 +177,5 @@ describe("installWin32 (ifx)", () => {
     );
     expect(core.exportVariable).toHaveBeenCalledWith("PATH", "C:\\bin");
     expect(core.exportVariable).toHaveBeenCalledWith("INTEL_VAR", "foo");
-    expect(core.exportVariable).toHaveBeenCalledWith("FC", "ifx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CC", "icx");
-    expect(core.exportVariable).toHaveBeenCalledWith("CXX", "icpx");
   });
 });

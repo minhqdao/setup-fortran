@@ -7,7 +7,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -20,20 +20,29 @@ describe("installDebian nvfortran", () => {
     typeof exec.getExecOutput
   >;
   const mockedCache = cache as jest.Mocked<typeof cache>;
+  const mockedExportVariable = core.exportVariable as jest.MockedFunction<
+    typeof core.exportVariable
+  >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.NVFortran,
     version: "24.1",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockedCache.restoreCache.mockResolvedValue(undefined);
-    mockedExec.mockResolvedValue(0);
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 24.1-0"));
+      }
+      return 0;
+    });
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
       stdout: "install ok installed install ok installed",
       exitCode: 0,
@@ -42,7 +51,7 @@ describe("installDebian nvfortran", () => {
 
   it("calls curl with retry for legacy ncurses", async () => {
     // Version <= 24.3 triggers ncurses check
-    const target = { ...baseTarget, version: "24.3" };
+    const inputs = { ...baseInputs, version: "24.3" };
     
     // Simulate ncurses not installed
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
@@ -50,7 +59,7 @@ describe("installDebian nvfortran", () => {
       exitCode: 0,
     });
 
-    await installDebian(target);
+    await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
@@ -59,7 +68,7 @@ describe("installDebian nvfortran", () => {
   });
 
   it("skips ncurses install if already present", async () => {
-    const target = { ...baseTarget, version: "24.3" };
+    const inputs = { ...baseInputs, version: "24.3" };
     
     // Already installed
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
@@ -67,7 +76,7 @@ describe("installDebian nvfortran", () => {
       exitCode: 0,
     });
 
-    await installDebian(target);
+    await installDebian(inputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
@@ -77,13 +86,24 @@ describe("installDebian nvfortran", () => {
 
   it("skips ncurses install for newer nvhpc versions", async () => {
     // Version > 24.3
-    const target = { ...baseTarget, version: "25.1" };
+    const inputs = { ...baseInputs, version: "25.1" };
     
-    await installDebian(target);
+    await installDebian(inputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining(["--retry", "5"]),
     );
+  });
+
+  it("exports compiler variables and returns the installation result", async () => {
+    const result = await installDebian(baseInputs);
+
+    expect(result).toEqual({
+      version: "nvfortran 24.1-0",
+      fc: "nvfortran",
+      cc: "nvc",
+      cxx: "nvc++",
+    });
   });
 });

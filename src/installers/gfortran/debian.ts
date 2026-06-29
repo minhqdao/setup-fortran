@@ -1,9 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -18,11 +18,13 @@ function aptCacheKey(version: string, osVersion: string): string {
   return `apt-gfortran-${osVersion}-${version}`;
 }
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
-  core.info(`Installing GFortran ${version} on Linux (${target.arch})...`);
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  core.info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
 
-  const cacheKey = aptCacheKey(version, target.osVersion);
+  const cacheKey = aptCacheKey(version, inputs.osVersion);
   const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
 
   if (cacheHit) {
@@ -37,7 +39,7 @@ export async function installDebian(target: Target): Promise<string> {
       `gfortran-${version}`,
     ]);
   } else {
-    if (needsPpa(version, target.osVersion)) {
+    if (needsPpa(version, inputs.osVersion)) {
       core.info(`Adding PPA for GFortran ${version}...`);
       await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
@@ -58,19 +60,15 @@ export async function installDebian(target: Target): Promise<string> {
     `/usr/bin/gfortran-${version}`,
   ]);
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  core.exportVariable("FC", `gfortran-${version}`);
-  core.exportVariable("F77", `gfortran-${version}`);
-  core.exportVariable("F90", `gfortran-${version}`);
-  core.exportVariable("CC", `gcc-${version}`);
-  core.exportVariable("CXX", `g++-${version}`);
-  core.exportVariable("FPM_FC", `gfortran-${version}`);
-  core.exportVariable("FPM_CC", `gcc-${version}`);
-  core.exportVariable("FPM_CXX", `g++-${version}`);
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: `gfortran-${version}`,
+    cc: `gcc-${version}`,
+    cxx: `g++-${version}`,
+  };
+  return result;
 }
 
 async function aptGetInstallWithRetry(

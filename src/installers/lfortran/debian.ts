@@ -3,9 +3,9 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -33,17 +33,19 @@ const SUPPORTED_VERSIONS = {
 //
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
-export async function installDebian(target: Target): Promise<string> {
-  if (target.arch === Arch.ARM64) {
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  if (inputs.arch === Arch.ARM64) {
     throw new Error(
       `LFortran is not available for Linux ARM64 on conda-forge. ` +
         `See https://anaconda.org/conda-forge/lfortran for supported platforms.`,
     );
   }
 
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
-  core.info(`Installing LFortran ${version} on Linux (${target.arch})...`);
+  core.info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
 
   // Install Miniforge into a dedicated prefix under the runner's temp dir.
   // Using a fixed path makes it easy to add to PATH later.
@@ -99,17 +101,17 @@ export async function installDebian(target: Target): Promise<string> {
 
   core.addPath(lfortranBinDir);
 
-  core.exportVariable("FC", "lfortran");
-  core.exportVariable("CC", "clang");
-  core.exportVariable("CXX", "clang++");
-  core.exportVariable("FPM_FC", "lfortran");
-  core.exportVariable("FPM_CC", "clang");
-  core.exportVariable("FPM_CXX", "clang++");
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
 
   const resolvedVersion = await resolveInstalledVersion(lfortranBin);
   core.info(`LFortran ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "lfortran",
+    cc: "clang",
+    cxx: "clang++",
+  };
+  return result;
 }
 
 async function resolveInstalledVersion(binaryPath: string): Promise<string> {

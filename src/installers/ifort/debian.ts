@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
-import { Arch, type Target } from "../../types";
+import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -30,8 +30,10 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
   const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
   if (!entry) {
@@ -137,16 +139,15 @@ export async function installDebian(target: Target): Promise<string> {
     );
   }
 
-  core.exportVariable("FC", "ifort");
-  core.exportVariable("CC", "icc");
-  core.exportVariable("CXX", "icpc");
-  core.exportVariable("FPM_FC", "ifort");
-  core.exportVariable("FPM_CC", "icc");
-  core.exportVariable("FPM_CXX", "icpc");
-
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: "ifort",
+    cc: "icc",
+    cxx: "icpc",
+  };
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

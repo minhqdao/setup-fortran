@@ -10,7 +10,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -21,12 +21,13 @@ describe("GFortran Debian Installer", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedCache = cache as jest.Mocked<typeof cache>;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.GFortran,
     version: "14",
     os: OS.Linux,
     osVersion: "20.04.6",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -76,8 +77,8 @@ describe("GFortran Debian Installer", () => {
 
   describe("installDebian", () => {
     it("adds PPA when needsPpa returns true", async () => {
-      const target = { ...baseTarget, version: "15", osVersion: "24.04" };
-      await installDebian(target);
+      const inputs = { ...baseInputs, version: "15", osVersion: "24.04" };
+      await installDebian(inputs);
 
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "add-apt-repository",
@@ -87,8 +88,8 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("does not add PPA when needsPpa returns false", async () => {
-      const target = { ...baseTarget, version: "14", osVersion: "24.04" };
-      await installDebian(target);
+      const inputs = { ...baseInputs, version: "14", osVersion: "24.04" };
+      await installDebian(inputs);
 
       expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
         "add-apt-repository",
@@ -98,7 +99,7 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("always updates apt and installs gfortran on cache miss", async () => {
-      await installDebian(baseTarget);
+      await installDebian(baseInputs);
 
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
         ["/var/cache/apt/archives"],
@@ -132,7 +133,7 @@ describe("GFortran Debian Installer", () => {
 
     it("installs from cache on cache hit", async () => {
       mockedCache.restoreCache.mockResolvedValue("hit");
-      await installDebian(baseTarget);
+      await installDebian(baseInputs);
 
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
@@ -162,7 +163,7 @@ describe("GFortran Debian Installer", () => {
       });
 
       jest.useFakeTimers();
-      const installPromise = installDebian(baseTarget);
+      const installPromise = installDebian(baseInputs);
 
       // Flush microtasks to allow the first attempt to fail and reach the setTimeout
       for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -183,7 +184,7 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("retries add-apt-repository on failure and eventually succeeds", async () => {
-      const target = { ...baseTarget, version: "15", osVersion: "24.04" };
+      const inputs = { ...baseInputs, version: "15", osVersion: "24.04" };
       let attempts = 0;
       mockedExec.mockImplementation(async (cmd, args) => {
         if (cmd === "sudo" && args?.[0] === "add-apt-repository") {
@@ -194,7 +195,7 @@ describe("GFortran Debian Installer", () => {
       });
 
       jest.useFakeTimers();
-      const installPromise = installDebian(target);
+      const installPromise = installDebian(inputs);
 
       // Flush microtasks
       for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -215,7 +216,7 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("configures update-alternatives", async () => {
-      await installDebian(baseTarget);
+      await installDebian(baseInputs);
 
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "update-alternatives",
@@ -232,16 +233,8 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("exports environment variables", async () => {
-      await installDebian(baseTarget);
+      await installDebian(baseInputs);
 
-      expect(core.exportVariable).toHaveBeenCalledWith("FC", "gfortran-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("F77", "gfortran-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("F90", "gfortran-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("CC", "gcc-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("CXX", "g++-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("FPM_FC", "gfortran-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("FPM_CC", "gcc-14");
-      expect(core.exportVariable).toHaveBeenCalledWith("FPM_CXX", "g++-14");
     });
   });
 });

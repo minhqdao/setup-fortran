@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import { installDarwin } from "../../../src/installers/gfortran/darwin";
-import { Arch, Compiler, OS, Msystem, type Target } from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -12,12 +12,13 @@ describe("installDarwin (gfortran)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.GFortran,
     version: "14",
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -49,7 +50,7 @@ describe("installDarwin (gfortran)", () => {
   });
 
   it("installs gcc via Homebrew if missing", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("brew", [
       "install",
@@ -79,45 +80,13 @@ describe("installDarwin (gfortran)", () => {
       return 0;
     });
 
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
     expect(mockedExec).not.toHaveBeenCalledWith("brew", ["install", "gcc@14"]);
   });
 
   it("exports environment variables and SDKROOT", async () => {
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FC",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "F77",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "F90",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CC",
-      expect.stringContaining("gcc-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CXX",
-      expect.stringContaining("g++-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_FC",
-      expect.stringContaining("gfortran-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CC",
-      expect.stringContaining("gcc-14"),
-    );
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "FPM_CXX",
-      expect.stringContaining("g++-14"),
-    );
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "SDKROOT",
       "/path/to/SDK",
@@ -125,7 +94,12 @@ describe("installDarwin (gfortran)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDarwin(baseTarget);
-    expect(version).toContain("14.1.0");
+    const result = await installDarwin(baseInputs);
+    expect(result).toMatchObject({
+      fc: expect.stringContaining("gfortran-14"),
+      cc: expect.stringContaining("gcc-14"),
+      cxx: expect.stringContaining("g++-14"),
+    });
+    expect(result.version).toContain("14.1.0");
   });
 });

@@ -1,9 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
-import { Arch } from "../../types";
+import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
-import type { Target } from "../../types";
+import type { Inputs } from "../../types";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -66,11 +66,13 @@ function resolveFlangBinaryPath(major: number, version: string): string {
   );
 }
 
-export async function installDebian(target: Target): Promise<string> {
-  const version = resolveVersion(target, SUPPORTED_VERSIONS);
+export async function installDebian(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
 
-  core.info(`Installing Flang ${version} on Linux (${target.arch})...`);
+  core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
 
   core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
   await exec.exec("sudo", [
@@ -81,10 +83,11 @@ export async function installDebian(target: Target): Promise<string> {
   ]);
 
   core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
+  // Force IPv4 (-4) to avoid transient connection issues on some runners
   await exec.exec("bash", [
     "-c",
     [
-      `curl -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
+      `curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
       `| sudo bash -s -- ${version}`,
     ].join(" "),
   ]);
@@ -92,10 +95,13 @@ export async function installDebian(target: Target): Promise<string> {
   const pkgName = `flang-${version}`;
 
   core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
+  // Force IPv4 to avoid transient connection issues with apt.llvm.org
   await exec.exec("sudo", [
     "apt-get",
     "install",
     "-y",
+    "-o",
+    "Acquire::ForceIPv4=true",
     pkgName,
     `libomp-${version}-dev`,
   ]);
@@ -127,12 +133,6 @@ export async function installDebian(target: Target): Promise<string> {
     core.addPath(llvmBinDir);
   }
 
-  core.exportVariable("FC", `${flangBinaryName(major)}-${version}`);
-  core.exportVariable("CC", `clang-${version}`);
-  core.exportVariable("CXX", `clang++-${version}`);
-  core.exportVariable("FPM_FC", `${flangBinaryName(major)}-${version}`);
-  core.exportVariable("FPM_CC", `clang-${version}`);
-  core.exportVariable("FPM_CXX", `clang++-${version}`);
   core.exportVariable("FLANG_VERSION", major);
 
   // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
@@ -148,14 +148,20 @@ export async function installDebian(target: Target): Promise<string> {
     );
   }
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: await resolveInstalledVersion(
+      `${flangBinaryName(major)}-${version}`,
+    ),
+    fc: `${flangBinaryName(major)}-${version}`,
+    cc: `clang-${version}`,
+    cxx: `clang++-${version}`,
+  };
+  const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  return result;
 }
 
-async function resolveInstalledVersion(): Promise<string> {
-  const fc = process.env.FC;
-  if (!fc) throw new Error("FC is not set");
+async function resolveInstalledVersion(fc: string): Promise<string> {
   let output = "";
   await exec.exec(fc, ["--version"], {
     listeners: {

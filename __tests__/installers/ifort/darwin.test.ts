@@ -9,7 +9,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -31,12 +31,13 @@ describe("installDarwin (ifort)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.IFort,
     version: "2021.10",
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -67,7 +68,7 @@ describe("installDarwin (ifort)", () => {
   it("restores from cache if available", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
 
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalled();
     expect(mockedTc.downloadTool).not.toHaveBeenCalled();
@@ -77,7 +78,7 @@ describe("installDarwin (ifort)", () => {
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
 
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedTc.downloadTool).toHaveBeenCalled();
     expect(mockedExec).toHaveBeenCalledWith("hdiutil", [
@@ -98,8 +99,8 @@ describe("installDarwin (ifort)", () => {
   });
 
   it("throws error on ARM64", async () => {
-    const target = { ...baseTarget, arch: Arch.ARM64 };
-    await expect(installDarwin(target)).rejects.toThrow(
+    const inputs = { ...baseInputs, arch: Arch.ARM64 };
+    await expect(installDarwin(inputs)).rejects.toThrow(
       "No supported versions found for ifort on darwin (arm64)",
     );
   });
@@ -107,23 +108,22 @@ describe("installDarwin (ifort)", () => {
   it("exports environment variables", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
 
-    await installDarwin(baseTarget);
+    await installDarwin(baseInputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "ONEAPI_ROOT",
       "/opt/intel/oneapi",
     );
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "icpc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "icpc");
   });
 
   it("resolves and returns the installed version", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    const version = await installDarwin(baseTarget);
-    expect(version).toBe("ifort (IFORT) 2021.10.0 20230609");
+    const result = await installDarwin(baseInputs);
+    expect(result).toEqual({
+      version: "ifort (IFORT) 2021.10.0 20230609",
+      fc: "ifort",
+      cc: "icc",
+      cxx: "icpc",
+    });
   });
 });

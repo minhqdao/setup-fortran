@@ -10,7 +10,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -34,12 +34,13 @@ describe("installDebian (AOCC)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.AOCC,
     version: "5.1",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -65,7 +66,7 @@ describe("installDebian (AOCC)", () => {
   });
 
   it("downloads and installs on cache miss", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       [tempInstallDir],
@@ -94,7 +95,7 @@ describe("installDebian (AOCC)", () => {
 
   it("skips download and restores from cache on cache hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", ["mv", tempInstallDir, "/opt/AMD/aocc-compiler-5.1.0"]);
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
@@ -103,7 +104,7 @@ describe("installDebian (AOCC)", () => {
 
   it("skips download when already installed on disk but cache miss", async () => {
     mockedFs.existsSync.mockReturnValue(true);
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.anything()]);
@@ -111,16 +112,19 @@ describe("installDebian (AOCC)", () => {
   });
 
   it("sources setenv script and exports variables", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith("PATH", "/opt/AMD/aocc/bin:/usr/bin");
     expect(mockedExportVariable).toHaveBeenCalledWith("LD_LIBRARY_PATH", "/opt/AMD/aocc/lib");
-    expect(mockedExportVariable).toHaveBeenCalledWith("AOCC_DIR", "/opt/AMD/aocc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "flang");
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("AOCC flang version 5.1.0");
+    const result = await installDebian(baseInputs);
+    expect(result).toEqual({
+      version: "AOCC flang version 5.1.0",
+      fc: "flang",
+      cc: "clang",
+      cxx: "clang++",
+    });
   });
 });

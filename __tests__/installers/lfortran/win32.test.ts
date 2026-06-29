@@ -8,7 +8,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -29,12 +29,13 @@ describe("installWin32 (LFortran)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
     version: "0.63.0",
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -53,7 +54,7 @@ describe("installWin32 (LFortran)", () => {
 
   describe("Native (Conda)", () => {
     it("downloads and installs Miniforge", async () => {
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
       expect(mockedExec).toHaveBeenCalledWith("curl", [
         "-fsSL",
@@ -72,7 +73,7 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("installs lfortran via conda", async () => {
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining("conda.exe"),
@@ -81,31 +82,19 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("exports environment variables and sets linker", async () => {
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
       expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("lfortran"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("clang++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
       expect(mockedExportVariable).toHaveBeenCalledWith("LFORTRAN_LINKER", expect.stringContaining("link.exe"));
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const target = { ...baseTarget, msystem: Msystem.UCRT64 };
-      await installWin32(target);
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["lfortran"]);
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("CXX", expect.stringContaining("clang++.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("lfortran.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
     });
   });
 });

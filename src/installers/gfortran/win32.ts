@@ -2,7 +2,13 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as tc from "@actions/tool-cache";
-import { Arch, LATEST, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  LATEST,
+  Msystem,
+  type InstallationResult,
+  type Inputs,
+} from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
 
@@ -51,14 +57,16 @@ const SUPPORTED_VERSIONS = {
   Record<Msystem, readonly string[] | undefined>
 >;
 
-export async function installWin32(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+export async function installWin32(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
 
-  switch (target.msystem) {
+  switch (inputs.msystem) {
     case Msystem.Native:
-      return await installNative(target, version);
+      return await installNative(inputs, version);
     case Msystem.UCRT64:
-      return await installMSYS2(target);
+      return await installMSYS2(inputs);
     case Msystem.Clang64:
       throw new Error(
         `Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
@@ -68,14 +76,17 @@ export async function installWin32(target: Target): Promise<string> {
   }
 }
 
-async function installNative(target: Target, version: string): Promise<string> {
+async function installNative(
+  inputs: Inputs,
+  version: string,
+): Promise<InstallationResult> {
   const release = GCC_RELEASES.find((r) => r.version === version);
   if (!release) {
     throw new Error(`Unsupported GFortran version: ${version}`);
   }
   const downloadUrl = release.url;
 
-  let toolRoot = tc.find(`gfortran-${target.msystem}`, version, target.arch);
+  let toolRoot = tc.find(`gfortran-${inputs.msystem}`, version, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading GFortran ${version} from ${downloadUrl}`);
@@ -89,51 +100,45 @@ async function installNative(target: Target, version: string): Promise<string> {
     core.info(`Caching GFortran ${version} in ${actualToolDir}...`);
     toolRoot = await tc.cacheDir(
       actualToolDir,
-      `gfortran-${target.msystem}`,
+      `gfortran-${inputs.msystem}`,
       version,
-      target.arch,
+      inputs.arch,
     );
   }
 
   const binPath = path.join(toolRoot, "bin");
   core.addPath(binPath);
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
   const gfortranPath = path.join(binPath, "gfortran.exe");
   const gccPath = path.join(binPath, "gcc.exe");
   const gxxPath = path.join(binPath, "g++.exe");
 
-  core.exportVariable("FC", gfortranPath);
-  core.exportVariable("F77", gfortranPath);
-  core.exportVariable("F90", gfortranPath);
-  core.exportVariable("CC", gccPath);
-  core.exportVariable("CXX", gxxPath);
-  core.exportVariable("FPM_FC", gfortranPath);
-  core.exportVariable("FPM_CC", gccPath);
-  core.exportVariable("FPM_CXX", gxxPath);
-
-  return await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: resolvedVersion,
+    fc: gfortranPath,
+    cc: gccPath,
+    cxx: gxxPath,
+  };
+  return result;
 }
 
-async function installMSYS2(target: Target): Promise<string> {
-  await setupMSYS2(target.msystem, ["gcc-fortran"]);
+async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
+  await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
 
-  const msysBin = path.join("C:\\msys64", target.msystem, "bin");
+  const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
   const gfortranPath = path.join(msysBin, "gfortran.exe");
   const gccPath = path.join(msysBin, "gcc.exe");
   const gxxPath = path.join(msysBin, "g++.exe");
 
-  core.info(`Setting FC, F77, and F90 environment variables...`);
-  core.exportVariable("FC", gfortranPath);
-  core.exportVariable("F77", gfortranPath);
-  core.exportVariable("F90", gfortranPath);
-  core.exportVariable("CC", gccPath);
-  core.exportVariable("CXX", gxxPath);
-  core.exportVariable("FPM_FC", gfortranPath);
-  core.exportVariable("FPM_CC", gccPath);
-  core.exportVariable("FPM_CXX", gxxPath);
-
-  return await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion();
+  const result = {
+    version: resolvedVersion,
+    fc: gfortranPath,
+    cc: gccPath,
+    cxx: gxxPath,
+  };
+  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {

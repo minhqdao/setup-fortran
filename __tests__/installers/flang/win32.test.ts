@@ -9,7 +9,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -49,12 +49,13 @@ describe("installWin32 (Flang)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.Flang,
     version: "22",
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -83,7 +84,7 @@ describe("installWin32 (Flang)", () => {
       mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.exe");
       mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang");
 
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
       expect(mockedTc.downloadTool).toHaveBeenCalled();
       expect(mockedExec).toHaveBeenCalledWith(
@@ -96,23 +97,18 @@ describe("installWin32 (Flang)", () => {
     it("sets up MSVC libs and exports variables", async () => {
       mockedTc.find.mockReturnValue("C:\\Cache\\flang");
 
-      await installWin32(baseTarget);
+      await installWin32(baseInputs);
 
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("flang.exe"));
       expect(mockedExportVariable).toHaveBeenCalledWith("LIB", expect.stringContaining("Cache"));
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const target = { ...baseTarget, version: "latest", msystem: Msystem.UCRT64 };
-      await installWin32(target);
+      const inputs = { ...baseInputs, version: "latest", msystem: Msystem.UCRT64 };
+      await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["flang"]);
-      expect(mockedExportVariable).toHaveBeenCalledWith("FC", expect.stringContaining("flang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", expect.stringContaining("flang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", expect.stringContaining("clang.exe"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", expect.stringContaining("clang++.exe"));
     });
   });
 });

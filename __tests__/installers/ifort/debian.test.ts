@@ -8,7 +8,7 @@ import {
   Compiler,
   OS,
   Msystem,
-  type Target,
+  type Inputs,
 } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -28,12 +28,13 @@ describe("installDebian (ifort)", () => {
     typeof core.exportVariable
   >;
 
-  const baseTarget: Target = {
+  const baseInputs: Inputs = {
     compiler: Compiler.IFort,
     version: "2021.10",
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
+  cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -63,7 +64,7 @@ describe("installDebian (ifort)", () => {
   });
 
   it("adds the Intel repository on cache miss", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -87,7 +88,7 @@ describe("installDebian (ifort)", () => {
   });
 
   it("installs the correct packages and saves to cache on miss", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
@@ -109,7 +110,7 @@ describe("installDebian (ifort)", () => {
 
   it("skips installation and restores from cache on hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -132,24 +133,18 @@ describe("installDebian (ifort)", () => {
   });
 
   it("exports environment variables", async () => {
-    await installDebian(baseTarget);
+    await installDebian(baseInputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "ONEAPI_ROOT",
       "/opt/intel/oneapi",
     );
-    expect(mockedExportVariable).toHaveBeenCalledWith("FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("CXX", "icpc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_FC", "ifort");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CC", "icc");
-    expect(mockedExportVariable).toHaveBeenCalledWith("FPM_CXX", "icpc");
   });
 
   it("applies OpenMP workaround for 2024.1 bundle", async () => {
     // 2021.12 ifort corresponds to 2024.1 bundle
-    const target = { ...baseTarget, version: "2021.12" };
-    await installDebian(target);
+    const inputs = { ...baseInputs, version: "2021.12" };
+    await installDebian(inputs);
 
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "FFLAGS",
@@ -158,7 +153,12 @@ describe("installDebian (ifort)", () => {
   });
 
   it("resolves and returns the installed version", async () => {
-    const version = await installDebian(baseTarget);
-    expect(version).toBe("ifort (IFORT) 2021.10.0 20230609");
+    const result = await installDebian(baseInputs);
+    expect(result).toEqual({
+      version: "ifort (IFORT) 2021.10.0 20230609",
+      fc: "ifort",
+      cc: "icc",
+      cxx: "icpc",
+    });
   });
 });

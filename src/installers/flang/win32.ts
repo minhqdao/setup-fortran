@@ -3,7 +3,13 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as tc from "@actions/tool-cache";
-import { Arch, LATEST, Msystem, type Target } from "../../types";
+import {
+  Arch,
+  LATEST,
+  Msystem,
+  type InstallationResult,
+  type Inputs,
+} from "../../types";
 import {
   resolveWindowsVersion,
   parseMajorOrPatch,
@@ -138,21 +144,23 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
   core.exportVariable("LIB", existing ? `${libDirs};${existing}` : libDirs);
 }
 
-export async function installWin32(target: Target): Promise<string> {
-  switch (target.msystem) {
+export async function installWin32(
+  inputs: Inputs,
+): Promise<InstallationResult> {
+  switch (inputs.msystem) {
     case Msystem.Native:
-      return await installNative(target);
+      return await installNative(inputs);
     case Msystem.UCRT64:
     case Msystem.Clang64:
-      return await installMSYS2(target);
+      return await installMSYS2(inputs);
   }
 }
 
-async function installNative(target: Target): Promise<string> {
+async function installNative(inputs: Inputs): Promise<InstallationResult> {
   // resolveWindowsVersion handles patch versions internally via resolveVersion.
-  // Use its return value — not target.version — so that LATEST is expanded to
+  // Use its return value — not inputs.version — so that LATEST is expanded to
   // the first supported version before parseMajorOrPatch sees it.
-  const resolved = resolveWindowsVersion(target, SUPPORTED_VERSIONS, {
+  const resolved = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS, {
     matchMajorIfPatch: true,
   });
   const { major, patch: userPatch } = parseMajorOrPatch(resolved);
@@ -160,22 +168,22 @@ async function installNative(target: Target): Promise<string> {
   let patch: string;
 
   if (userPatch !== undefined) {
-    const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[target.arch]}.exe`;
+    const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[inputs.arch]}.exe`;
     await verifyAssetExists("llvm/llvm-project", userPatch, filename);
     patch = userPatch;
   } else {
     patch = await resolveLatestPatch("llvm/llvm-project", major);
   }
 
-  const suffix = WINDOWS_INSTALLER_SUFFIX[target.arch];
+  const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
   const filename = `LLVM-${patch}-${suffix}.exe`;
   const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
 
   core.info(
-    `Installing Flang ${major} (${patch}) on Windows (${target.arch})...`,
+    `Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`,
   );
 
-  let toolRoot = tc.find("flang", patch, target.arch);
+  let toolRoot = tc.find("flang", patch, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
@@ -190,7 +198,7 @@ async function installNative(target: Target): Promise<string> {
     await extractExe(downloadPath, tempExtractDir);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(tempExtractDir, "flang", patch, target.arch);
+    toolRoot = await tc.cacheDir(tempExtractDir, "flang", patch, inputs.arch);
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,
@@ -204,13 +212,6 @@ async function installNative(target: Target): Promise<string> {
   const clangExe = path.join(binDir, "clang.exe");
   const clangPPExe = path.join(binDir, "clang++.exe");
 
-  core.exportVariable("FC", flangExe);
-  core.exportVariable("CC", clangExe);
-  core.exportVariable("CXX", clangPPExe);
-  core.exportVariable("FPM_FC", flangExe);
-  core.exportVariable("FPM_CC", clangExe);
-  core.exportVariable("FPM_CXX", clangPPExe);
-
   // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
   // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
   const flangLibDir = path.join(toolRoot, "lib");
@@ -220,23 +221,29 @@ async function installNative(target: Target): Promise<string> {
     existingLib ? `${flangLibDir};${existingLib}` : flangLibDir,
   );
 
-  await setupMsvcLibs(target.arch);
+  await setupMsvcLibs(inputs.arch);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangExe,
+    cc: clangExe,
+    cxx: clangPPExe,
+  };
+  return result;
 }
 
-async function installMSYS2(target: Target): Promise<string> {
-  const version = resolveWindowsVersion(target, SUPPORTED_VERSIONS);
+async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
   core.info(
     `Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`,
   );
 
   // The MSYS2 package for flang in the UCRT64 environment.
-  await setupMSYS2(target.msystem, ["flang"]);
+  await setupMSYS2(inputs.msystem, ["flang"]);
 
-  const msysRoot = path.join("C:\\msys64", target.msystem);
+  const msysRoot = path.join("C:\\msys64", inputs.msystem);
   const msysBin = path.join(msysRoot, "bin");
   const flangExe = path.join(msysBin, "flang.exe");
   const clangExe = path.join(msysBin, "clang.exe");
@@ -244,17 +251,17 @@ async function installMSYS2(target: Target): Promise<string> {
 
   core.addPath(msysBin);
 
-  core.exportVariable("FC", flangExe);
-  core.exportVariable("CC", clangExe);
-  core.exportVariable("CXX", clangPPExe);
-  core.exportVariable("FPM_FC", flangExe);
-  core.exportVariable("FPM_CC", clangExe);
-  core.exportVariable("FPM_CXX", clangPPExe);
-  core.exportVariable("WINDOWS_ENV", target.msystem);
+  core.exportVariable("WINDOWS_ENV", inputs.msystem);
 
   const resolvedVersion = await resolveInstalledVersion(flangExe);
   core.info(`Flang ${resolvedVersion} installed successfully via MSYS2.`);
-  return resolvedVersion;
+  const result = {
+    version: resolvedVersion,
+    fc: flangExe,
+    cc: clangExe,
+    cxx: clangPPExe,
+  };
+  return result;
 }
 
 async function resolveInstalledVersion(flangExe: string): Promise<string> {

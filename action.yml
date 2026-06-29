@@ -18,10 +18,20 @@ inputs:
       non-Windows runners.
     required: false
     default: native
+  cleanup-disk:
+    description: 'Free up disk space by removing large pre-installed toolkits'
+    required: false
+    default: 'false'
 
 outputs:
   version:
     description: The installed compiler version
+  fc:
+    description: The Fortran compiler command or path
+  cc:
+    description: The C compiler command or path
+  cxx:
+    description: The C++ compiler command or path
 
 runs:
   using: node24
