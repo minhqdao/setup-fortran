@@ -22,6 +22,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | `compiler` | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`) | `gfortran` |
 | `version` | Compiler version to install | `latest` |
 | `msystem` | MSYS2 subsystem (`native`, `ucrt64`, `clang64`) | `native` |
+| `cleanup-disk` | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`) | `false` |
 
 ## Compiler support
 
