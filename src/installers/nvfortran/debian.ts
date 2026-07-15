@@ -2,8 +2,6 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
@@ -112,14 +110,6 @@ const NV_ARCH: Record<Arch, string> = {
 // Ubuntu 22.04 already has them natively so no action is needed there.
 const LEGACY_NCURSES_MAX_VERSION = "24.3";
 
-// amd64 lives on archive.ubuntu.com; other arches (including arm64) are on ports.
-const NCURSES_ARCHIVE_BASE: Record<Arch, string> = {
-  [Arch.X64]: "http://archive.ubuntu.com/ubuntu",
-  [Arch.ARM64]: "http://ports.ubuntu.com/ubuntu-ports",
-};
-
-const NCURSES_JAMMY_VERSION = "6.3-2ubuntu0.1";
-
 /**
  * Compare two nvhpc version strings of the form "YY.M" or "YY.MM".
  * Returns negative if a < b, 0 if equal, positive if a > b.
@@ -142,43 +132,33 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
   return installedCount < 2;
 }
 
-/**
- * Install libncursesw5 and libtinfo5 from the Ubuntu jammy archive.
- * Must be called before installing the nvhpc apt package.
- * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
- */
-async function installLegacyNcurses(inputs: Inputs): Promise<void> {
-  const base = NCURSES_ARCHIVE_BASE[inputs.arch];
-  const debArch = APT_ARCH[inputs.arch];
-  const poolPath = "pool/universe/n/ncurses";
+async function installLegacyNcurses(): Promise<void> {
+  core.info("Backfilling legacy ncurses5 libs via apt-get configuration...");
 
-  // libtinfo5 must be installed before libncursesw5 (dependency order).
-  const debs = [
-    `libtinfo5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
-    `libncursesw5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
-  ];
+  await exec.exec("sudo", [
+    "add-apt-repository",
+    "-y",
+    "deb http://archive.ubuntu.com/ubuntu/ jammy universe",
+  ]);
 
-  for (const deb of debs) {
-    const url = `${base}/${poolPath}/${deb}`;
-    const dest = path.join(os.tmpdir(), deb);
-    core.info(`Downloading ${deb} from jammy archive...`);
-    await exec.exec("curl", [
-      "--retry",
-      "5",
-      "--retry-delay",
-      "10",
-      "--retry-all-errors",
-      "--connect-timeout",
-      "30",
-      "--max-time",
-      "120",
-      "-fsSL",
-      "-o",
-      dest,
-      url,
-    ]);
-    await exec.exec("sudo", ["dpkg", "-i", dest]);
-  }
+  await exec.exec("sudo", [
+    "apt-get",
+    "update",
+    "-y",
+    "-o",
+    "Acquire::http::Timeout=60",
+    "-o",
+    "Acquire::Retries=3",
+  ]);
+
+  await exec.exec("sudo", [
+    "apt-get",
+    "install",
+    "-y",
+    "--no-install-recommends",
+    "libtinfo5",
+    "libncursesw5",
+  ]);
 }
 
 export async function installDebian(
@@ -234,7 +214,7 @@ export async function installDebian(
       core.info(
         `nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`,
       );
-      await installLegacyNcurses(inputs);
+      await installLegacyNcurses();
     }
 
     // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
