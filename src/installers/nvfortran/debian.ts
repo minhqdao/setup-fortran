@@ -2,6 +2,8 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
@@ -133,37 +135,69 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
 }
 
 async function installLegacyNcurses(inputs: Inputs): Promise<void> {
-  core.info("Backfilling legacy ncurses5 libs via apt-get configuration...");
+  core.info("Backfilling legacy ncurses5 libs via dynamic direct download...");
 
-  const ubuntuMirror =
+  const debArch = APT_ARCH[inputs.arch];
+  const baseUrl =
     inputs.arch === Arch.ARM64
-      ? "http://ports.ubuntu.com/ubuntu-ports"
-      : "http://archive.ubuntu.com/ubuntu/";
+      ? "http://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
+      : "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
 
-  await exec.exec("sudo", [
-    "add-apt-repository",
-    "-y",
-    `deb ${ubuntuMirror} jammy universe`,
-  ]);
+  // 1. Fetch directory listing (Forcing IPv4 to bypass GitHub Actions ARM64 network blackholes)
+  let dirListing = "";
+  await exec.exec("curl", ["-fsSL", "--ipv4", "--retry", "5", baseUrl], {
+    listeners: { stdout: (data) => (dirListing += data.toString()) },
+  });
 
-  await exec.exec("sudo", [
-    "apt-get",
-    "update",
-    "-y",
-    "-o",
-    "Acquire::http::Timeout=60",
-    "-o",
-    "Acquire::Retries=3",
-  ]);
+  // 2. Extract all matching versions dynamically
+  const tinfoRegex = new RegExp(
+    `href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`,
+    "g",
+  );
+  const ncursesRegex = new RegExp(
+    `href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`,
+    "g",
+  );
 
-  await exec.exec("sudo", [
-    "apt-get",
-    "install",
-    "-y",
-    "--no-install-recommends",
-    "libtinfo5",
-    "libncursesw5",
-  ]);
+  const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
+  const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
+
+  if (tinfoMatches.length === 0 || ncursesMatches.length === 0) {
+    throw new Error(
+      `Could not resolve dynamic versions for legacy ncurses5 on ${debArch}.`,
+    );
+  }
+
+  // 3. Grab the last match (the latest point release in the directory sort)
+  const tinfoDeb = tinfoMatches[tinfoMatches.length - 1][1];
+  const ncursesDeb = ncursesMatches[ncursesMatches.length - 1][1];
+
+  // 4. Download and install in dependency order (tinfo5 first, then ncursesw5)
+  for (const deb of [tinfoDeb, ncursesDeb]) {
+    const url = `${baseUrl}${deb}`;
+    const dest = path.join(os.tmpdir(), deb);
+
+    core.info(`Downloading ${deb}...`);
+    await exec.exec("curl", [
+      "--ipv4",
+      "--retry",
+      "5",
+      "--retry-delay",
+      "5",
+      "--retry-all-errors",
+      "--connect-timeout",
+      "20",
+      "--max-time",
+      "120",
+      "-fsSL",
+      "-o",
+      dest,
+      url,
+    ]);
+
+    core.info(`Installing ${deb} via dpkg...`);
+    await exec.exec("sudo", ["dpkg", "-i", dest]);
+  }
 }
 
 export async function installDebian(

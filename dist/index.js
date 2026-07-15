@@ -97011,6 +97011,8 @@ async function installIFort(inputs) {
 
 
 
+
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 // Version scheme: YY.M (e.g. "26.1" = January 2026).
@@ -97128,32 +97130,51 @@ async function needsLegacyNcursesInstall() {
     return installedCount < 2;
 }
 async function installLegacyNcurses(inputs) {
-    core.info("Backfilling legacy ncurses5 libs via apt-get configuration...");
-    const ubuntuMirror = inputs.arch === Arch.ARM64
-        ? "http://ports.ubuntu.com/ubuntu-ports"
-        : "http://archive.ubuntu.com/ubuntu/";
-    await exec.exec("sudo", [
-        "add-apt-repository",
-        "-y",
-        `deb ${ubuntuMirror} jammy universe`,
-    ]);
-    await exec.exec("sudo", [
-        "apt-get",
-        "update",
-        "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
-    ]);
-    await exec.exec("sudo", [
-        "apt-get",
-        "install",
-        "-y",
-        "--no-install-recommends",
-        "libtinfo5",
-        "libncursesw5",
-    ]);
+    core.info("Backfilling legacy ncurses5 libs via dynamic direct download...");
+    const debArch = APT_ARCH[inputs.arch];
+    const baseUrl = inputs.arch === Arch.ARM64
+        ? "http://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
+        : "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
+    // 1. Fetch directory listing (Forcing IPv4 to bypass GitHub Actions ARM64 network blackholes)
+    let dirListing = "";
+    await exec.exec("curl", ["-fsSL", "--ipv4", "--retry", "5", baseUrl], {
+        listeners: { stdout: (data) => (dirListing += data.toString()) },
+    });
+    // 2. Extract all matching versions dynamically
+    const tinfoRegex = new RegExp(`href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
+    const ncursesRegex = new RegExp(`href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
+    const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
+    const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
+    if (tinfoMatches.length === 0 || ncursesMatches.length === 0) {
+        throw new Error(`Could not resolve dynamic versions for legacy ncurses5 on ${debArch}.`);
+    }
+    // 3. Grab the last match (the latest point release in the directory sort)
+    const tinfoDeb = tinfoMatches[tinfoMatches.length - 1][1];
+    const ncursesDeb = ncursesMatches[ncursesMatches.length - 1][1];
+    // 4. Download and install in dependency order (tinfo5 first, then ncursesw5)
+    for (const deb of [tinfoDeb, ncursesDeb]) {
+        const url = `${baseUrl}${deb}`;
+        const dest = external_path_.join(external_os_.tmpdir(), deb);
+        core.info(`Downloading ${deb}...`);
+        await exec.exec("curl", [
+            "--ipv4",
+            "--retry",
+            "5",
+            "--retry-delay",
+            "5",
+            "--retry-all-errors",
+            "--connect-timeout",
+            "20",
+            "--max-time",
+            "120",
+            "-fsSL",
+            "-o",
+            dest,
+            url,
+        ]);
+        core.info(`Installing ${deb} via dpkg...`);
+        await exec.exec("sudo", ["dpkg", "-i", dest]);
+    }
 }
 async function nvfortran_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, nvfortran_debian_SUPPORTED_VERSIONS);
