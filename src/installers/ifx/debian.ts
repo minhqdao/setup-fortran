@@ -9,6 +9,7 @@ import { resolveVersion } from "../../resolve_version";
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "2026.1",
     "2026.0",
     "2025.3",
     "2025.2",

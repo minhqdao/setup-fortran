@@ -96135,6 +96135,7 @@ var external_fs_ = __nccwpck_require__(79896);
 // ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "2026.1",
         "2026.0",
         "2025.3",
         "2025.2",
@@ -96276,6 +96277,10 @@ async function debian_resolveInstalledVersion() {
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
 const IFX_RELEASES = [
+    {
+        version: "2026.1.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/5f9f735d-6f98-4b9b-8776-a52b8256ee54/intel-dpcpp-cpp-compiler-2026.1.0.115_offline.exe",
+    },
     {
         version: "2026.0.0",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/9af38d13-867b-45af-a950-0b42d9bac1ae/intel-fortran-compiler-2026.0.0.566_offline.exe",

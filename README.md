@@ -45,7 +45,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | windows-2025 | windows-2022 |
 |---------|--------------|--------------|--------------|--------------|
 | latest   | ✓ | ✓ | ✓ | ✓ |
-| 2026.0.0 |   |   | ✓ | ✓ |
+| 2026.1   | ✓ | ✓ | ✓ | ✓ |
 | 2026.0   | ✓ | ✓ | ✓ | ✓ |
 | 2025.3.3 |   |   | ✓ | ✓ |
 | 2025.3.2 |   |   | ✓ | ✓ |
@@ -238,11 +238,11 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
     toolchain:
       - { compiler: gfortran, version: "15" }
-      - { compiler: ifx, version: "2016.0" }
+      - { compiler: ifx, version: "2016.1" }
       - { compiler: lfortran, version: "0.63.0" }
     exclude:
       - os: macos-latest
-        toolchain: { compiler: ifx, version: "2016.0" }
+        toolchain: { compiler: ifx, version: "2016.1" }
     include:
       - os: windows-11-arm
         toolchain: { compiler: flang, version: "22"}
