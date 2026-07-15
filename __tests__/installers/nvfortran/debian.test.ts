@@ -49,7 +49,7 @@ describe("installDebian nvfortran", () => {
     });
   });
 
-  it("calls curl with retry for legacy ncurses", async () => {
+  it("installs legacy ncurses via add-apt-repository when needed", async () => {
     // Version <= 24.3 triggers ncurses check
     const inputs = { ...baseInputs, version: "24.3" };
     
@@ -62,8 +62,23 @@ describe("installDebian nvfortran", () => {
     await installDebian(inputs);
 
     expect(mockedExec).toHaveBeenCalledWith(
-      "curl",
-      expect.arrayContaining(["--retry", "5", "--retry-delay", "10"]),
+      "sudo",
+      expect.arrayContaining([
+        "add-apt-repository",
+        "-y",
+        "deb http://archive.ubuntu.com/ubuntu/ jammy universe",
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        "libtinfo5",
+        "libncursesw5",
+      ]),
     );
   });
 
@@ -79,8 +94,8 @@ describe("installDebian nvfortran", () => {
     await installDebian(inputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith(
-      "curl",
-      expect.arrayContaining(["--retry", "5"]),
+      "sudo",
+      expect.arrayContaining(["add-apt-repository", expect.anything(), expect.stringContaining("jammy")]),
     );
   });
 
@@ -91,8 +106,8 @@ describe("installDebian nvfortran", () => {
     await installDebian(inputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith(
-      "curl",
-      expect.arrayContaining(["--retry", "5"]),
+      "sudo",
+      expect.arrayContaining(["add-apt-repository", expect.anything(), expect.stringContaining("jammy")]),
     );
   });
 
