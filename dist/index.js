@@ -97127,12 +97127,15 @@ async function needsLegacyNcursesInstall() {
         .length;
     return installedCount < 2;
 }
-async function installLegacyNcurses() {
+async function installLegacyNcurses(inputs) {
     core.info("Backfilling legacy ncurses5 libs via apt-get configuration...");
+    const ubuntuMirror = inputs.arch === Arch.ARM64
+        ? "http://ports.ubuntu.com/ubuntu-ports"
+        : "http://archive.ubuntu.com/ubuntu/";
     await exec.exec("sudo", [
         "add-apt-repository",
         "-y",
-        "deb http://archive.ubuntu.com/ubuntu/ jammy universe",
+        `deb ${ubuntuMirror} jammy universe`,
     ]);
     await exec.exec("sudo", [
         "apt-get",
@@ -97196,7 +97199,7 @@ async function nvfortran_debian_installDebian(inputs) {
         if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
             (await needsLegacyNcursesInstall())) {
             core.info(`nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`);
-            await installLegacyNcurses();
+            await installLegacyNcurses(inputs);
         }
         // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
         const pkgName = `nvhpc-${version.replace(".", "-")}`;

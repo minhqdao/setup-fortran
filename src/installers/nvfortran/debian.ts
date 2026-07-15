@@ -132,13 +132,18 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
   return installedCount < 2;
 }
 
-async function installLegacyNcurses(): Promise<void> {
+async function installLegacyNcurses(inputs: Inputs): Promise<void> {
   core.info("Backfilling legacy ncurses5 libs via apt-get configuration...");
+
+  const ubuntuMirror =
+    inputs.arch === Arch.ARM64
+      ? "http://ports.ubuntu.com/ubuntu-ports"
+      : "http://archive.ubuntu.com/ubuntu/";
 
   await exec.exec("sudo", [
     "add-apt-repository",
     "-y",
-    "deb http://archive.ubuntu.com/ubuntu/ jammy universe",
+    `deb ${ubuntuMirror} jammy universe`,
   ]);
 
   await exec.exec("sudo", [
@@ -214,7 +219,7 @@ export async function installDebian(
       core.info(
         `nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`,
       );
-      await installLegacyNcurses();
+      await installLegacyNcurses(inputs);
     }
 
     // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
