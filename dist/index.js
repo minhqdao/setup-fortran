@@ -97113,12 +97113,6 @@ const NV_ARCH = {
 // were dropped in Ubuntu 24.04 (noble). We backfill them from the jammy archive.
 // Ubuntu 22.04 already has them natively so no action is needed there.
 const LEGACY_NCURSES_MAX_VERSION = "24.3";
-// amd64 lives on archive.ubuntu.com; other arches (including arm64) are on ports.
-const NCURSES_ARCHIVE_BASE = {
-    [Arch.X64]: "http://archive.ubuntu.com/ubuntu",
-    [Arch.ARM64]: "http://ports.ubuntu.com/ubuntu-ports",
-};
-const NCURSES_JAMMY_VERSION = "6.3-2ubuntu0.1";
 /**
  * Compare two nvhpc version strings of the form "YY.M" or "YY.MM".
  * Returns negative if a < b, 0 if equal, positive if a > b.
@@ -97135,32 +97129,42 @@ async function needsLegacyNcursesInstall() {
         .length;
     return installedCount < 2;
 }
-/**
- * Install libncursesw5 and libtinfo5 from the Ubuntu jammy archive.
- * Must be called before installing the nvhpc apt package.
- * Install order matters: libtinfo5 first, because libncursesw5 depends on it.
- */
 async function installLegacyNcurses(inputs) {
-    const base = NCURSES_ARCHIVE_BASE[inputs.arch];
+    core.info("Backfilling legacy ncurses5 libs via dynamic direct download...");
     const debArch = APT_ARCH[inputs.arch];
-    const poolPath = "pool/universe/n/ncurses";
-    // libtinfo5 must be installed before libncursesw5 (dependency order).
-    const debs = [
-        `libtinfo5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
-        `libncursesw5_${NCURSES_JAMMY_VERSION}_${debArch}.deb`,
-    ];
-    for (const deb of debs) {
-        const url = `${base}/${poolPath}/${deb}`;
+    const baseUrl = inputs.arch === Arch.ARM64
+        ? "http://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
+        : "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
+    // 1. Fetch directory listing (Forcing IPv4 to bypass GitHub Actions ARM64 network blackholes)
+    let dirListing = "";
+    await exec.exec("curl", ["-fsSL", "--ipv4", "--retry", "5", baseUrl], {
+        listeners: { stdout: (data) => (dirListing += data.toString()) },
+    });
+    // 2. Extract all matching versions dynamically
+    const tinfoRegex = new RegExp(`href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
+    const ncursesRegex = new RegExp(`href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
+    const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
+    const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
+    if (tinfoMatches.length === 0 || ncursesMatches.length === 0) {
+        throw new Error(`Could not resolve dynamic versions for legacy ncurses5 on ${debArch}.`);
+    }
+    // 3. Grab the last match (the latest point release in the directory sort)
+    const tinfoDeb = tinfoMatches[tinfoMatches.length - 1][1];
+    const ncursesDeb = ncursesMatches[ncursesMatches.length - 1][1];
+    // 4. Download and install in dependency order (tinfo5 first, then ncursesw5)
+    for (const deb of [tinfoDeb, ncursesDeb]) {
+        const url = `${baseUrl}${deb}`;
         const dest = external_path_.join(external_os_.tmpdir(), deb);
-        core.info(`Downloading ${deb} from jammy archive...`);
+        core.info(`Downloading ${deb}...`);
         await exec.exec("curl", [
+            "--ipv4",
             "--retry",
             "5",
             "--retry-delay",
-            "10",
+            "5",
             "--retry-all-errors",
             "--connect-timeout",
-            "30",
+            "20",
             "--max-time",
             "120",
             "-fsSL",
@@ -97168,6 +97172,7 @@ async function installLegacyNcurses(inputs) {
             dest,
             url,
         ]);
+        core.info(`Installing ${deb} via dpkg...`);
         await exec.exec("sudo", ["dpkg", "-i", dest]);
     }
 }

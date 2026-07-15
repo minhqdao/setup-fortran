@@ -49,7 +49,7 @@ describe("installDebian nvfortran", () => {
     });
   });
 
-  it("calls curl with retry for legacy ncurses", async () => {
+  it("installs legacy ncurses via direct download when needed", async () => {
     // Version <= 24.3 triggers ncurses check
     const inputs = { ...baseInputs, version: "24.3" };
     
@@ -59,11 +59,49 @@ describe("installDebian nvfortran", () => {
       exitCode: 0,
     });
 
+    // Simulate directory listing with valid .deb entries
+    const dirListing =
+      '<a href="libtinfo5_6.3-2ubuntu0.1_amd64.deb">libtinfo5_6.3-2ubuntu0.1_amd64.deb</a>\n' +
+      '<a href="libncursesw5_6.3-2ubuntu0.1_amd64.deb">libncursesw5_6.3-2ubuntu0.1_amd64.deb</a>\n';
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 24.1-0"));
+      }
+      if (commandLine === "curl" && args?.some(a => typeof a === "string" && a.includes("pool/universe/n/ncurses/"))) {
+        options?.listeners?.stdout?.(Buffer.from(dirListing));
+      }
+      return 0;
+    });
+
     await installDebian(inputs);
 
+    // Should download the directory listing
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining(["--retry", "5", "--retry-delay", "10"]),
+      expect.arrayContaining(["--ipv4", "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/"]),
+      expect.anything(),
+    );
+    // Should download each .deb
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        expect.stringContaining("libtinfo5_6.3-2ubuntu0.1_amd64.deb"),
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        expect.stringContaining("libncursesw5_6.3-2ubuntu0.1_amd64.deb"),
+      ]),
+    );
+    // Should install each .deb via dpkg
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libtinfo5")]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libncursesw5")]),
     );
   });
 
@@ -78,9 +116,14 @@ describe("installDebian nvfortran", () => {
 
     await installDebian(inputs);
 
+    // Should not fetch directory listing or download any .deb
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining(["--retry", "5"]),
+      expect.arrayContaining([
+        expect.stringContaining("archive.ubuntu.com"),
+        expect.stringContaining("ncurses"),
+      ]),
+      expect.anything(),
     );
   });
 
@@ -90,9 +133,14 @@ describe("installDebian nvfortran", () => {
     
     await installDebian(inputs);
 
+    // Should not fetch directory listing or download any .deb
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining(["--retry", "5"]),
+      expect.arrayContaining([
+        expect.stringContaining("archive.ubuntu.com"),
+        expect.stringContaining("ncurses"),
+      ]),
+      expect.anything(),
     );
   });
 
