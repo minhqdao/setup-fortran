@@ -149,16 +149,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Restore dist-tests
-        uses: nick-fields/retry@v4
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          retry_wait_seconds: 10
-          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Restore dist-verify
         uses: nick-fields/retry@v4
         with:
@@ -166,6 +156,16 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 10
           command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
         env:
           GH_TOKEN: ${{ github.token }}
 
