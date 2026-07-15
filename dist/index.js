@@ -96279,7 +96279,7 @@ async function debian_resolveInstalledVersion() {
 const IFX_RELEASES = [
     {
         version: "2026.1.0",
-        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/5f9f735d-6f98-4b9b-8776-a52b8256ee54/intel-dpcpp-cpp-compiler-2026.1.0.115_offline.exe",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fe796a48-cd17-4b7b-b5ad-445b36d42f0f/intel-fortran-compiler-2026.1.0.101_offline.exe",
     },
     {
         version: "2026.0.0",
