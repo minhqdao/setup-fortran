@@ -68,7 +68,16 @@ jobs:
             exit 1
           fi
 
-      - name: Build dist-tests and save
+      - name: Build dist-verify
+        run: npm run build:verify-installation
+
+      - name: Save dist-verify
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-verify
+          path: dist-verify
+
+      - name: Build dist-tests
         run: npm run build:integration-test
 
       - name: Save dist-tests
