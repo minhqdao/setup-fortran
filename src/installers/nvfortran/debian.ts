@@ -145,9 +145,26 @@ async function installLegacyNcurses(inputs: Inputs): Promise<void> {
 
   // 1. Fetch directory listing (Forcing IPv4 to bypass GitHub Actions ARM64 network blackholes)
   let dirListing = "";
-  await exec.exec("curl", ["-fsSL", "--ipv4", "--retry", "5", baseUrl], {
-    listeners: { stdout: (data) => (dirListing += data.toString()) },
-  });
+  await exec.exec(
+    "curl",
+    [
+      "--ipv4",
+      "--retry",
+      "5",
+      "--retry-delay",
+      "5",
+      "--retry-all-errors",
+      "--connect-timeout",
+      "20",
+      "--max-time",
+      "60",
+      "-fsSL",
+      baseUrl,
+    ],
+    {
+      listeners: { stdout: (data) => (dirListing += data.toString()) },
+    },
+  );
 
   // 2. Extract all matching versions dynamically
   const tinfoRegex = new RegExp(
