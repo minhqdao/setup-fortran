@@ -21,16 +21,17 @@
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map",
     "build:integration-test": "ncc build src/run_fortran_tests.ts -o dist-tests --source-map",
+    "build:verify-installation": "ncc build src/verify_installation.ts -o dist-verify --source-map",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
     "integration-test": "node dist-tests/index.js",
-    "verify-installation": "npx tsx src/verify_installation.ts",
+    "verify-installation": "node dist-verify/index.js",
     "all": "npm run format && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
-    "@actions/cache": "^5.1.0",
+    "@actions/cache": "^5.2.0",
     "@actions/core": "^2.0.3",
     "@actions/exec": "^2.0.0",
     "@actions/tool-cache": "^3.0.1"

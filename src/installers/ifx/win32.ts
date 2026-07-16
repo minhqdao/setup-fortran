@@ -18,6 +18,10 @@ import path from "path";
 // LATEST resolves to the first entry.
 const IFX_RELEASES = [
   {
+    version: "2026.1.0",
+    url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fe796a48-cd17-4b7b-b5ad-445b36d42f0f/intel-fortran-compiler-2026.1.0.101_offline.exe",
+  },
+  {
     version: "2026.0.0",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/9af38d13-867b-45af-a950-0b42d9bac1ae/intel-fortran-compiler-2026.0.0.566_offline.exe",
   },
