@@ -78,7 +78,7 @@ describe("installDebian nvfortran", () => {
     // Should download the directory listing
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining(["--ipv4", "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/"]),
+      expect.arrayContaining(["-4", "https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/"]),
       expect.anything(),
     );
     // Should download each .deb

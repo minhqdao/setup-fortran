@@ -8,10 +8,6 @@ import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 
-// Make sure the versions are always in descending order. The first one will be
-// used as the default if no version was specified by the user.
-// Version scheme: YY.M (e.g. "26.1" = January 2026).
-// Releases ship roughly every two months.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "26.5",
@@ -48,10 +44,7 @@ const SUPPORTED_VERSIONS = {
     "21.5",
     "21.3",
     "21.2",
-    // 21.1 excluded: corrupted package on NVIDIA's x64 apt mirror
     "20.11",
-    // 20.9 excluded: predates the apt repo (tarball-only releases)
-    // 20.7 excluded: predates the apt repo (tarball-only releases)
   ],
   [Arch.ARM64]: [
     "26.5",
@@ -90,36 +83,64 @@ const SUPPORTED_VERSIONS = {
     "21.2",
     "21.1",
     "20.11",
-    // 20.9 excluded: predates the apt repo (tarball-only releases)
-    // 20.7 excluded: predates the apt repo (tarball-only releases)
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
-// Maps Arch to the apt repo architecture string used by NVIDIA.
-const APT_ARCH: Record<Arch, string> = {
+const APT_ARCH: Record<Arch, "amd64" | "arm64"> = {
   [Arch.X64]: "amd64",
   [Arch.ARM64]: "arm64",
 };
 
-// Maps Arch to the directory name NVIDIA uses under /opt/nvidia/hpc_sdk/.
 const NV_ARCH: Record<Arch, string> = {
   [Arch.X64]: "Linux_x86_64",
   [Arch.ARM64]: "Linux_aarch64",
 };
 
-// nvhpc ≤ 24.3 depend on legacy ncurses5 libs (libncursesw5, libtinfo5) that
-// were dropped in Ubuntu 24.04 (noble). We backfill them from the jammy archive.
-// Ubuntu 22.04 already has them natively so no action is needed there.
 const LEGACY_NCURSES_MAX_VERSION = "24.3";
 
-/**
- * Compare two nvhpc version strings of the form "YY.M" or "YY.MM".
- * Returns negative if a < b, 0 if equal, positive if a > b.
- */
+const CURL_RETRY_ARGS: readonly string[] = [
+  "-4",
+  "-L",
+  "--retry",
+  "10",
+  "--retry-delay",
+  "5",
+  "--retry-max-time",
+  "300",
+  "--retry-connrefused",
+  "--connect-timeout",
+  "30",
+  "--max-time",
+  "600",
+  "-fsSL",
+];
+
 function compareNvhpcVersions(a: string, b: string): number {
   const [aYear, aMonth] = a.split(".").map(Number);
   const [bYear, bMonth] = b.split(".").map(Number);
   return aYear !== bYear ? aYear - bYear : aMonth - bMonth;
+}
+
+async function execWithRetry(
+  command: string,
+  args: string[],
+  maxRetries = 5,
+  delayMs = 5000,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await exec.exec(command, args);
+      return;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      core.warning(
+        `Command "${command} ${args.join(" ")}" failed (attempt ${String(attempt)}/${String(maxRetries)}). Retrying in ${String(delayMs / 1000)}s...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
 async function needsLegacyNcursesInstall(): Promise<boolean> {
@@ -128,91 +149,86 @@ async function needsLegacyNcursesInstall(): Promise<boolean> {
     ["-W", "-f=${Status}", "libncursesw5", "libtinfo5"],
     { ignoreReturnCode: true },
   );
-  // "install ok installed" must appear twice (once per package)
   const installedCount = (result.stdout.match(/install ok installed/g) ?? [])
     .length;
   return installedCount < 2;
 }
 
 async function installLegacyNcurses(inputs: Inputs): Promise<void> {
-  core.info("Backfilling legacy ncurses5 libs via dynamic direct download...");
+  core.info("Backfilling legacy ncurses5 libs...");
 
   const debArch = APT_ARCH[inputs.arch];
   const baseUrl =
     inputs.arch === Arch.ARM64
-      ? "http://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
-      : "http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
+      ? "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
+      : "https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
 
-  // 1. Fetch directory listing (Forcing IPv4 to bypass GitHub Actions ARM64 network blackholes)
-  let dirListing = "";
-  await exec.exec(
-    "curl",
-    [
-      "--ipv4",
-      "--retry",
-      "5",
-      "--retry-delay",
-      "5",
-      "--retry-all-errors",
-      "--connect-timeout",
-      "20",
-      "--max-time",
-      "60",
-      "-fsSL",
-      baseUrl,
-    ],
-    {
-      listeners: { stdout: (data) => (dirListing += data.toString()) },
+  const directUrls: Record<
+    "amd64" | "arm64",
+    { tinfo: string; ncurses: string }
+  > = {
+    arm64: {
+      tinfo:
+        "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
+      ncurses:
+        "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
     },
-  );
+    amd64: {
+      tinfo:
+        "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
+      ncurses:
+        "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+    },
+  };
 
-  // 2. Extract all matching versions dynamically
-  const tinfoRegex = new RegExp(
-    `href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`,
-    "g",
-  );
-  const ncursesRegex = new RegExp(
-    `href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`,
-    "g",
-  );
+  let tinfoUrl = "";
+  let ncursesUrl = "";
 
-  const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
-  const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
+  try {
+    let dirListing = "";
+    await exec.exec("curl", [...CURL_RETRY_ARGS, baseUrl], {
+      listeners: { stdout: (data) => (dirListing += data.toString()) },
+    });
 
-  if (tinfoMatches.length === 0 || ncursesMatches.length === 0) {
-    throw new Error(
-      `Could not resolve dynamic versions for legacy ncurses5 on ${debArch}.`,
+    const tinfoRegex = new RegExp(
+      `href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`,
+      "g",
+    );
+    const ncursesRegex = new RegExp(
+      `href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`,
+      "g",
+    );
+
+    const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
+    const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
+
+    if (tinfoMatches.length > 0 && ncursesMatches.length > 0) {
+      tinfoUrl = `${baseUrl}${tinfoMatches[tinfoMatches.length - 1][1]}`;
+      ncursesUrl = `${baseUrl}${ncursesMatches[ncursesMatches.length - 1][1]}`;
+    }
+  } catch (e) {
+    core.warning(
+      `Directory scraping failed (${String(e)}). Using direct Launchpad HTTPS mirror.`,
     );
   }
 
-  // 3. Grab the last match (the latest point release in the directory sort)
-  const tinfoDeb = tinfoMatches[tinfoMatches.length - 1][1];
-  const ncursesDeb = ncursesMatches[ncursesMatches.length - 1][1];
+  if (!tinfoUrl || !ncursesUrl) {
+    const fallbacks = directUrls[debArch];
+    tinfoUrl = fallbacks.tinfo;
+    ncursesUrl = fallbacks.ncurses;
+  }
 
-  // 4. Download and install in dependency order (tinfo5 first, then ncursesw5)
-  for (const deb of [tinfoDeb, ncursesDeb]) {
-    const url = `${baseUrl}${deb}`;
-    const dest = path.join(os.tmpdir(), deb);
+  for (const [pkgName, url] of [
+    ["libtinfo5", tinfoUrl],
+    ["libncursesw5", ncursesUrl],
+  ]) {
+    const debFile = path.basename(url);
+    const dest = path.join(os.tmpdir(), debFile);
 
-    core.info(`Downloading ${deb}...`);
-    await exec.exec("curl", [
-      "--ipv4",
-      "--retry",
-      "5",
-      "--retry-delay",
-      "5",
-      "--retry-all-errors",
-      "--connect-timeout",
-      "20",
-      "--max-time",
-      "120",
-      "-fsSL",
-      "-o",
-      dest,
-      url,
-    ]);
+    core.info(`Downloading ${pkgName}...`);
+    await exec.exec("curl", [...CURL_RETRY_ARGS, "-o", dest, url]);
 
-    core.info(`Installing ${deb} via dpkg...`);
+    core.info(`Installing ${debFile} via dpkg...`);
     await exec.exec("sudo", ["dpkg", "-i", dest]);
   }
 }
@@ -226,43 +242,63 @@ export async function installDebian(
 
   core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
 
+  core.info(
+    "Configuring global APT settings (Force IPv4, Timeouts & Retries)...",
+  );
+  await exec.exec("sudo", [
+    "bash",
+    "-c",
+    'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "10";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
+  ]);
+
+  core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
+  const replaceMirrors = (filePath: string): string[] => [
+    "sed",
+    "-i",
+    "-e",
+    "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
+    "-e",
+    "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
+    "-e",
+    "s|http://ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
+    filePath,
+  ];
+
+  if (fs.existsSync("/etc/apt/sources.list")) {
+    await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
+  }
+  if (fs.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
+    await exec.exec(
+      "sudo",
+      replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"),
+    );
+  }
+
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
   const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
 
-  // --- Cache restore ---
   const cacheHit = await cache.restoreCache([installDir], cacheKey);
   if (cacheHit) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
     if (inputs.cleanupDisk) await cleanupDisk();
-    // Add NVIDIA's apt repo.
-    // GPG key: https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
-    // Repo:    https://developer.download.nvidia.com/hpc-sdk/ubuntu/{amd64|arm64}
+
     core.info("Adding NVIDIA HPC SDK apt repository...");
-    await exec.exec("bash", [
-      "-c",
-      `curl -fsSL https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK` +
-        ` | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`,
-    ]);
+    const curlCmd = `curl ${CURL_RETRY_ARGS.join(" ")} https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`;
+    await execWithRetry("bash", ["-c", curlCmd]);
+
     await exec.exec("bash", [
       "-c",
       `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
         ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
         ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
     ]);
-    await exec.exec("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=60",
-      "-o",
-      "Acquire::Retries=3",
-    ]);
+
+    core.info("Updating apt repositories with retry...");
+    await execWithRetry("sudo", ["apt-get", "update", "-y"]);
 
     core.info("Checking if legacy ncurses5 libs are needed...");
-
     if (
       compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
       (await needsLegacyNcursesInstall())
@@ -273,10 +309,9 @@ export async function installDebian(
       await installLegacyNcurses(inputs);
     }
 
-    // Package name: dots → dashes, e.g. "26.1" → "nvhpc-26-1", "25.11" → "nvhpc-25-11"
     const pkgName = `nvhpc-${version.replace(".", "-")}`;
-    core.info(`Installing apt package ${pkgName}...`);
-    await exec.exec("sudo", [
+    core.info(`Installing apt package ${pkgName} with retry...`);
+    await execWithRetry("sudo", [
       "apt-get",
       "install",
       "-y",
@@ -291,18 +326,13 @@ export async function installDebian(
     core.info("Cleaning up apt archives...");
     await exec.exec("sudo", ["apt-get", "clean"]);
 
-    // --- Cache save ---
-    // The install lands entirely under installDir, so caching that directory
-    // is sufficient to skip apt on subsequent runs.
     core.info(`Saving nvhpc ${version} to cache...`);
     await cache.saveCache([installDir], cacheKey);
   }
 
-  // Export environment regardless of whether we got a cache hit or did a fresh install.
   core.info(`Adding ${binDir} to PATH...`);
   core.addPath(binDir);
 
-  // Make the bundled math/comm libraries findable at runtime.
   const libDir = `${installDir}/compilers/lib`;
   const existingLdPath = process.env.LD_LIBRARY_PATH ?? "";
   core.exportVariable(
@@ -312,13 +342,12 @@ export async function installDebian(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`nvfortran ${resolvedVersion} installed successfully.`);
-  const result = {
+  return {
     version: resolvedVersion,
     fc: "nvfortran",
     cc: "nvc",
     cxx: "nvc++",
   };
-  return result;
 }
 
 async function cleanupDisk(): Promise<void> {
@@ -328,21 +357,15 @@ async function cleanupDisk(): Promise<void> {
     silent: true,
   });
 
-  // parseInt cleanly ignores the trailing 'G' (e.g., "14G" -> 14)
   const availGb = parseInt(output.trim().split("\n")[1], 10);
   core.info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
 
-  // 1. Clear the apt cache to ensure no old .deb files are sitting around
   await exec.exec("sudo", ["apt-get", "clean"]);
-
-  // 2. Prune unused Docker images (Frees ~3-5GB safely)
-  // If the user needs an image later, Docker will just download it again.
   await exec.exec("sudo", ["docker", "image", "prune", "--all", "--force"], {
     ignoreReturnCode: true,
     silent: true,
   });
 
-  // 3. Remove large unused toolkits to free up significant space (~10GB+)
   const toolkitsToRemove = [
     "/usr/local/lib/android",
     "/opt/ghc",
