@@ -97654,13 +97654,31 @@ async function flang_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
     const major = parseInt(version, 10);
     core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
-    core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
+    // 1. Force IPv4 and enable retries globally for ALL apt invocations.
+    // This guarantees that internal apt-get calls inside llvm.sh also use IPv4 and retry.
+    core.info("Configuring global APT settings (Force IPv4 & Retries)...");
     await exec.exec("sudo", [
+        "bash",
+        "-c",
+        'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
+    ]);
+    // 2. Fix apt mirrors (handles both x86_64 archive & ARM64 ports, across legacy sources.list & DEB822 ubuntu.sources)
+    core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
+    const replaceMirrors = (filePath) => [
         "sed",
         "-i",
+        "-e",
         "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-        "/etc/apt/sources.list",
-    ]);
+        "-e",
+        "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
+        filePath,
+    ];
+    if (external_fs_.existsSync("/etc/apt/sources.list")) {
+        await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
+    }
+    if (external_fs_.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
+        await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"));
+    }
     core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
     // Force IPv4 (-4) to avoid transient connection issues on some runners
     await exec.exec("bash", [
@@ -97672,21 +97690,16 @@ async function flang_debian_installDebian(inputs) {
     ]);
     const pkgName = `flang-${version}`;
     core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
-    // Force IPv4 to avoid transient connection issues with apt.llvm.org
     await exec.exec("sudo", [
         "apt-get",
         "install",
         "-y",
-        "-o",
-        "Acquire::ForceIPv4=true",
         pkgName,
         `libomp-${version}-dev`,
     ]);
     const binaryPath = resolveFlangBinaryPath(major, version);
     // Register the binary under the generic `flang` name so users can always
     // call `flang` regardless of which LLVM major is installed.
-    // Skip if the resolved path is already /usr/bin/flang — update-alternatives
-    // forbids registering a file as its own alternative.
     if (binaryPath !== "/usr/bin/flang") {
         core.info(`Registering update-alternatives: /usr/bin/flang -> ${binaryPath}`);
         await exec.exec("sudo", [
@@ -97705,10 +97718,7 @@ async function flang_debian_installDebian(inputs) {
         core.addPath(llvmBinDir);
     }
     core.exportVariable("FLANG_VERSION", major);
-    // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link
-    // time. This is particularly important for LLVM 15/16 where the runtime
-    // libs (libFortranRuntime, libFortranDecimal, etc.) are not in the default
-    // linker search path.
+    // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link time.
     const llvmLibDir = `/usr/lib/llvm-${version}/lib`;
     if (external_fs_.existsSync(llvmLibDir)) {
         const existing = process.env.LIBRARY_PATH ?? "";

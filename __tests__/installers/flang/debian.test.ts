@@ -80,8 +80,6 @@ describe("installDebian (Flang)", () => {
       "apt-get",
       "install",
       "-y",
-      "-o",
-      "Acquire::ForceIPv4=true",
       "flang-18",
       "libomp-18-dev",
     ]);
