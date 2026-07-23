@@ -18,6 +18,7 @@ import type { Inputs } from "../../types";
 //   - The binary is always named `lfortran` regardless of version.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "0.64.0",
     "0.63.0",
     "0.62.0",
     "0.61.0",

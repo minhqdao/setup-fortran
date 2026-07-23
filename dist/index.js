@@ -98175,6 +98175,7 @@ async function installFlang(inputs) {
 //   - The binary is always named `lfortran` regardless of version.
 const lfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "0.64.0",
         "0.63.0",
         "0.62.0",
         "0.61.0",
@@ -98280,6 +98281,7 @@ async function lfortran_debian_resolveInstalledVersion(binaryPath) {
 //   - LATEST resolves to the first entry in the list.
 const lfortran_darwin_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "0.64.0",
         "0.63.0",
         "0.62.0",
         "0.61.0",
@@ -98289,6 +98291,7 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
         "0.57.0",
     ],
     [Arch.ARM64]: [
+        "0.64.0",
         "0.63.0",
         "0.62.0",
         "0.61.0",
@@ -98427,6 +98430,7 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 const lfortran_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [Msystem.Native]: [
+            "0.64.0",
             "0.63.0",
             "0.62.0",
             "0.61.0",

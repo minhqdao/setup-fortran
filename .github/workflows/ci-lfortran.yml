@@ -33,6 +33,7 @@ jobs:
             windows-2022,
           ]
         toolchain:
+          - { compiler: lfortran, version: "0.64.0" }
           - { compiler: lfortran, version: "0.63.0" }
           - { compiler: lfortran, version: "0.62.0" }
           - { compiler: lfortran, version: "0.61.0" }
