@@ -258,8 +258,9 @@ async function runInstallerWithRetry(
   maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await exec.exec(`"${installerPath}"`, [
+    const exitCode = await exec.exec(
+      `"${installerPath}"`,
+      [
         "-s",
         "-a",
         "--silent",
@@ -267,20 +268,26 @@ async function runInstallerWithRetry(
         "accept",
         "-p=NEED_VS2019_INTEGRATION=0",
         "-p=NEED_VS2022_INTEGRATION=0",
-      ]);
-      return;
-    } catch (err) {
-      const exitCode = (err as { exitCode?: number }).exitCode;
+      ],
+      { ignoreReturnCode: true },
+    );
+
+    // 0 = Success, 1001 = Already installed
+    if (exitCode === 0 || exitCode === 1001) {
       if (exitCode === 1001) {
         core.info("Intel oneAPI is already installed, skipping.");
-        return;
       }
-      if (attempt === maxAttempts) throw err;
-      core.warning(
-        `Installer crashed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`,
-      );
-      await new Promise((res) => setTimeout(res, attempt * 15_000));
+      return;
     }
+
+    if (attempt === maxAttempts) {
+      throw new Error(`Installer failed with exit code ${exitCode.toString()}`);
+    }
+
+    core.warning(
+      `Installer crashed with exit code ${exitCode.toString()} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`,
+    );
+    await new Promise((res) => setTimeout(res, attempt * 15_000));
   }
 }
 
