@@ -69,7 +69,7 @@ describe("installDebian (Flang)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
-      "curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
+      "curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
     ]);
   });
 

@@ -97656,15 +97656,14 @@ async function flang_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
     const major = parseInt(version, 10);
     core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
-    // 1. Force IPv4 and enable retries globally for ALL apt invocations.
-    // This guarantees that internal apt-get calls inside llvm.sh also use IPv4 and retry.
-    core.info("Configuring global APT settings (Force IPv4 & Retries)...");
+    // 1. Force IPv4, retries, AND short socket timeouts (10s instead of default 120s)
+    core.info("Configuring global APT settings (IPv4, Retries & 10s Timeouts)...");
     await exec.exec("sudo", [
         "bash",
         "-c",
-        'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
+        'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "10";\nAcquire::https::Timeout "10";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
     ]);
-    // 2. Fix apt mirrors (handles both x86_64 archive & ARM64 ports, across legacy sources.list & DEB822 ubuntu.sources)
+    // 2. Fix apt mirrors across ALL possible location formats
     core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
     const replaceMirrors = (filePath) => [
         "sed",
@@ -97675,18 +97674,23 @@ async function flang_debian_installDebian(inputs) {
         "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
         filePath,
     ];
-    if (external_fs_.existsSync("/etc/apt/sources.list")) {
-        await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
-    }
-    if (external_fs_.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
-        await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"));
+    // Target legacy sources.list, new deb822 ubuntu.sources, and runner apt-mirrors.txt
+    const mirrorTargets = [
+        "/etc/apt/sources.list",
+        "/etc/apt/apt-mirrors.txt",
+        "/etc/apt/sources.list.d/ubuntu.sources",
+    ];
+    for (const target of mirrorTargets) {
+        if (external_fs_.existsSync(target)) {
+            await exec.exec("sudo", replaceMirrors(target));
+        }
     }
     core.info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
-    // Force IPv4 (-4) to avoid transient connection issues on some runners
+    // Add timeouts to curl so it fails fast if apt.llvm.org drops connection
     await exec.exec("bash", [
         "-c",
         [
-            `curl -4 -fsSL --retry 3 --retry-delay 15 https://apt.llvm.org/llvm.sh`,
+            `curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh`,
             `| sudo bash -s -- ${version}`,
         ].join(" "),
     ]);
@@ -97700,8 +97704,6 @@ async function flang_debian_installDebian(inputs) {
         `libomp-${version}-dev`,
     ]);
     const binaryPath = resolveFlangBinaryPath(major, version);
-    // Register the binary under the generic `flang` name so users can always
-    // call `flang` regardless of which LLVM major is installed.
     if (binaryPath !== "/usr/bin/flang") {
         core.info(`Registering update-alternatives: /usr/bin/flang -> ${binaryPath}`);
         await exec.exec("sudo", [
@@ -97713,14 +97715,11 @@ async function flang_debian_installDebian(inputs) {
             "100",
         ]);
     }
-    // Add the llvm bin dir to PATH so versioned tools (clang-22, etc.) are
-    // reachable in subsequent steps without qualification.
     const llvmBinDir = `/usr/lib/llvm-${version}/bin`;
     if (external_fs_.existsSync(llvmBinDir)) {
         core.addPath(llvmBinDir);
     }
     core.exportVariable("FLANG_VERSION", major);
-    // Set LIBRARY_PATH so the Fortran runtime libraries are findable at link time.
     const llvmLibDir = `/usr/lib/llvm-${version}/lib`;
     if (external_fs_.existsSync(llvmLibDir)) {
         const existing = process.env.LIBRARY_PATH ?? "";
