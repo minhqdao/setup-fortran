@@ -97448,8 +97448,7 @@ async function installNVFortran(inputs) {
 
 
 
-// Make sure that the "latest" version is listed first. If the user does not
-// specify a version, the latest will be installed by default.
+
 const AOCC_RELEASES = [
     {
         version: "5.2",
@@ -97481,8 +97480,8 @@ function getReleaseMetadata(version) {
     if (!release) {
         throw new Error(`AOCC version ${version} is not defined in AOCC_RELEASES.`);
     }
-    const fullVersion = `${version}.0`; // e.g., "5.1" -> "5.1.0"
-    const urlVersion = version.replace(".", "-"); // e.g., "5.1" -> "5-1"
+    const fullVersion = `${version}.0`;
+    const urlVersion = version.replace(".", "-");
     const deb = `aocc-compiler-${fullVersion}_1_amd64.deb`;
     return {
         deb,
@@ -97501,23 +97500,16 @@ async function aocc_debian_installDebian(inputs) {
     if (cacheHit) {
         core.info("Restored from cache, moving to /opt...");
         await exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
+        await exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
         await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
     }
     else if (!external_fs_.existsSync(metadata.installDir)) {
         const debPath = external_path_.join(external_os_.tmpdir(), metadata.deb);
         core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
-        await exec.exec("curl", [
-            "-fSL",
-            "--retry",
-            "3",
-            "--retry-delay",
-            "15",
-            "--user-agent",
-            "Mozilla/5.0",
-            "-o",
-            debPath,
-            metadata.url,
-        ]);
+        // Use tool-cache for resilient HTTP downloading with headers and retries
+        await tool_cache.downloadTool(metadata.url, debPath, undefined, {
+            "User-Agent": "Mozilla/5.0",
+        });
         core.info(`Verifying checksum...`);
         await exec.exec("bash", [
             "-c",
@@ -97527,7 +97519,8 @@ async function aocc_debian_installDebian(inputs) {
         await exec.exec("sudo", ["dpkg", "-i", debPath]);
         await exec.exec("sudo", ["apt-get", "install", "-f", "-y"]);
         core.info(`Saving AOCC ${version} to cache...`);
-        await exec.exec("sudo", ["cp", "-r", metadata.installDir, tempInstallDir]);
+        await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
+        await exec.exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
         await exec.exec("sudo", [
             "chown",
             "-R",
@@ -97559,8 +97552,11 @@ async function aocc_debian_installDebian(inputs) {
             core.exportVariable(key, val);
         }
     }
-    core.addPath(external_path_.join(metadata.installDir, "bin"));
-    const resolvedVersion = await aocc_debian_resolveInstalledVersion();
+    const binDir = external_path_.join(metadata.installDir, "bin");
+    core.addPath(binDir);
+    // Update process.env.PATH so flang can be called in this process
+    process.env.PATH = `${binDir}:${process.env.PATH ?? ""}`;
+    const resolvedVersion = await aocc_debian_resolveInstalledVersion(binDir);
     const result = {
         version: resolvedVersion,
         fc: "flang",
@@ -97569,9 +97565,10 @@ async function aocc_debian_installDebian(inputs) {
     };
     return result;
 }
-async function aocc_debian_resolveInstalledVersion() {
+async function aocc_debian_resolveInstalledVersion(binDir) {
     let output = "";
-    await exec.exec("flang", ["--version"], {
+    const flangBinary = external_path_.join(binDir, "flang");
+    await exec.exec(flangBinary, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();

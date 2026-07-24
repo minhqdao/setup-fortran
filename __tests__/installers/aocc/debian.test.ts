@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as tc from "@actions/tool-cache";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
@@ -16,9 +17,11 @@ import {
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
+jest.mock("@actions/tool-cache");
 jest.mock("os", () => ({
   ...jest.requireActual("os"),
   homedir: jest.fn().mockReturnValue("/home/user"),
+  tmpdir: jest.fn().mockReturnValue("/tmp"),
   userInfo: jest.fn().mockReturnValue({ username: "user" }),
 }));
 jest.mock("fs", () => ({
@@ -30,6 +33,9 @@ describe("installDebian (AOCC)", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedFs = fs as jest.Mocked<typeof fs>;
   const mockedCache = cache as jest.Mocked<typeof cache>;
+  const mockedDownloadTool = tc.downloadTool as jest.MockedFunction<
+    typeof tc.downloadTool
+  >;
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
@@ -50,13 +56,14 @@ describe("installDebian (AOCC)", () => {
     jest.clearAllMocks();
     mockedFs.existsSync.mockReturnValue(false); // Assume not installed
     mockedCache.restoreCache.mockResolvedValue(undefined); // Cache miss
+    mockedDownloadTool.mockResolvedValue("/tmp/aocc-compiler-5.1.0_1_amd64.deb");
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "bash" && args?.[1] === 'source "/opt/AMD/aocc-compiler-5.1.0/setenv_AOCC.sh" && env') {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("PATH=/opt/AMD/aocc/bin:/usr/bin\nLD_LIBRARY_PATH=/opt/AMD/aocc/lib\nAOCC_DIR=/opt/AMD/aocc\n"));
         }
       }
-      if (commandLine === "flang" && args?.[0] === "--version") {
+      if (commandLine === "/opt/AMD/aocc-compiler-5.1.0/bin/flang" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("AOCC flang version 5.1.0"));
         }
@@ -72,21 +79,15 @@ describe("installDebian (AOCC)", () => {
       [tempInstallDir],
       expect.stringContaining("aocc-5.1-x64-22.04"),
     );
-    expect(mockedExec).toHaveBeenCalledWith(
-      "curl",
-      expect.arrayContaining([
-        "-fSL",
-        "--retry",
-        "3",
-        "--retry-delay",
-        "15",
-        "-o",
-        expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
-      ]),
+    expect(mockedDownloadTool).toHaveBeenCalledWith(
+      expect.stringContaining("aocc-5"),
+      expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+      undefined,
+      { "User-Agent": "Mozilla/5.0" },
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb")]);
     
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["cp", "-r", "/opt/AMD/aocc-compiler-5.1.0", tempInstallDir]);
+    expect(mockedExec).toHaveBeenCalledWith("sudo", ["cp", "-rT", "/opt/AMD/aocc-compiler-5.1.0", tempInstallDir]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       [tempInstallDir],
       expect.stringContaining("aocc-5.1-x64-22.04"),
