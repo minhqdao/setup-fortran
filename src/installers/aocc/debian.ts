@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as tc from "@actions/tool-cache";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
@@ -8,8 +9,6 @@ import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 
-// Make sure that the "latest" version is listed first. If the user does not
-// specify a version, the latest will be installed by default.
 const AOCC_RELEASES = [
   {
     version: "5.2",
@@ -52,8 +51,8 @@ function getReleaseMetadata(version: string): AoccMetadata {
     throw new Error(`AOCC version ${version} is not defined in AOCC_RELEASES.`);
   }
 
-  const fullVersion = `${version}.0`; // e.g., "5.1" -> "5.1.0"
-  const urlVersion = version.replace(".", "-"); // e.g., "5.1" -> "5-1"
+  const fullVersion = `${version}.0`;
+  const urlVersion = version.replace(".", "-");
   const deb = `aocc-compiler-${fullVersion}_1_amd64.deb`;
 
   return {
@@ -79,23 +78,16 @@ export async function installDebian(
   if (cacheHit) {
     core.info("Restored from cache, moving to /opt...");
     await exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
+    await exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
     await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
   } else if (!fs.existsSync(metadata.installDir)) {
     const debPath = path.join(os.tmpdir(), metadata.deb);
 
     core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
-    await exec.exec("curl", [
-      "-fSL",
-      "--retry",
-      "3",
-      "--retry-delay",
-      "15",
-      "--user-agent",
-      "Mozilla/5.0",
-      "-o",
-      debPath,
-      metadata.url,
-    ]);
+    // Use tool-cache for resilient HTTP downloading with headers and retries
+    await tc.downloadTool(metadata.url, debPath, undefined, {
+      "User-Agent": "Mozilla/5.0",
+    });
 
     core.info(`Verifying checksum...`);
     await exec.exec("bash", [
@@ -108,7 +100,8 @@ export async function installDebian(
     await exec.exec("sudo", ["apt-get", "install", "-f", "-y"]);
 
     core.info(`Saving AOCC ${version} to cache...`);
-    await exec.exec("sudo", ["cp", "-r", metadata.installDir, tempInstallDir]);
+    await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
+    await exec.exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
     await exec.exec("sudo", [
       "chown",
       "-R",
@@ -144,9 +137,13 @@ export async function installDebian(
     }
   }
 
-  core.addPath(path.join(metadata.installDir, "bin"));
+  const binDir = path.join(metadata.installDir, "bin");
+  core.addPath(binDir);
 
-  const resolvedVersion = await resolveInstalledVersion();
+  // Update process.env.PATH so flang can be called in this process
+  process.env.PATH = `${binDir}:${process.env.PATH ?? ""}`;
+
+  const resolvedVersion = await resolveInstalledVersion(binDir);
   const result = {
     version: resolvedVersion,
     fc: "flang",
@@ -156,9 +153,10 @@ export async function installDebian(
   return result;
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(binDir: string): Promise<string> {
   let output = "";
-  await exec.exec("flang", ["--version"], {
+  const flangBinary = path.join(binDir, "flang");
+  await exec.exec(flangBinary, ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {
         output += data.toString();

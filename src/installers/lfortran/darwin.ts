@@ -18,6 +18,7 @@ import type { Inputs } from "../../types";
 //   - LATEST resolves to the first entry in the list.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "0.64.0",
     "0.63.0",
     "0.62.0",
     "0.61.0",
@@ -27,6 +28,7 @@ const SUPPORTED_VERSIONS = {
     "0.57.0",
   ],
   [Arch.ARM64]: [
+    "0.64.0",
     "0.63.0",
     "0.62.0",
     "0.61.0",

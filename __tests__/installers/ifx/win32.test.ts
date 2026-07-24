@@ -6,13 +6,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { installWin32 } from "../../../src/installers/ifx/win32";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -43,7 +37,7 @@ describe("installWin32 (ifx)", () => {
     os: OS.Windows,
     osVersion: "10.0.19045",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -82,8 +76,9 @@ describe("installWin32 (ifx)", () => {
 
     expect(mockedDownloadTool).toHaveBeenCalled();
     expect(mockedExec).toHaveBeenCalledWith(
-      "\"C:\\Temp\\installer.exe\"",
+      '"C:\\Temp\\installer.exe"',
       expect.arrayContaining(["-s", "-a", "--silent", "--eula", "accept"]),
+      { ignoreReturnCode: true },
     );
     expect(cache.saveCache).toHaveBeenCalled();
   });
@@ -94,9 +89,9 @@ describe("installWin32 (ifx)", () => {
 
     let attempts = 0;
     mockedExec.mockImplementation(async (cmd) => {
-      if (cmd === "\"C:\\Temp\\installer.exe\"") {
+      if (cmd === '"C:\\Temp\\installer.exe"') {
         attempts++;
-        if (attempts === 1) throw new Error("Installer crashed");
+        if (attempts === 1) return 1;
       }
       if (cmd === "ifx") return 0;
       if (cmd === "cmd") return 0;
@@ -120,7 +115,9 @@ describe("installWin32 (ifx)", () => {
 
     expect(attempts).toBe(2);
     expect(core.warning).toHaveBeenCalledWith(
-      expect.stringContaining("Installer crashed (attempt 1/3)"),
+      expect.stringContaining(
+        "Installer crashed with exit code 1 (attempt 1/3)",
+      ),
     );
   });
 
@@ -130,11 +127,9 @@ describe("installWin32 (ifx)", () => {
 
     let installerCalls = 0;
     mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (commandLine === "\"C:\\Temp\\installer.exe\"") {
+      if (commandLine === '"C:\\Temp\\installer.exe"') {
         installerCalls++;
-        const error = new Error("Already installed");
-        (error as any).exitCode = 1001;
-        throw error;
+        return 1001;
       } else if (commandLine === "ifx") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("ifx version 2026.0.0"));

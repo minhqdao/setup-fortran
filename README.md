@@ -182,6 +182,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
 |---------|--------------|--------------|----------|----------------|----------|----------------|----------|--------------|--------------|----------------------|----------------------|----------------------|----------------------|
 | latest  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 0.64.0  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |
 | 0.63.0  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |
 | 0.62.0  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |
 | 0.61.0  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |
@@ -227,7 +228,7 @@ This defaults to `gfortran` and the newest version available on that platform.
 - uses: minhqdao/setup-fortran@v1
   with:
     compiler: lfortran
-    version: "0.63.0"
+    version: "0.64.0"
 ```
 
 ### Matrix build
@@ -239,7 +240,7 @@ strategy:
     toolchain:
       - { compiler: gfortran, version: "15" }
       - { compiler: ifx, version: "2016.1" }
-      - { compiler: lfortran, version: "0.63.0" }
+      - { compiler: lfortran, version: "0.64.0" }
     exclude:
       - os: macos-latest
         toolchain: { compiler: ifx, version: "2016.1" }
