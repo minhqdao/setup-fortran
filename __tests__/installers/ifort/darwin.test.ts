@@ -90,10 +90,16 @@ describe("installDarwin (ifort)", () => {
       "-nobrowse",
     ]);
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      expect.stringContaining("install.sh"),
-      "--silent",
+      expect.stringContaining("bootstrapper"),
+      "-s",
+      "--action",
+      "install",
       "--eula",
       "accept",
+      "--continue-with-optional-error=yes",
+      "--ignore-errors",
+      "--components",
+      "intel.oneapi.mac.ifort-compiler",
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalled();
   });

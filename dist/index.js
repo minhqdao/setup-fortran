@@ -96833,7 +96833,7 @@ async function darwin_installDarwin(inputs) {
     core.info(`Installing ifort ${version} on macOS (${inputs.arch})...`);
     if (inputs.arch === Arch.ARM64) {
         throw new Error("Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
-            "Please ensure your workflow uses the 'macos-13' runner.");
+            "Please ensure your workflow uses an x64 runner or Intel environment.");
     }
     const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
@@ -96858,22 +96858,32 @@ async function darwin_installDarwin(inputs) {
                 "-quiet",
                 "-nobrowse",
             ]);
-            // Intel's silent installer script moves around depending on the release year.
-            // We search for the standard locations.
-            let installScript = external_path_default().join(mountPoint, "install.sh");
+            // Prefer calling the bootstrapper binary directly if present
+            let installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "bootstrapper");
             if (!external_fs_.existsSync(installScript)) {
                 installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "install.sh");
             }
             if (!external_fs_.existsSync(installScript)) {
-                installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "bootstrapper");
+                installScript = external_path_default().join(mountPoint, "install.sh");
             }
             core.info(`Running silent install via ${installScript}...`);
-            await exec.exec("sudo", [installScript, "--silent", "--eula", "accept"]);
+            await exec.exec("sudo", [
+                installScript,
+                "-s",
+                "--action",
+                "install",
+                "--eula",
+                "accept",
+                "--continue-with-optional-error=yes",
+                "--ignore-errors",
+                "--components",
+                "intel.oneapi.mac.ifort-compiler",
+            ]);
             core.info("Saving installation to cache...");
             await cache.saveCache(cachePaths, cacheKey);
         }
         finally {
-            // Always ensure the DMG is unmounted, even if the installation fails
+            // Always ensure the DMG is unmounted
             core.info("Unmounting DMG...");
             await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
                 ignoreReturnCode: true,
@@ -96897,17 +96907,17 @@ async function darwin_installDarwin(inputs) {
         const val = line.substring(eqIdx + 1);
         if (/^(PATH|DYLD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
             core.exportVariable(key, val);
+            process.env[key] = val; // Keep current Node process env in sync
         }
     }
     const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
     core.info(`ifort ${resolvedVersion} installed successfully.`);
-    const result = {
+    return {
         version: resolvedVersion,
         fc: "ifort",
         cc: "icc",
         cxx: "icpc",
     };
-    return result;
 }
 async function ifort_darwin_resolveInstalledVersion() {
     let output = "";
