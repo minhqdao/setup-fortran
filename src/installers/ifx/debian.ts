@@ -5,8 +5,6 @@ import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
-// The first entry is used as the default when LATEST is requested.
-// ARM64 is not supported: Intel oneAPI does not provide Linux ARM64 packages.
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "2026.1",
@@ -38,6 +36,15 @@ const SUPPORTED_VERSIONS = {
   ],
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
+
+const APT_ACQUIRE_OPTS = [
+  "-o",
+  "Acquire::http::Timeout=120",
+  "-o",
+  "Acquire::https::Timeout=120",
+  "-o",
+  "Acquire::Retries=5",
+];
 
 export async function installDebian(
   inputs: Inputs,
@@ -72,15 +79,7 @@ export async function installDebian(
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=60",
-      "-o",
-      "Acquire::Retries=3",
-    ]);
+    await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
 
     const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
     const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
@@ -92,11 +91,13 @@ export async function installDebian(
     const cppPkg = `${cppPkgBase}-${version}`;
 
     core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-    await exec.exec("sudo", [
-      "apt-get",
+
+    await aptInstallWithRetry([
       "install",
       "-y",
       "--no-install-recommends",
+      "--fix-missing",
+      ...APT_ACQUIRE_OPTS,
       fortranPkg,
       cppPkg,
     ]);
@@ -106,8 +107,6 @@ export async function installDebian(
     core.info(`Cache hit for ${cacheKey}, skipping installation...`);
   }
 
-  // setvars.sh sourcing always runs — cache hit or miss — because the
-  // environment variables are not cached, only the files are.
   const setVarsScript = "/opt/intel/oneapi/setvars.sh";
   core.info(`Sourcing ${setVarsScript} and exporting environment...`);
 
@@ -125,25 +124,49 @@ export async function installDebian(
     if (eqIdx === -1) continue;
     const key = line.substring(0, eqIdx);
     const val = line.substring(eqIdx + 1);
-    // Only export oneAPI/Intel/PATH-related variables.
+
     if (
       /^(PATH|LD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(
         key,
       )
     ) {
       core.exportVariable(key, val);
+      process.env[key] = val; // Keeps the Node process environment synchronized
     }
   }
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
-  const result = {
+  return {
     version: resolvedVersion,
     fc: "ifx",
     cc: "icx",
     cxx: "icpx",
   };
-  return result;
+}
+
+async function aptInstallWithRetry(
+  args: string[],
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec("sudo", ["apt-get", ...args], {
+      ignoreReturnCode: true,
+    });
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
+      );
+    }
+
+    core.warning(
+      `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Retrying in 15 seconds...`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
 }
 
 async function resolveInstalledVersion(): Promise<string> {

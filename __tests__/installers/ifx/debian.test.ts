@@ -66,14 +66,25 @@ describe("installDebian ifx", () => {
       ["/opt/intel/oneapi"],
       "oneapi-ifx-2023.2.0",
     );
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      "intel-oneapi-compiler-fortran-2023.2.0",
-      "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.0",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        "--fix-missing",
+        "-o",
+        "Acquire::http::Timeout=120",
+        "-o",
+        "Acquire::https::Timeout=120",
+        "-o",
+        "Acquire::Retries=5",
+        "intel-oneapi-compiler-fortran-2023.2.0",
+        "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.0",
+      ],
+      { ignoreReturnCode: true },
+    );
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
       "oneapi-ifx-2023.2.0",
@@ -109,28 +120,50 @@ describe("installDebian ifx", () => {
     const inputs = { ...baseInputs, version: "2025.2" };
     await installDebian(inputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      "intel-oneapi-compiler-fortran-2025.2",
-      "intel-oneapi-compiler-dpcpp-cpp-2025.2",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        "--fix-missing",
+        "-o",
+        "Acquire::http::Timeout=120",
+        "-o",
+        "Acquire::https::Timeout=120",
+        "-o",
+        "Acquire::Retries=5",
+        "intel-oneapi-compiler-fortran-2025.2",
+        "intel-oneapi-compiler-dpcpp-cpp-2025.2",
+      ],
+      { ignoreReturnCode: true },
+    );
   });
 
   it("resolves 2023.2 to the latest patch 2023.2.4 using resolveMinorToLatestPatch", async () => {
     const inputs = { ...baseInputs, version: "2023.2" };
     await installDebian(inputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      "intel-oneapi-compiler-fortran-2023.2.4",
-      "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.4",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-install-recommends",
+        "--fix-missing",
+        "-o",
+        "Acquire::http::Timeout=120",
+        "-o",
+        "Acquire::https::Timeout=120",
+        "-o",
+        "Acquire::Retries=5",
+        "intel-oneapi-compiler-fortran-2023.2.4",
+        "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.4",
+      ],
+      { ignoreReturnCode: true },
+    );
   });
 
   it("adds the Intel repository on cache miss", async () => {
@@ -141,9 +174,11 @@ describe("installDebian ifx", () => {
       "update",
       "-y",
       "-o",
-      "Acquire::http::Timeout=60",
+      "Acquire::http::Timeout=120",
       "-o",
-      "Acquire::Retries=3",
+      "Acquire::https::Timeout=120",
+      "-o",
+      "Acquire::Retries=5",
     ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",

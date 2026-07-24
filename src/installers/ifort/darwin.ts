@@ -70,7 +70,7 @@ export async function installDarwin(
   if (inputs.arch === Arch.ARM64) {
     throw new Error(
       "Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
-        "Please ensure your workflow uses the 'macos-13' runner.",
+        "Please ensure your workflow uses an x64 runner or Intel environment.",
     );
   }
 
@@ -104,9 +104,14 @@ export async function installDarwin(
         "-nobrowse",
       ]);
 
-      // Intel's silent installer script moves around depending on the release year.
-      // We search for the standard locations.
-      let installScript = path.join(mountPoint, "install.sh");
+      // Prefer calling the bootstrapper binary directly if present
+      let installScript = path.join(
+        mountPoint,
+        "bootstrapper.app",
+        "Contents",
+        "MacOS",
+        "bootstrapper",
+      );
       if (!fs.existsSync(installScript)) {
         installScript = path.join(
           mountPoint,
@@ -117,22 +122,27 @@ export async function installDarwin(
         );
       }
       if (!fs.existsSync(installScript)) {
-        installScript = path.join(
-          mountPoint,
-          "bootstrapper.app",
-          "Contents",
-          "MacOS",
-          "bootstrapper",
-        );
+        installScript = path.join(mountPoint, "install.sh");
       }
 
       core.info(`Running silent install via ${installScript}...`);
-      await exec.exec("sudo", [installScript, "--silent", "--eula", "accept"]);
+      await exec.exec("sudo", [
+        installScript,
+        "-s",
+        "--action",
+        "install",
+        "--eula",
+        "accept",
+        "--continue-with-optional-error=yes",
+        "--ignore-errors",
+        "--components",
+        "intel.oneapi.mac.ifort-compiler",
+      ]);
 
       core.info("Saving installation to cache...");
       await cache.saveCache(cachePaths, cacheKey);
     } finally {
-      // Always ensure the DMG is unmounted, even if the installation fails
+      // Always ensure the DMG is unmounted
       core.info("Unmounting DMG...");
       await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
         ignoreReturnCode: true,
@@ -163,18 +173,18 @@ export async function installDarwin(
       )
     ) {
       core.exportVariable(key, val);
+      process.env[key] = val; // Keep current Node process env in sync
     }
   }
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
-  const result = {
+  return {
     version: resolvedVersion,
     fc: "ifort",
     cc: "icc",
     cxx: "icpc",
   };
-  return result;
 }
 
 async function resolveInstalledVersion(): Promise<string> {
