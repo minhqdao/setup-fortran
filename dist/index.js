@@ -96834,6 +96834,38 @@ const ifort_darwin_SUPPORTED_VERSIONS = {
 };
 const darwin_ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${darwin_ONEAPI_ROOT}/setvars.sh`;
+async function downloadInstaller(url, destPath) {
+    const maxTcAttempts = 3;
+    for (let attempt = 1; attempt <= maxTcAttempts; attempt++) {
+        try {
+            core.info(`Downloading via tool-cache (attempt ${attempt.toString()}/${maxTcAttempts.toString()})...`);
+            return await tool_cache.downloadTool(url, destPath);
+        }
+        catch (error) {
+            core.warning(`tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`);
+            if (attempt < maxTcAttempts) {
+                await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
+            }
+        }
+    }
+    core.warning("tc.downloadTool failed after all attempts. Falling back to curl...");
+    await exec.exec("curl", [
+        "-sS",
+        "-L",
+        "--retry",
+        "5",
+        "--retry-delay",
+        "5",
+        "--connect-timeout",
+        "30",
+        "--max-time",
+        "600",
+        "-o",
+        destPath,
+        url,
+    ]);
+    return destPath;
+}
 async function darwin_installDarwin(inputs) {
     const version = resolveVersion(inputs, ifort_darwin_SUPPORTED_VERSIONS);
     const release = IFORT_RELEASES.find((r) => r.version === version);
@@ -96847,16 +96879,22 @@ async function darwin_installDarwin(inputs) {
     }
     const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
+    // 1. Ensure directory exists AND set ownership to current runner user
+    // (Prevents gtar extraction failure during cache restoration)
     if (!external_fs_.existsSync(darwin_ONEAPI_ROOT)) {
         await exec.exec("sudo", ["mkdir", "-p", darwin_ONEAPI_ROOT]);
     }
+    const currentUser = process.env.USER ?? "runner";
+    await exec.exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
+    // 2. Restore from cache if present
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
     if (cacheHit) {
         core.info(`Restored ifort installation from cache (${cacheHit}).`);
     }
     else {
         core.info(`Downloading ifort DMG installer...`);
-        const dmgPath = await tool_cache.downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`));
+        const targetPath = external_path_default().join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`);
+        const dmgPath = await downloadInstaller(release.url, targetPath);
         const mountPoint = "/Volumes/Intel_oneAPI_Installer";
         try {
             core.info("Mounting DMG...");
@@ -96868,7 +96906,6 @@ async function darwin_installDarwin(inputs) {
                 "-quiet",
                 "-nobrowse",
             ]);
-            // Prefer calling the bootstrapper binary directly if present
             let installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "bootstrapper");
             if (!external_fs_.existsSync(installScript)) {
                 installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "install.sh");
@@ -96893,7 +96930,6 @@ async function darwin_installDarwin(inputs) {
             await cache.saveCache(cachePaths, cacheKey);
         }
         finally {
-            // Always ensure the DMG is unmounted
             core.info("Unmounting DMG...");
             await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
                 ignoreReturnCode: true,
@@ -96917,7 +96953,7 @@ async function darwin_installDarwin(inputs) {
         const val = line.substring(eqIdx + 1);
         if (/^(PATH|DYLD_LIBRARY_PATH|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
             core.exportVariable(key, val);
-            process.env[key] = val; // Keep current Node process env in sync
+            process.env[key] = val;
         }
     }
     const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
