@@ -55,6 +55,50 @@ const SUPPORTED_VERSIONS = {
 const ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${ONEAPI_ROOT}/setvars.sh`;
 
+async function downloadInstaller(
+  url: string,
+  destPath: string,
+): Promise<string> {
+  const maxTcAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxTcAttempts; attempt++) {
+    try {
+      core.info(
+        `Downloading via tool-cache (attempt ${attempt.toString()}/${maxTcAttempts.toString()})...`,
+      );
+      return await tc.downloadTool(url, destPath);
+    } catch (error) {
+      core.warning(
+        `tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`,
+      );
+      if (attempt < maxTcAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
+      }
+    }
+  }
+
+  core.warning(
+    "tc.downloadTool failed after all attempts. Falling back to curl...",
+  );
+  await exec.exec("curl", [
+    "-sS",
+    "-L",
+    "--retry",
+    "5",
+    "--retry-delay",
+    "5",
+    "--connect-timeout",
+    "30",
+    "--max-time",
+    "600",
+    "-o",
+    destPath,
+    url,
+  ]);
+
+  return destPath;
+}
+
 export async function installDarwin(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -77,19 +121,26 @@ export async function installDarwin(
   const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
+  // 1. Ensure directory exists AND set ownership to current runner user
+  // (Prevents gtar extraction failure during cache restoration)
   if (!fs.existsSync(ONEAPI_ROOT)) {
     await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
   }
+  const currentUser = process.env.USER ?? "runner";
+  await exec.exec("sudo", ["chown", "-R", currentUser, ONEAPI_ROOT]);
 
+  // 2. Restore from cache if present
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   if (cacheHit) {
     core.info(`Restored ifort installation from cache (${cacheHit}).`);
   } else {
     core.info(`Downloading ifort DMG installer...`);
-    const dmgPath = await tc.downloadTool(
-      release.url,
-      path.join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`),
+    const targetPath = path.join(
+      process.env.RUNNER_TEMP ?? "/tmp",
+      `ifort-${version}.dmg`,
     );
+
+    const dmgPath = await downloadInstaller(release.url, targetPath);
 
     const mountPoint = "/Volumes/Intel_oneAPI_Installer";
 
@@ -104,7 +155,6 @@ export async function installDarwin(
         "-nobrowse",
       ]);
 
-      // Prefer calling the bootstrapper binary directly if present
       let installScript = path.join(
         mountPoint,
         "bootstrapper.app",
@@ -142,7 +192,6 @@ export async function installDarwin(
       core.info("Saving installation to cache...");
       await cache.saveCache(cachePaths, cacheKey);
     } finally {
-      // Always ensure the DMG is unmounted
       core.info("Unmounting DMG...");
       await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
         ignoreReturnCode: true,
@@ -173,7 +222,7 @@ export async function installDarwin(
       )
     ) {
       core.exportVariable(key, val);
-      process.env[key] = val; // Keep current Node process env in sync
+      process.env[key] = val;
     }
   }
 
