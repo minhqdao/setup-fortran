@@ -62,4 +62,6 @@ async function run(): Promise<void> {
   }
 }
 
-void run();
+if (process.env.SETUP_FORTRAN_BUNDLE_SMOKE_TEST !== "1") {
+  void run();
+}

@@ -26,12 +26,13 @@
     "format:check": "prettier --check src/**/*.ts",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
+    "test:bundle": "node -e \"process.env.SETUP_FORTRAN_BUNDLE_SMOKE_TEST='1'; require('./dist/index.js')\"",
     "integration-test": "node dist-tests/index.js",
     "verify-installation": "node dist-verify/index.js",
-    "all": "npm run format && npm run lint && npm run test && npm run build"
+    "all": "npm run format && npm run lint && npm run test && npm run build && npm run test:bundle"
   },
   "dependencies": {
-    "@actions/cache": "^6.2.0",
+    "@actions/cache": "^5.2.0",
     "@actions/core": "^3.0.1",
     "@actions/exec": "^3.0.0",
     "@actions/tool-cache": "^4.0.0"
