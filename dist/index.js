@@ -2811,1311 +2811,6 @@ module.exports = validRange
 
 /***/ }),
 
-/***/ 5236:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.exec = exec;
-exports.getExecOutput = getExecOutput;
-const string_decoder_1 = __nccwpck_require__(3193);
-const tr = __importStar(__nccwpck_require__(6665));
-/**
- * Exec a command.
- * Output will be streamed to the live console.
- * Returns promise with return code
- *
- * @param     commandLine        command to execute (can include additional args). Must be correctly escaped.
- * @param     args               optional arguments for tool. Escaping is handled by the lib.
- * @param     options            optional exec options.  See ExecOptions
- * @returns   Promise<number>    exit code
- */
-function exec(commandLine, args, options) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const commandArgs = tr.argStringToArray(commandLine);
-        if (commandArgs.length === 0) {
-            throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
-        }
-        // Path to tool to execute should be first arg
-        const toolPath = commandArgs[0];
-        args = commandArgs.slice(1).concat(args || []);
-        const runner = new tr.ToolRunner(toolPath, args, options);
-        return runner.exec();
-    });
-}
-/**
- * Exec a command and get the output.
- * Output will be streamed to the live console.
- * Returns promise with the exit code and collected stdout and stderr
- *
- * @param     commandLine           command to execute (can include additional args). Must be correctly escaped.
- * @param     args                  optional arguments for tool. Escaping is handled by the lib.
- * @param     options               optional exec options.  See ExecOptions
- * @returns   Promise<ExecOutput>   exit code, stdout, and stderr
- */
-function getExecOutput(commandLine, args, options) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
-        let stdout = '';
-        let stderr = '';
-        //Using string decoder covers the case where a mult-byte character is split
-        const stdoutDecoder = new string_decoder_1.StringDecoder('utf8');
-        const stderrDecoder = new string_decoder_1.StringDecoder('utf8');
-        const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
-        const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
-        const stdErrListener = (data) => {
-            stderr += stderrDecoder.write(data);
-            if (originalStdErrListener) {
-                originalStdErrListener(data);
-            }
-        };
-        const stdOutListener = (data) => {
-            stdout += stdoutDecoder.write(data);
-            if (originalStdoutListener) {
-                originalStdoutListener(data);
-            }
-        };
-        const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
-        //flush any remaining characters
-        stdout += stdoutDecoder.end();
-        stderr += stderrDecoder.end();
-        return {
-            exitCode,
-            stdout,
-            stderr
-        };
-    });
-}
-//# sourceMappingURL=exec.js.map
-
-/***/ }),
-
-/***/ 6665:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ToolRunner = void 0;
-exports.argStringToArray = argStringToArray;
-const os = __importStar(__nccwpck_require__(857));
-const events = __importStar(__nccwpck_require__(4434));
-const child = __importStar(__nccwpck_require__(5317));
-const path = __importStar(__nccwpck_require__(6928));
-const io = __importStar(__nccwpck_require__(4994));
-const ioUtil = __importStar(__nccwpck_require__(5207));
-const timers_1 = __nccwpck_require__(3557);
-/* eslint-disable @typescript-eslint/unbound-method */
-const IS_WINDOWS = process.platform === 'win32';
-/*
- * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
- */
-class ToolRunner extends events.EventEmitter {
-    constructor(toolPath, args, options) {
-        super();
-        if (!toolPath) {
-            throw new Error("Parameter 'toolPath' cannot be null or empty.");
-        }
-        this.toolPath = toolPath;
-        this.args = args || [];
-        this.options = options || {};
-    }
-    _debug(message) {
-        if (this.options.listeners && this.options.listeners.debug) {
-            this.options.listeners.debug(message);
-        }
-    }
-    _getCommandString(options, noPrefix) {
-        const toolPath = this._getSpawnFileName();
-        const args = this._getSpawnArgs(options);
-        let cmd = noPrefix ? '' : '[command]'; // omit prefix when piped to a second tool
-        if (IS_WINDOWS) {
-            // Windows + cmd file
-            if (this._isCmdFile()) {
-                cmd += toolPath;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows + verbatim
-            else if (options.windowsVerbatimArguments) {
-                cmd += `"${toolPath}"`;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows (regular)
-            else {
-                cmd += this._windowsQuoteCmdArg(toolPath);
-                for (const a of args) {
-                    cmd += ` ${this._windowsQuoteCmdArg(a)}`;
-                }
-            }
-        }
-        else {
-            // OSX/Linux - this can likely be improved with some form of quoting.
-            // creating processes on Unix is fundamentally different than Windows.
-            // on Unix, execvp() takes an arg array.
-            cmd += toolPath;
-            for (const a of args) {
-                cmd += ` ${a}`;
-            }
-        }
-        return cmd;
-    }
-    _processLineBuffer(data, strBuffer, onLine) {
-        try {
-            let s = strBuffer + data.toString();
-            let n = s.indexOf(os.EOL);
-            while (n > -1) {
-                const line = s.substring(0, n);
-                onLine(line);
-                // the rest of the string ...
-                s = s.substring(n + os.EOL.length);
-                n = s.indexOf(os.EOL);
-            }
-            return s;
-        }
-        catch (err) {
-            // streaming lines to console is best effort.  Don't fail a build.
-            this._debug(`error processing line. Failed with error ${err}`);
-            return '';
-        }
-    }
-    _getSpawnFileName() {
-        if (IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                return process.env['COMSPEC'] || 'cmd.exe';
-            }
-        }
-        return this.toolPath;
-    }
-    _getSpawnArgs(options) {
-        if (IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                let argline = `/D /S /C "${this._windowsQuoteCmdArg(this.toolPath)}`;
-                for (const a of this.args) {
-                    argline += ' ';
-                    argline += options.windowsVerbatimArguments
-                        ? a
-                        : this._windowsQuoteCmdArg(a);
-                }
-                argline += '"';
-                return [argline];
-            }
-        }
-        return this.args;
-    }
-    _endsWith(str, end) {
-        return str.endsWith(end);
-    }
-    _isCmdFile() {
-        const upperToolPath = this.toolPath.toUpperCase();
-        return (this._endsWith(upperToolPath, '.CMD') ||
-            this._endsWith(upperToolPath, '.BAT'));
-    }
-    _windowsQuoteCmdArg(arg) {
-        // for .exe, apply the normal quoting rules that libuv applies
-        if (!this._isCmdFile()) {
-            return this._uvQuoteCmdArg(arg);
-        }
-        // otherwise apply quoting rules specific to the cmd.exe command line parser.
-        // the libuv rules are generic and are not designed specifically for cmd.exe
-        // command line parser.
-        //
-        // for a detailed description of the cmd.exe command line parser, refer to
-        // http://stackoverflow.com/questions/4094699/how-does-the-windows-command-interpreter-cmd-exe-parse-scripts/7970912#7970912
-        // need quotes for empty arg
-        if (!arg) {
-            return '""';
-        }
-        // determine whether the arg needs to be quoted
-        const cmdSpecialChars = [
-            ' ',
-            '\t',
-            '&',
-            '(',
-            ')',
-            '[',
-            ']',
-            '{',
-            '}',
-            '^',
-            '=',
-            ';',
-            '!',
-            "'",
-            '+',
-            ',',
-            '`',
-            '~',
-            '|',
-            '<',
-            '>',
-            '"'
-        ];
-        let needsQuotes = false;
-        for (const char of arg) {
-            if (cmdSpecialChars.some(x => x === char)) {
-                needsQuotes = true;
-                break;
-            }
-        }
-        // short-circuit if quotes not needed
-        if (!needsQuotes) {
-            return arg;
-        }
-        // the following quoting rules are very similar to the rules that by libuv applies.
-        //
-        // 1) wrap the string in quotes
-        //
-        // 2) double-up quotes - i.e. " => ""
-        //
-        //    this is different from the libuv quoting rules. libuv replaces " with \", which unfortunately
-        //    doesn't work well with a cmd.exe command line.
-        //
-        //    note, replacing " with "" also works well if the arg is passed to a downstream .NET console app.
-        //    for example, the command line:
-        //          foo.exe "myarg:""my val"""
-        //    is parsed by a .NET console app into an arg array:
-        //          [ "myarg:\"my val\"" ]
-        //    which is the same end result when applying libuv quoting rules. although the actual
-        //    command line from libuv quoting rules would look like:
-        //          foo.exe "myarg:\"my val\""
-        //
-        // 3) double-up slashes that precede a quote,
-        //    e.g.  hello \world    => "hello \world"
-        //          hello\"world    => "hello\\""world"
-        //          hello\\"world   => "hello\\\\""world"
-        //          hello world\    => "hello world\\"
-        //
-        //    technically this is not required for a cmd.exe command line, or the batch argument parser.
-        //    the reasons for including this as a .cmd quoting rule are:
-        //
-        //    a) this is optimized for the scenario where the argument is passed from the .cmd file to an
-        //       external program. many programs (e.g. .NET console apps) rely on the slash-doubling rule.
-        //
-        //    b) it's what we've been doing previously (by deferring to node default behavior) and we
-        //       haven't heard any complaints about that aspect.
-        //
-        // note, a weakness of the quoting rules chosen here, is that % is not escaped. in fact, % cannot be
-        // escaped when used on the command line directly - even though within a .cmd file % can be escaped
-        // by using %%.
-        //
-        // the saving grace is, on the command line, %var% is left as-is if var is not defined. this contrasts
-        // the line parsing rules within a .cmd file, where if var is not defined it is replaced with nothing.
-        //
-        // one option that was explored was replacing % with ^% - i.e. %var% => ^%var^%. this hack would
-        // often work, since it is unlikely that var^ would exist, and the ^ character is removed when the
-        // variable is used. the problem, however, is that ^ is not removed when %* is used to pass the args
-        // to an external program.
-        //
-        // an unexplored potential solution for the % escaping problem, is to create a wrapper .cmd file.
-        // % can be escaped within a .cmd file.
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\'; // double the slash
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '"'; // double the quote
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _uvQuoteCmdArg(arg) {
-        // Tool runner wraps child_process.spawn() and needs to apply the same quoting as
-        // Node in certain cases where the undocumented spawn option windowsVerbatimArguments
-        // is used.
-        //
-        // Since this function is a port of quote_cmd_arg from Node 4.x (technically, lib UV,
-        // see https://github.com/nodejs/node/blob/v4.x/deps/uv/src/win/process.c for details),
-        // pasting copyright notice from Node within this function:
-        //
-        //      Copyright Joyent, Inc. and other Node contributors. All rights reserved.
-        //
-        //      Permission is hereby granted, free of charge, to any person obtaining a copy
-        //      of this software and associated documentation files (the "Software"), to
-        //      deal in the Software without restriction, including without limitation the
-        //      rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-        //      sell copies of the Software, and to permit persons to whom the Software is
-        //      furnished to do so, subject to the following conditions:
-        //
-        //      The above copyright notice and this permission notice shall be included in
-        //      all copies or substantial portions of the Software.
-        //
-        //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        //      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        //      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        //      AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        //      LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-        //      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-        //      IN THE SOFTWARE.
-        if (!arg) {
-            // Need double quotation for empty argument
-            return '""';
-        }
-        if (!arg.includes(' ') && !arg.includes('\t') && !arg.includes('"')) {
-            // No quotation needed
-            return arg;
-        }
-        if (!arg.includes('"') && !arg.includes('\\')) {
-            // No embedded double quotes or backslashes, so I can just wrap
-            // quote marks around the whole thing.
-            return `"${arg}"`;
-        }
-        // Expected input/output:
-        //   input : hello"world
-        //   output: "hello\"world"
-        //   input : hello""world
-        //   output: "hello\"\"world"
-        //   input : hello\world
-        //   output: hello\world
-        //   input : hello\\world
-        //   output: hello\\world
-        //   input : hello\"world
-        //   output: "hello\\\"world"
-        //   input : hello\\"world
-        //   output: "hello\\\\\"world"
-        //   input : hello world\
-        //   output: "hello world\\" - note the comment in libuv actually reads "hello world\"
-        //                             but it appears the comment is wrong, it should be "hello world\\"
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\';
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '\\';
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _cloneExecOptions(options) {
-        options = options || {};
-        const result = {
-            cwd: options.cwd || process.cwd(),
-            env: options.env || process.env,
-            silent: options.silent || false,
-            windowsVerbatimArguments: options.windowsVerbatimArguments || false,
-            failOnStdErr: options.failOnStdErr || false,
-            ignoreReturnCode: options.ignoreReturnCode || false,
-            delay: options.delay || 10000
-        };
-        result.outStream = options.outStream || process.stdout;
-        result.errStream = options.errStream || process.stderr;
-        return result;
-    }
-    _getSpawnOptions(options, toolPath) {
-        options = options || {};
-        const result = {};
-        result.cwd = options.cwd;
-        result.env = options.env;
-        result['windowsVerbatimArguments'] =
-            options.windowsVerbatimArguments || this._isCmdFile();
-        if (options.windowsVerbatimArguments) {
-            result.argv0 = `"${toolPath}"`;
-        }
-        return result;
-    }
-    /**
-     * Exec a tool.
-     * Output will be streamed to the live console.
-     * Returns promise with return code
-     *
-     * @param     tool     path to tool to exec
-     * @param     options  optional exec options.  See ExecOptions
-     * @returns   number
-     */
-    exec() {
-        return __awaiter(this, void 0, void 0, function* () {
-            // root the tool path if it is unrooted and contains relative pathing
-            if (!ioUtil.isRooted(this.toolPath) &&
-                (this.toolPath.includes('/') ||
-                    (IS_WINDOWS && this.toolPath.includes('\\')))) {
-                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
-                this.toolPath = path.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
-            }
-            // if the tool is only a file name, then resolve it from the PATH
-            // otherwise verify it exists (add extension on Windows if necessary)
-            this.toolPath = yield io.which(this.toolPath, true);
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                this._debug(`exec tool: ${this.toolPath}`);
-                this._debug('arguments:');
-                for (const arg of this.args) {
-                    this._debug(`   ${arg}`);
-                }
-                const optionsNonNull = this._cloneExecOptions(this.options);
-                if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                    optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os.EOL);
-                }
-                const state = new ExecState(optionsNonNull, this.toolPath);
-                state.on('debug', (message) => {
-                    this._debug(message);
-                });
-                if (this.options.cwd && !(yield ioUtil.exists(this.options.cwd))) {
-                    return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
-                }
-                const fileName = this._getSpawnFileName();
-                const cp = child.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
-                let stdbuffer = '';
-                if (cp.stdout) {
-                    cp.stdout.on('data', (data) => {
-                        if (this.options.listeners && this.options.listeners.stdout) {
-                            this.options.listeners.stdout(data);
-                        }
-                        if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                            optionsNonNull.outStream.write(data);
-                        }
-                        stdbuffer = this._processLineBuffer(data, stdbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.stdline) {
-                                this.options.listeners.stdline(line);
-                            }
-                        });
-                    });
-                }
-                let errbuffer = '';
-                if (cp.stderr) {
-                    cp.stderr.on('data', (data) => {
-                        state.processStderr = true;
-                        if (this.options.listeners && this.options.listeners.stderr) {
-                            this.options.listeners.stderr(data);
-                        }
-                        if (!optionsNonNull.silent &&
-                            optionsNonNull.errStream &&
-                            optionsNonNull.outStream) {
-                            const s = optionsNonNull.failOnStdErr
-                                ? optionsNonNull.errStream
-                                : optionsNonNull.outStream;
-                            s.write(data);
-                        }
-                        errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.errline) {
-                                this.options.listeners.errline(line);
-                            }
-                        });
-                    });
-                }
-                cp.on('error', (err) => {
-                    state.processError = err.message;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    state.CheckComplete();
-                });
-                cp.on('exit', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    this._debug(`Exit code ${code} received from tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                cp.on('close', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                state.on('done', (error, exitCode) => {
-                    if (stdbuffer.length > 0) {
-                        this.emit('stdline', stdbuffer);
-                    }
-                    if (errbuffer.length > 0) {
-                        this.emit('errline', errbuffer);
-                    }
-                    cp.removeAllListeners();
-                    if (error) {
-                        reject(error);
-                    }
-                    else {
-                        resolve(exitCode);
-                    }
-                });
-                if (this.options.input) {
-                    if (!cp.stdin) {
-                        throw new Error('child process missing stdin');
-                    }
-                    cp.stdin.end(this.options.input);
-                }
-            }));
-        });
-    }
-}
-exports.ToolRunner = ToolRunner;
-/**
- * Convert an arg string to an array of args. Handles escaping
- *
- * @param    argString   string of arguments
- * @returns  string[]    array of arguments
- */
-function argStringToArray(argString) {
-    const args = [];
-    let inQuotes = false;
-    let escaped = false;
-    let arg = '';
-    function append(c) {
-        // we only escape double quotes.
-        if (escaped && c !== '"') {
-            arg += '\\';
-        }
-        arg += c;
-        escaped = false;
-    }
-    for (let i = 0; i < argString.length; i++) {
-        const c = argString.charAt(i);
-        if (c === '"') {
-            if (!escaped) {
-                inQuotes = !inQuotes;
-            }
-            else {
-                append(c);
-            }
-            continue;
-        }
-        if (c === '\\' && escaped) {
-            append(c);
-            continue;
-        }
-        if (c === '\\' && inQuotes) {
-            escaped = true;
-            continue;
-        }
-        if (c === ' ' && !inQuotes) {
-            if (arg.length > 0) {
-                args.push(arg);
-                arg = '';
-            }
-            continue;
-        }
-        append(c);
-    }
-    if (arg.length > 0) {
-        args.push(arg.trim());
-    }
-    return args;
-}
-class ExecState extends events.EventEmitter {
-    constructor(options, toolPath) {
-        super();
-        this.processClosed = false; // tracks whether the process has exited and stdio is closed
-        this.processError = '';
-        this.processExitCode = 0;
-        this.processExited = false; // tracks whether the process has exited
-        this.processStderr = false; // tracks whether stderr was written to
-        this.delay = 10000; // 10 seconds
-        this.done = false;
-        this.timeout = null;
-        if (!toolPath) {
-            throw new Error('toolPath must not be empty');
-        }
-        this.options = options;
-        this.toolPath = toolPath;
-        if (options.delay) {
-            this.delay = options.delay;
-        }
-    }
-    CheckComplete() {
-        if (this.done) {
-            return;
-        }
-        if (this.processClosed) {
-            this._setResult();
-        }
-        else if (this.processExited) {
-            this.timeout = (0, timers_1.setTimeout)(ExecState.HandleTimeout, this.delay, this);
-        }
-    }
-    _debug(message) {
-        this.emit('debug', message);
-    }
-    _setResult() {
-        // determine whether there is an error
-        let error;
-        if (this.processExited) {
-            if (this.processError) {
-                error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
-            }
-            else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
-                error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
-            }
-            else if (this.processStderr && this.options.failOnStdErr) {
-                error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
-            }
-        }
-        // clear the timeout
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-            this.timeout = null;
-        }
-        this.done = true;
-        this.emit('done', error, this.processExitCode);
-    }
-    static HandleTimeout(state) {
-        if (state.done) {
-            return;
-        }
-        if (!state.processClosed && state.processExited) {
-            const message = `The STDIO streams did not close within ${state.delay / 1000} seconds of the exit event from process '${state.toolPath}'. This may indicate a child process inherited the STDIO streams and has not yet exited.`;
-            state._debug(message);
-        }
-        state._setResult();
-    }
-}
-//# sourceMappingURL=toolrunner.js.map
-
-/***/ }),
-
-/***/ 5207:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var _a;
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
-exports.readlink = readlink;
-exports.exists = exists;
-exports.isDirectory = isDirectory;
-exports.isRooted = isRooted;
-exports.tryGetExecutablePath = tryGetExecutablePath;
-exports.getCmdPath = getCmdPath;
-const fs = __importStar(__nccwpck_require__(9896));
-const path = __importStar(__nccwpck_require__(6928));
-_a = fs.promises
-// export const {open} = 'fs'
-, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.open = _a.open, exports.readdir = _a.readdir, exports.rename = _a.rename, exports.rm = _a.rm, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
-// export const {open} = 'fs'
-exports.IS_WINDOWS = process.platform === 'win32';
-/**
- * Custom implementation of readlink to ensure Windows junctions
- * maintain trailing backslash for backward compatibility with Node.js < 24
- *
- * In Node.js 20, Windows junctions (directory symlinks) always returned paths
- * with trailing backslashes. Node.js 24 removed this behavior, which breaks
- * code that relied on this format for path operations.
- *
- * This implementation restores the Node 20 behavior by adding a trailing
- * backslash to all junction results on Windows.
- */
-function readlink(fsPath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const result = yield fs.promises.readlink(fsPath);
-        // On Windows, restore Node 20 behavior: add trailing backslash to all results
-        // since junctions on Windows are always directory links
-        if (exports.IS_WINDOWS && !result.endsWith('\\')) {
-            return `${result}\\`;
-        }
-        return result;
-    });
-}
-// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
-exports.UV_FS_O_EXLOCK = 0x10000000;
-exports.READONLY = fs.constants.O_RDONLY;
-function exists(fsPath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            yield (0, exports.stat)(fsPath);
-        }
-        catch (err) {
-            if (err.code === 'ENOENT') {
-                return false;
-            }
-            throw err;
-        }
-        return true;
-    });
-}
-function isDirectory(fsPath_1) {
-    return __awaiter(this, arguments, void 0, function* (fsPath, useStat = false) {
-        const stats = useStat ? yield (0, exports.stat)(fsPath) : yield (0, exports.lstat)(fsPath);
-        return stats.isDirectory();
-    });
-}
-/**
- * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
- * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
- */
-function isRooted(p) {
-    p = normalizeSeparators(p);
-    if (!p) {
-        throw new Error('isRooted() parameter "p" cannot be empty');
-    }
-    if (exports.IS_WINDOWS) {
-        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
-        ); // e.g. C: or C:\hello
-    }
-    return p.startsWith('/');
-}
-/**
- * Best effort attempt to determine whether a file exists and is executable.
- * @param filePath    file path to check
- * @param extensions  additional file extensions to try
- * @return if file exists and is executable, returns the file path. otherwise empty string.
- */
-function tryGetExecutablePath(filePath, extensions) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let stats = undefined;
-        try {
-            // test file exists
-            stats = yield (0, exports.stat)(filePath);
-        }
-        catch (err) {
-            if (err.code !== 'ENOENT') {
-                // eslint-disable-next-line no-console
-                console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-            }
-        }
-        if (stats && stats.isFile()) {
-            if (exports.IS_WINDOWS) {
-                // on Windows, test for valid extension
-                const upperExt = path.extname(filePath).toUpperCase();
-                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
-                    return filePath;
-                }
-            }
-            else {
-                if (isUnixExecutable(stats)) {
-                    return filePath;
-                }
-            }
-        }
-        // try each extension
-        const originalFilePath = filePath;
-        for (const extension of extensions) {
-            filePath = originalFilePath + extension;
-            stats = undefined;
-            try {
-                stats = yield (0, exports.stat)(filePath);
-            }
-            catch (err) {
-                if (err.code !== 'ENOENT') {
-                    // eslint-disable-next-line no-console
-                    console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-                }
-            }
-            if (stats && stats.isFile()) {
-                if (exports.IS_WINDOWS) {
-                    // preserve the case of the actual file (since an extension was appended)
-                    try {
-                        const directory = path.dirname(filePath);
-                        const upperName = path.basename(filePath).toUpperCase();
-                        for (const actualName of yield (0, exports.readdir)(directory)) {
-                            if (upperName === actualName.toUpperCase()) {
-                                filePath = path.join(directory, actualName);
-                                break;
-                            }
-                        }
-                    }
-                    catch (err) {
-                        // eslint-disable-next-line no-console
-                        console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
-                    }
-                    return filePath;
-                }
-                else {
-                    if (isUnixExecutable(stats)) {
-                        return filePath;
-                    }
-                }
-            }
-        }
-        return '';
-    });
-}
-function normalizeSeparators(p) {
-    p = p || '';
-    if (exports.IS_WINDOWS) {
-        // convert slashes on Windows
-        p = p.replace(/\//g, '\\');
-        // remove redundant slashes
-        return p.replace(/\\\\+/g, '\\');
-    }
-    // remove redundant slashes
-    return p.replace(/\/\/+/g, '/');
-}
-// on Mac/Linux, test the execute bit
-//     R   W  X  R  W X R W X
-//   256 128 64 32 16 8 4 2 1
-function isUnixExecutable(stats) {
-    return ((stats.mode & 1) > 0 ||
-        ((stats.mode & 8) > 0 &&
-            process.getgid !== undefined &&
-            stats.gid === process.getgid()) ||
-        ((stats.mode & 64) > 0 &&
-            process.getuid !== undefined &&
-            stats.uid === process.getuid()));
-}
-// Get the path of cmd.exe in windows
-function getCmdPath() {
-    var _a;
-    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
-}
-//# sourceMappingURL=io-util.js.map
-
-/***/ }),
-
-/***/ 4994:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.cp = cp;
-exports.mv = mv;
-exports.rmRF = rmRF;
-exports.mkdirP = mkdirP;
-exports.which = which;
-exports.findInPath = findInPath;
-const assert_1 = __nccwpck_require__(2613);
-const path = __importStar(__nccwpck_require__(6928));
-const ioUtil = __importStar(__nccwpck_require__(5207));
-/**
- * Copies a file or folder.
- * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See CopyOptions.
- */
-function cp(source_1, dest_1) {
-    return __awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        const { force, recursive, copySourceDirectory } = readCopyOptions(options);
-        const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
-        // Dest is an existing file, but not forcing
-        if (destStat && destStat.isFile() && !force) {
-            return;
-        }
-        // If dest is an existing directory, should copy inside.
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
-            ? path.join(dest, path.basename(source))
-            : dest;
-        if (!(yield ioUtil.exists(source))) {
-            throw new Error(`no such file or directory: ${source}`);
-        }
-        const sourceStat = yield ioUtil.stat(source);
-        if (sourceStat.isDirectory()) {
-            if (!recursive) {
-                throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
-            }
-            else {
-                yield cpDirRecursive(source, newDest, 0, force);
-            }
-        }
-        else {
-            if (path.relative(source, newDest) === '') {
-                // a file cannot be copied to itself
-                throw new Error(`'${newDest}' and '${source}' are the same file`);
-            }
-            yield copyFile(source, newDest, force);
-        }
-    });
-}
-/**
- * Moves a path.
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See MoveOptions.
- */
-function mv(source_1, dest_1) {
-    return __awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        if (yield ioUtil.exists(dest)) {
-            let destExists = true;
-            if (yield ioUtil.isDirectory(dest)) {
-                // If dest is directory copy src into dest
-                dest = path.join(dest, path.basename(source));
-                destExists = yield ioUtil.exists(dest);
-            }
-            if (destExists) {
-                if (options.force == null || options.force) {
-                    yield rmRF(dest);
-                }
-                else {
-                    throw new Error('Destination already exists');
-                }
-            }
-        }
-        yield mkdirP(path.dirname(dest));
-        yield ioUtil.rename(source, dest);
-    });
-}
-/**
- * Remove a path recursively with force
- *
- * @param inputPath path to remove
- */
-function rmRF(inputPath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (ioUtil.IS_WINDOWS) {
-            // Check for invalid characters
-            // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-            if (/[*"<>|]/.test(inputPath)) {
-                throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
-            }
-        }
-        try {
-            // note if path does not exist, error is silent
-            yield ioUtil.rm(inputPath, {
-                force: true,
-                maxRetries: 3,
-                recursive: true,
-                retryDelay: 300
-            });
-        }
-        catch (err) {
-            throw new Error(`File was unable to be removed ${err}`);
-        }
-    });
-}
-/**
- * Make a directory.  Creates the full path with folders in between
- * Will throw if it fails
- *
- * @param   fsPath        path to create
- * @returns Promise<void>
- */
-function mkdirP(fsPath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        (0, assert_1.ok)(fsPath, 'a path argument must be provided');
-        yield ioUtil.mkdir(fsPath, { recursive: true });
-    });
-}
-/**
- * Returns path of a tool had the tool actually been invoked.  Resolves via paths.
- * If you check and the tool does not exist, it will throw.
- *
- * @param     tool              name of the tool
- * @param     check             whether to check if tool exists
- * @returns   Promise<string>   path to tool
- */
-function which(tool, check) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // recursive when check=true
-        if (check) {
-            const result = yield which(tool, false);
-            if (!result) {
-                if (ioUtil.IS_WINDOWS) {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.`);
-                }
-                else {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
-                }
-            }
-            return result;
-        }
-        const matches = yield findInPath(tool);
-        if (matches && matches.length > 0) {
-            return matches[0];
-        }
-        return '';
-    });
-}
-/**
- * Returns a list of all occurrences of the given tool on the system path.
- *
- * @returns   Promise<string[]>  the paths of the tool
- */
-function findInPath(tool) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // build the list of extensions to try
-        const extensions = [];
-        if (ioUtil.IS_WINDOWS && process.env['PATHEXT']) {
-            for (const extension of process.env['PATHEXT'].split(path.delimiter)) {
-                if (extension) {
-                    extensions.push(extension);
-                }
-            }
-        }
-        // if it's rooted, return it if exists. otherwise return empty.
-        if (ioUtil.isRooted(tool)) {
-            const filePath = yield ioUtil.tryGetExecutablePath(tool, extensions);
-            if (filePath) {
-                return [filePath];
-            }
-            return [];
-        }
-        // if any path separators, return empty
-        if (tool.includes(path.sep)) {
-            return [];
-        }
-        // build the list of directories
-        //
-        // Note, technically "where" checks the current directory on Windows. From a toolkit perspective,
-        // it feels like we should not do this. Checking the current directory seems like more of a use
-        // case of a shell, and the which() function exposed by the toolkit should strive for consistency
-        // across platforms.
-        const directories = [];
-        if (process.env.PATH) {
-            for (const p of process.env.PATH.split(path.delimiter)) {
-                if (p) {
-                    directories.push(p);
-                }
-            }
-        }
-        // find all matches
-        const matches = [];
-        for (const directory of directories) {
-            const filePath = yield ioUtil.tryGetExecutablePath(path.join(directory, tool), extensions);
-            if (filePath) {
-                matches.push(filePath);
-            }
-        }
-        return matches;
-    });
-}
-function readCopyOptions(options) {
-    const force = options.force == null ? true : options.force;
-    const recursive = Boolean(options.recursive);
-    const copySourceDirectory = options.copySourceDirectory == null
-        ? true
-        : Boolean(options.copySourceDirectory);
-    return { force, recursive, copySourceDirectory };
-}
-function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // Ensure there is not a run away recursive copy
-        if (currentDepth >= 255)
-            return;
-        currentDepth++;
-        yield mkdirP(destDir);
-        const files = yield ioUtil.readdir(sourceDir);
-        for (const fileName of files) {
-            const srcFile = `${sourceDir}/${fileName}`;
-            const destFile = `${destDir}/${fileName}`;
-            const srcFileStat = yield ioUtil.lstat(srcFile);
-            if (srcFileStat.isDirectory()) {
-                // Recurse
-                yield cpDirRecursive(srcFile, destFile, currentDepth, force);
-            }
-            else {
-                yield copyFile(srcFile, destFile, force);
-            }
-        }
-        // Change the mode for the newly created directory
-        yield ioUtil.chmod(destDir, (yield ioUtil.stat(sourceDir)).mode);
-    });
-}
-// Buffered file copy
-function copyFile(srcFile, destFile, force) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if ((yield ioUtil.lstat(srcFile)).isSymbolicLink()) {
-            // unlink/re-link it
-            try {
-                yield ioUtil.lstat(destFile);
-                yield ioUtil.unlink(destFile);
-            }
-            catch (e) {
-                // Try to override file permission
-                if (e.code === 'EPERM') {
-                    yield ioUtil.chmod(destFile, '0666');
-                    yield ioUtil.unlink(destFile);
-                }
-                // other errors = it doesn't exist, no work to do
-            }
-            // Copy over symlink
-            const symlinkFull = yield ioUtil.readlink(srcFile);
-            yield ioUtil.symlink(symlinkFull, destFile, ioUtil.IS_WINDOWS ? 'junction' : null);
-        }
-        else if (!(yield ioUtil.exists(destFile)) || force) {
-            yield ioUtil.copyFile(srcFile, destFile);
-        }
-    });
-}
-//# sourceMappingURL=io.js.map
-
-/***/ }),
-
 /***/ 7712:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -43184,27 +41879,11 @@ module.exports = require("assert");
 
 /***/ }),
 
-/***/ 5317:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("child_process");
-
-/***/ }),
-
 /***/ 4434:
 /***/ ((module) => {
 
 "use strict";
 module.exports = require("events");
-
-/***/ }),
-
-/***/ 9896:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("fs");
 
 /***/ }),
 
@@ -43413,14 +42092,6 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("string_decoder");
-
-/***/ }),
-
-/***/ 3557:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("timers");
 
 /***/ }),
 
@@ -43950,8 +42621,8 @@ function escapeProperty(s) {
 //# sourceMappingURL=command.js.map
 ;// CONCATENATED MODULE: external "crypto"
 const external_crypto_namespaceObject = require("crypto");
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(9896);
+;// CONCATENATED MODULE: external "fs"
+const external_fs_namespaceObject = require("fs");
 ;// CONCATENATED MODULE: ./node_modules/@actions/core/lib/file-command.js
 // For internal use, subject to change.
 // We use any as a valid input type
@@ -43965,10 +42636,10 @@ function file_command_issueFileCommand(command, message) {
     if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
     }
-    if (!external_fs_.existsSync(filePath)) {
+    if (!external_fs_namespaceObject.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
     }
-    external_fs_.appendFileSync(filePath, `${utils_toCommandValue(message)}${external_os_.EOL}`, {
+    external_fs_namespaceObject.appendFileSync(filePath, `${utils_toCommandValue(message)}${external_os_.EOL}`, {
         encoding: 'utf8'
     });
 }
@@ -44950,7 +43621,7 @@ var summary_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _
 };
 
 
-const { access, appendFile, writeFile } = external_fs_.promises;
+const { access, appendFile, writeFile } = external_fs_namespaceObject.promises;
 const SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
 const SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
 class Summary {
@@ -44973,7 +43644,7 @@ class Summary {
                 throw new Error(`Unable to find environment variable for $${SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
             }
             try {
-                yield access(pathFromEnv, external_fs_.constants.R_OK | external_fs_.constants.W_OK);
+                yield access(pathFromEnv, external_fs_namespaceObject.constants.R_OK | external_fs_namespaceObject.constants.W_OK);
             }
             catch (_a) {
                 throw new Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
@@ -45257,11 +43928,11 @@ function toPlatformPath(pth) {
 var external_string_decoder_ = __nccwpck_require__(3193);
 // EXTERNAL MODULE: external "events"
 var external_events_ = __nccwpck_require__(4434);
-// EXTERNAL MODULE: external "child_process"
-var external_child_process_ = __nccwpck_require__(5317);
+;// CONCATENATED MODULE: external "child_process"
+const external_child_process_namespaceObject = require("child_process");
 // EXTERNAL MODULE: external "assert"
 var external_assert_ = __nccwpck_require__(2613);
-;// CONCATENATED MODULE: ./node_modules/@actions/core/node_modules/@actions/io/lib/io-util.js
+;// CONCATENATED MODULE: ./node_modules/@actions/io/lib/io-util.js
 var io_util_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -45273,7 +43944,7 @@ var io_util_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _
 };
 
 
-const { chmod, copyFile, lstat, mkdir, open: io_util_open, readdir, rename, rm, rmdir, stat, symlink, unlink } = external_fs_.promises;
+const { chmod, copyFile, lstat, mkdir, open: io_util_open, readdir, rename, rm, rmdir, stat, symlink, unlink } = external_fs_namespaceObject.promises;
 // export const {open} = 'fs'
 const IS_WINDOWS = process.platform === 'win32';
 /**
@@ -45289,7 +43960,7 @@ const IS_WINDOWS = process.platform === 'win32';
  */
 function readlink(fsPath) {
     return io_util_awaiter(this, void 0, void 0, function* () {
-        const result = yield fs.promises.readlink(fsPath);
+        const result = yield external_fs_namespaceObject.promises.readlink(fsPath);
         // On Windows, restore Node 20 behavior: add trailing backslash to all results
         // since junctions on Windows are always directory links
         if (IS_WINDOWS && !result.endsWith('\\')) {
@@ -45300,7 +43971,7 @@ function readlink(fsPath) {
 }
 // See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
 const UV_FS_O_EXLOCK = 0x10000000;
-const READONLY = external_fs_.constants.O_RDONLY;
+const READONLY = external_fs_namespaceObject.constants.O_RDONLY;
 function exists(fsPath) {
     return io_util_awaiter(this, void 0, void 0, function* () {
         try {
@@ -45441,7 +44112,7 @@ function getCmdPath() {
     return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
 }
 //# sourceMappingURL=io-util.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/core/node_modules/@actions/io/lib/io.js
+;// CONCATENATED MODULE: ./node_modules/@actions/io/lib/io.js
 var io_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -45465,19 +44136,19 @@ var io_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argum
 function io_cp(source_1, dest_1) {
     return io_awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
         const { force, recursive, copySourceDirectory } = readCopyOptions(options);
-        const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
+        const destStat = (yield exists(dest)) ? yield stat(dest) : null;
         // Dest is an existing file, but not forcing
         if (destStat && destStat.isFile() && !force) {
             return;
         }
         // If dest is an existing directory, should copy inside.
         const newDest = destStat && destStat.isDirectory() && copySourceDirectory
-            ? path.join(dest, path.basename(source))
+            ? external_path_.join(dest, external_path_.basename(source))
             : dest;
-        if (!(yield ioUtil.exists(source))) {
+        if (!(yield exists(source))) {
             throw new Error(`no such file or directory: ${source}`);
         }
-        const sourceStat = yield ioUtil.stat(source);
+        const sourceStat = yield stat(source);
         if (sourceStat.isDirectory()) {
             if (!recursive) {
                 throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
@@ -45487,7 +44158,7 @@ function io_cp(source_1, dest_1) {
             }
         }
         else {
-            if (path.relative(source, newDest) === '') {
+            if (external_path_.relative(source, newDest) === '') {
                 // a file cannot be copied to itself
                 throw new Error(`'${newDest}' and '${source}' are the same file`);
             }
@@ -45531,7 +44202,7 @@ function mv(source_1, dest_1) {
  */
 function rmRF(inputPath) {
     return io_awaiter(this, void 0, void 0, function* () {
-        if (ioUtil.IS_WINDOWS) {
+        if (IS_WINDOWS) {
             // Check for invalid characters
             // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
             if (/[*"<>|]/.test(inputPath)) {
@@ -45540,7 +44211,7 @@ function rmRF(inputPath) {
         }
         try {
             // note if path does not exist, error is silent
-            yield ioUtil.rm(inputPath, {
+            yield rm(inputPath, {
                 force: true,
                 maxRetries: 3,
                 recursive: true,
@@ -45561,8 +44232,8 @@ function rmRF(inputPath) {
  */
 function mkdirP(fsPath) {
     return io_awaiter(this, void 0, void 0, function* () {
-        ok(fsPath, 'a path argument must be provided');
-        yield ioUtil.mkdir(fsPath, { recursive: true });
+        (0,external_assert_.ok)(fsPath, 'a path argument must be provided');
+        yield mkdir(fsPath, { recursive: true });
     });
 }
 /**
@@ -45669,11 +44340,11 @@ function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
             return;
         currentDepth++;
         yield mkdirP(destDir);
-        const files = yield ioUtil.readdir(sourceDir);
+        const files = yield readdir(sourceDir);
         for (const fileName of files) {
             const srcFile = `${sourceDir}/${fileName}`;
             const destFile = `${destDir}/${fileName}`;
-            const srcFileStat = yield ioUtil.lstat(srcFile);
+            const srcFileStat = yield lstat(srcFile);
             if (srcFileStat.isDirectory()) {
                 // Recurse
                 yield cpDirRecursive(srcFile, destFile, currentDepth, force);
@@ -45683,39 +44354,39 @@ function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
             }
         }
         // Change the mode for the newly created directory
-        yield ioUtil.chmod(destDir, (yield ioUtil.stat(sourceDir)).mode);
+        yield chmod(destDir, (yield stat(sourceDir)).mode);
     });
 }
 // Buffered file copy
 function io_copyFile(srcFile, destFile, force) {
     return io_awaiter(this, void 0, void 0, function* () {
-        if ((yield ioUtil.lstat(srcFile)).isSymbolicLink()) {
+        if ((yield lstat(srcFile)).isSymbolicLink()) {
             // unlink/re-link it
             try {
-                yield ioUtil.lstat(destFile);
-                yield ioUtil.unlink(destFile);
+                yield lstat(destFile);
+                yield unlink(destFile);
             }
             catch (e) {
                 // Try to override file permission
                 if (e.code === 'EPERM') {
-                    yield ioUtil.chmod(destFile, '0666');
-                    yield ioUtil.unlink(destFile);
+                    yield chmod(destFile, '0666');
+                    yield unlink(destFile);
                 }
                 // other errors = it doesn't exist, no work to do
             }
             // Copy over symlink
-            const symlinkFull = yield ioUtil.readlink(srcFile);
-            yield ioUtil.symlink(symlinkFull, destFile, ioUtil.IS_WINDOWS ? 'junction' : null);
+            const symlinkFull = yield readlink(srcFile);
+            yield symlink(symlinkFull, destFile, IS_WINDOWS ? 'junction' : null);
         }
-        else if (!(yield ioUtil.exists(destFile)) || force) {
-            yield ioUtil.copyFile(srcFile, destFile);
+        else if (!(yield exists(destFile)) || force) {
+            yield copyFile(srcFile, destFile);
         }
     });
 }
 //# sourceMappingURL=io.js.map
-// EXTERNAL MODULE: external "timers"
-var external_timers_ = __nccwpck_require__(3557);
-;// CONCATENATED MODULE: ./node_modules/@actions/core/node_modules/@actions/exec/lib/toolrunner.js
+;// CONCATENATED MODULE: external "timers"
+const external_timers_namespaceObject = require("timers");
+;// CONCATENATED MODULE: ./node_modules/@actions/exec/lib/toolrunner.js
 var toolrunner_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -46100,7 +44771,7 @@ class ToolRunner extends external_events_.EventEmitter {
                     return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
                 }
                 const fileName = this._getSpawnFileName();
-                const cp = external_child_process_.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
+                const cp = external_child_process_namespaceObject.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
                 let stdbuffer = '';
                 if (cp.stdout) {
                     cp.stdout.on('data', (data) => {
@@ -46263,7 +44934,7 @@ class ExecState extends external_events_.EventEmitter {
             this._setResult();
         }
         else if (this.processExited) {
-            this.timeout = (0,external_timers_.setTimeout)(ExecState.HandleTimeout, this.delay, this);
+            this.timeout = (0,external_timers_namespaceObject.setTimeout)(ExecState.HandleTimeout, this.delay, this);
         }
     }
     _debug(message) {
@@ -46303,7 +44974,7 @@ class ExecState extends external_events_.EventEmitter {
     }
 }
 //# sourceMappingURL=toolrunner.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/core/node_modules/@actions/exec/lib/exec.js
+;// CONCATENATED MODULE: ./node_modules/@actions/exec/lib/exec.js
 var exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -46327,14 +44998,14 @@ var exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
  */
 function exec_exec(commandLine, args, options) {
     return exec_awaiter(this, void 0, void 0, function* () {
-        const commandArgs = tr.argStringToArray(commandLine);
+        const commandArgs = argStringToArray(commandLine);
         if (commandArgs.length === 0) {
             throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
         }
         // Path to tool to execute should be first arg
         const toolPath = commandArgs[0];
         args = commandArgs.slice(1).concat(args || []);
-        const runner = new tr.ToolRunner(toolPath, args, options);
+        const runner = new ToolRunner(toolPath, args, options);
         return runner.exec();
     });
 }
@@ -46354,8 +45025,8 @@ function getExecOutput(commandLine, args, options) {
         let stdout = '';
         let stderr = '';
         //Using string decoder covers the case where a mult-byte character is split
-        const stdoutDecoder = new StringDecoder('utf8');
-        const stderrDecoder = new StringDecoder('utf8');
+        const stdoutDecoder = new external_string_decoder_.StringDecoder('utf8');
+        const stderrDecoder = new external_string_decoder_.StringDecoder('utf8');
         const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
         const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
         const stdErrListener = (data) => {
@@ -46901,1128 +45572,6 @@ function parseInputs() {
     return inputs;
 }
 
-// EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
-var lib_exec = __nccwpck_require__(5236);
-;// CONCATENATED MODULE: ./node_modules/@actions/cache/node_modules/@actions/io/lib/io-util.js
-var lib_io_util_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-const { chmod: io_util_chmod, copyFile: io_util_copyFile, lstat: io_util_lstat, mkdir: io_util_mkdir, open: lib_io_util_open, readdir: io_util_readdir, rename: io_util_rename, rm: io_util_rm, rmdir: io_util_rmdir, stat: io_util_stat, symlink: io_util_symlink, unlink: io_util_unlink } = external_fs_.promises;
-// export const {open} = 'fs'
-const io_util_IS_WINDOWS = process.platform === 'win32';
-/**
- * Custom implementation of readlink to ensure Windows junctions
- * maintain trailing backslash for backward compatibility with Node.js < 24
- *
- * In Node.js 20, Windows junctions (directory symlinks) always returned paths
- * with trailing backslashes. Node.js 24 removed this behavior, which breaks
- * code that relied on this format for path operations.
- *
- * This implementation restores the Node 20 behavior by adding a trailing
- * backslash to all junction results on Windows.
- */
-function io_util_readlink(fsPath) {
-    return lib_io_util_awaiter(this, void 0, void 0, function* () {
-        const result = yield fs.promises.readlink(fsPath);
-        // On Windows, restore Node 20 behavior: add trailing backslash to all results
-        // since junctions on Windows are always directory links
-        if (io_util_IS_WINDOWS && !result.endsWith('\\')) {
-            return `${result}\\`;
-        }
-        return result;
-    });
-}
-// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
-const io_util_UV_FS_O_EXLOCK = 0x10000000;
-const io_util_READONLY = external_fs_.constants.O_RDONLY;
-function io_util_exists(fsPath) {
-    return lib_io_util_awaiter(this, void 0, void 0, function* () {
-        try {
-            yield io_util_stat(fsPath);
-        }
-        catch (err) {
-            if (err.code === 'ENOENT') {
-                return false;
-            }
-            throw err;
-        }
-        return true;
-    });
-}
-function io_util_isDirectory(fsPath_1) {
-    return lib_io_util_awaiter(this, arguments, void 0, function* (fsPath, useStat = false) {
-        const stats = useStat ? yield io_util_stat(fsPath) : yield io_util_lstat(fsPath);
-        return stats.isDirectory();
-    });
-}
-/**
- * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
- * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
- */
-function io_util_isRooted(p) {
-    p = io_util_normalizeSeparators(p);
-    if (!p) {
-        throw new Error('isRooted() parameter "p" cannot be empty');
-    }
-    if (io_util_IS_WINDOWS) {
-        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
-        ); // e.g. C: or C:\hello
-    }
-    return p.startsWith('/');
-}
-/**
- * Best effort attempt to determine whether a file exists and is executable.
- * @param filePath    file path to check
- * @param extensions  additional file extensions to try
- * @return if file exists and is executable, returns the file path. otherwise empty string.
- */
-function io_util_tryGetExecutablePath(filePath, extensions) {
-    return lib_io_util_awaiter(this, void 0, void 0, function* () {
-        let stats = undefined;
-        try {
-            // test file exists
-            stats = yield io_util_stat(filePath);
-        }
-        catch (err) {
-            if (err.code !== 'ENOENT') {
-                // eslint-disable-next-line no-console
-                console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-            }
-        }
-        if (stats && stats.isFile()) {
-            if (io_util_IS_WINDOWS) {
-                // on Windows, test for valid extension
-                const upperExt = external_path_.extname(filePath).toUpperCase();
-                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
-                    return filePath;
-                }
-            }
-            else {
-                if (io_util_isUnixExecutable(stats)) {
-                    return filePath;
-                }
-            }
-        }
-        // try each extension
-        const originalFilePath = filePath;
-        for (const extension of extensions) {
-            filePath = originalFilePath + extension;
-            stats = undefined;
-            try {
-                stats = yield io_util_stat(filePath);
-            }
-            catch (err) {
-                if (err.code !== 'ENOENT') {
-                    // eslint-disable-next-line no-console
-                    console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-                }
-            }
-            if (stats && stats.isFile()) {
-                if (io_util_IS_WINDOWS) {
-                    // preserve the case of the actual file (since an extension was appended)
-                    try {
-                        const directory = external_path_.dirname(filePath);
-                        const upperName = external_path_.basename(filePath).toUpperCase();
-                        for (const actualName of yield io_util_readdir(directory)) {
-                            if (upperName === actualName.toUpperCase()) {
-                                filePath = external_path_.join(directory, actualName);
-                                break;
-                            }
-                        }
-                    }
-                    catch (err) {
-                        // eslint-disable-next-line no-console
-                        console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
-                    }
-                    return filePath;
-                }
-                else {
-                    if (io_util_isUnixExecutable(stats)) {
-                        return filePath;
-                    }
-                }
-            }
-        }
-        return '';
-    });
-}
-function io_util_normalizeSeparators(p) {
-    p = p || '';
-    if (io_util_IS_WINDOWS) {
-        // convert slashes on Windows
-        p = p.replace(/\//g, '\\');
-        // remove redundant slashes
-        return p.replace(/\\\\+/g, '\\');
-    }
-    // remove redundant slashes
-    return p.replace(/\/\/+/g, '/');
-}
-// on Mac/Linux, test the execute bit
-//     R   W  X  R  W X R W X
-//   256 128 64 32 16 8 4 2 1
-function io_util_isUnixExecutable(stats) {
-    return ((stats.mode & 1) > 0 ||
-        ((stats.mode & 8) > 0 &&
-            process.getgid !== undefined &&
-            stats.gid === process.getgid()) ||
-        ((stats.mode & 64) > 0 &&
-            process.getuid !== undefined &&
-            stats.uid === process.getuid()));
-}
-// Get the path of cmd.exe in windows
-function io_util_getCmdPath() {
-    var _a;
-    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
-}
-//# sourceMappingURL=io-util.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/cache/node_modules/@actions/io/lib/io.js
-var lib_io_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-
-/**
- * Copies a file or folder.
- * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See CopyOptions.
- */
-function lib_io_cp(source_1, dest_1) {
-    return lib_io_awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        const { force, recursive, copySourceDirectory } = io_readCopyOptions(options);
-        const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
-        // Dest is an existing file, but not forcing
-        if (destStat && destStat.isFile() && !force) {
-            return;
-        }
-        // If dest is an existing directory, should copy inside.
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
-            ? path.join(dest, path.basename(source))
-            : dest;
-        if (!(yield ioUtil.exists(source))) {
-            throw new Error(`no such file or directory: ${source}`);
-        }
-        const sourceStat = yield ioUtil.stat(source);
-        if (sourceStat.isDirectory()) {
-            if (!recursive) {
-                throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
-            }
-            else {
-                yield io_cpDirRecursive(source, newDest, 0, force);
-            }
-        }
-        else {
-            if (path.relative(source, newDest) === '') {
-                // a file cannot be copied to itself
-                throw new Error(`'${newDest}' and '${source}' are the same file`);
-            }
-            yield lib_io_copyFile(source, newDest, force);
-        }
-    });
-}
-/**
- * Moves a path.
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See MoveOptions.
- */
-function io_mv(source_1, dest_1) {
-    return lib_io_awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        if (yield ioUtil.exists(dest)) {
-            let destExists = true;
-            if (yield ioUtil.isDirectory(dest)) {
-                // If dest is directory copy src into dest
-                dest = path.join(dest, path.basename(source));
-                destExists = yield ioUtil.exists(dest);
-            }
-            if (destExists) {
-                if (options.force == null || options.force) {
-                    yield io_rmRF(dest);
-                }
-                else {
-                    throw new Error('Destination already exists');
-                }
-            }
-        }
-        yield io_mkdirP(path.dirname(dest));
-        yield ioUtil.rename(source, dest);
-    });
-}
-/**
- * Remove a path recursively with force
- *
- * @param inputPath path to remove
- */
-function io_rmRF(inputPath) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        if (ioUtil.IS_WINDOWS) {
-            // Check for invalid characters
-            // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-            if (/[*"<>|]/.test(inputPath)) {
-                throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
-            }
-        }
-        try {
-            // note if path does not exist, error is silent
-            yield ioUtil.rm(inputPath, {
-                force: true,
-                maxRetries: 3,
-                recursive: true,
-                retryDelay: 300
-            });
-        }
-        catch (err) {
-            throw new Error(`File was unable to be removed ${err}`);
-        }
-    });
-}
-/**
- * Make a directory.  Creates the full path with folders in between
- * Will throw if it fails
- *
- * @param   fsPath        path to create
- * @returns Promise<void>
- */
-function io_mkdirP(fsPath) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        (0,external_assert_.ok)(fsPath, 'a path argument must be provided');
-        yield io_util_mkdir(fsPath, { recursive: true });
-    });
-}
-/**
- * Returns path of a tool had the tool actually been invoked.  Resolves via paths.
- * If you check and the tool does not exist, it will throw.
- *
- * @param     tool              name of the tool
- * @param     check             whether to check if tool exists
- * @returns   Promise<string>   path to tool
- */
-function io_which(tool, check) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // recursive when check=true
-        if (check) {
-            const result = yield io_which(tool, false);
-            if (!result) {
-                if (io_util_IS_WINDOWS) {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.`);
-                }
-                else {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
-                }
-            }
-            return result;
-        }
-        const matches = yield io_findInPath(tool);
-        if (matches && matches.length > 0) {
-            return matches[0];
-        }
-        return '';
-    });
-}
-/**
- * Returns a list of all occurrences of the given tool on the system path.
- *
- * @returns   Promise<string[]>  the paths of the tool
- */
-function io_findInPath(tool) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // build the list of extensions to try
-        const extensions = [];
-        if (io_util_IS_WINDOWS && process.env['PATHEXT']) {
-            for (const extension of process.env['PATHEXT'].split(external_path_.delimiter)) {
-                if (extension) {
-                    extensions.push(extension);
-                }
-            }
-        }
-        // if it's rooted, return it if exists. otherwise return empty.
-        if (io_util_isRooted(tool)) {
-            const filePath = yield io_util_tryGetExecutablePath(tool, extensions);
-            if (filePath) {
-                return [filePath];
-            }
-            return [];
-        }
-        // if any path separators, return empty
-        if (tool.includes(external_path_.sep)) {
-            return [];
-        }
-        // build the list of directories
-        //
-        // Note, technically "where" checks the current directory on Windows. From a toolkit perspective,
-        // it feels like we should not do this. Checking the current directory seems like more of a use
-        // case of a shell, and the which() function exposed by the toolkit should strive for consistency
-        // across platforms.
-        const directories = [];
-        if (process.env.PATH) {
-            for (const p of process.env.PATH.split(external_path_.delimiter)) {
-                if (p) {
-                    directories.push(p);
-                }
-            }
-        }
-        // find all matches
-        const matches = [];
-        for (const directory of directories) {
-            const filePath = yield io_util_tryGetExecutablePath(external_path_.join(directory, tool), extensions);
-            if (filePath) {
-                matches.push(filePath);
-            }
-        }
-        return matches;
-    });
-}
-function io_readCopyOptions(options) {
-    const force = options.force == null ? true : options.force;
-    const recursive = Boolean(options.recursive);
-    const copySourceDirectory = options.copySourceDirectory == null
-        ? true
-        : Boolean(options.copySourceDirectory);
-    return { force, recursive, copySourceDirectory };
-}
-function io_cpDirRecursive(sourceDir, destDir, currentDepth, force) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        // Ensure there is not a run away recursive copy
-        if (currentDepth >= 255)
-            return;
-        currentDepth++;
-        yield io_mkdirP(destDir);
-        const files = yield ioUtil.readdir(sourceDir);
-        for (const fileName of files) {
-            const srcFile = `${sourceDir}/${fileName}`;
-            const destFile = `${destDir}/${fileName}`;
-            const srcFileStat = yield ioUtil.lstat(srcFile);
-            if (srcFileStat.isDirectory()) {
-                // Recurse
-                yield io_cpDirRecursive(srcFile, destFile, currentDepth, force);
-            }
-            else {
-                yield lib_io_copyFile(srcFile, destFile, force);
-            }
-        }
-        // Change the mode for the newly created directory
-        yield ioUtil.chmod(destDir, (yield ioUtil.stat(sourceDir)).mode);
-    });
-}
-// Buffered file copy
-function lib_io_copyFile(srcFile, destFile, force) {
-    return lib_io_awaiter(this, void 0, void 0, function* () {
-        if ((yield ioUtil.lstat(srcFile)).isSymbolicLink()) {
-            // unlink/re-link it
-            try {
-                yield ioUtil.lstat(destFile);
-                yield ioUtil.unlink(destFile);
-            }
-            catch (e) {
-                // Try to override file permission
-                if (e.code === 'EPERM') {
-                    yield ioUtil.chmod(destFile, '0666');
-                    yield ioUtil.unlink(destFile);
-                }
-                // other errors = it doesn't exist, no work to do
-            }
-            // Copy over symlink
-            const symlinkFull = yield ioUtil.readlink(srcFile);
-            yield ioUtil.symlink(symlinkFull, destFile, ioUtil.IS_WINDOWS ? 'junction' : null);
-        }
-        else if (!(yield ioUtil.exists(destFile)) || force) {
-            yield ioUtil.copyFile(srcFile, destFile);
-        }
-    });
-}
-//# sourceMappingURL=io.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/cache/node_modules/@actions/exec/lib/toolrunner.js
-var lib_toolrunner_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-
-
-
-
-
-/* eslint-disable @typescript-eslint/unbound-method */
-const lib_toolrunner_IS_WINDOWS = process.platform === 'win32';
-/*
- * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
- */
-class toolrunner_ToolRunner extends external_events_.EventEmitter {
-    constructor(toolPath, args, options) {
-        super();
-        if (!toolPath) {
-            throw new Error("Parameter 'toolPath' cannot be null or empty.");
-        }
-        this.toolPath = toolPath;
-        this.args = args || [];
-        this.options = options || {};
-    }
-    _debug(message) {
-        if (this.options.listeners && this.options.listeners.debug) {
-            this.options.listeners.debug(message);
-        }
-    }
-    _getCommandString(options, noPrefix) {
-        const toolPath = this._getSpawnFileName();
-        const args = this._getSpawnArgs(options);
-        let cmd = noPrefix ? '' : '[command]'; // omit prefix when piped to a second tool
-        if (lib_toolrunner_IS_WINDOWS) {
-            // Windows + cmd file
-            if (this._isCmdFile()) {
-                cmd += toolPath;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows + verbatim
-            else if (options.windowsVerbatimArguments) {
-                cmd += `"${toolPath}"`;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows (regular)
-            else {
-                cmd += this._windowsQuoteCmdArg(toolPath);
-                for (const a of args) {
-                    cmd += ` ${this._windowsQuoteCmdArg(a)}`;
-                }
-            }
-        }
-        else {
-            // OSX/Linux - this can likely be improved with some form of quoting.
-            // creating processes on Unix is fundamentally different than Windows.
-            // on Unix, execvp() takes an arg array.
-            cmd += toolPath;
-            for (const a of args) {
-                cmd += ` ${a}`;
-            }
-        }
-        return cmd;
-    }
-    _processLineBuffer(data, strBuffer, onLine) {
-        try {
-            let s = strBuffer + data.toString();
-            let n = s.indexOf(external_os_.EOL);
-            while (n > -1) {
-                const line = s.substring(0, n);
-                onLine(line);
-                // the rest of the string ...
-                s = s.substring(n + external_os_.EOL.length);
-                n = s.indexOf(external_os_.EOL);
-            }
-            return s;
-        }
-        catch (err) {
-            // streaming lines to console is best effort.  Don't fail a build.
-            this._debug(`error processing line. Failed with error ${err}`);
-            return '';
-        }
-    }
-    _getSpawnFileName() {
-        if (lib_toolrunner_IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                return process.env['COMSPEC'] || 'cmd.exe';
-            }
-        }
-        return this.toolPath;
-    }
-    _getSpawnArgs(options) {
-        if (lib_toolrunner_IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                let argline = `/D /S /C "${this._windowsQuoteCmdArg(this.toolPath)}`;
-                for (const a of this.args) {
-                    argline += ' ';
-                    argline += options.windowsVerbatimArguments
-                        ? a
-                        : this._windowsQuoteCmdArg(a);
-                }
-                argline += '"';
-                return [argline];
-            }
-        }
-        return this.args;
-    }
-    _endsWith(str, end) {
-        return str.endsWith(end);
-    }
-    _isCmdFile() {
-        const upperToolPath = this.toolPath.toUpperCase();
-        return (this._endsWith(upperToolPath, '.CMD') ||
-            this._endsWith(upperToolPath, '.BAT'));
-    }
-    _windowsQuoteCmdArg(arg) {
-        // for .exe, apply the normal quoting rules that libuv applies
-        if (!this._isCmdFile()) {
-            return this._uvQuoteCmdArg(arg);
-        }
-        // otherwise apply quoting rules specific to the cmd.exe command line parser.
-        // the libuv rules are generic and are not designed specifically for cmd.exe
-        // command line parser.
-        //
-        // for a detailed description of the cmd.exe command line parser, refer to
-        // http://stackoverflow.com/questions/4094699/how-does-the-windows-command-interpreter-cmd-exe-parse-scripts/7970912#7970912
-        // need quotes for empty arg
-        if (!arg) {
-            return '""';
-        }
-        // determine whether the arg needs to be quoted
-        const cmdSpecialChars = [
-            ' ',
-            '\t',
-            '&',
-            '(',
-            ')',
-            '[',
-            ']',
-            '{',
-            '}',
-            '^',
-            '=',
-            ';',
-            '!',
-            "'",
-            '+',
-            ',',
-            '`',
-            '~',
-            '|',
-            '<',
-            '>',
-            '"'
-        ];
-        let needsQuotes = false;
-        for (const char of arg) {
-            if (cmdSpecialChars.some(x => x === char)) {
-                needsQuotes = true;
-                break;
-            }
-        }
-        // short-circuit if quotes not needed
-        if (!needsQuotes) {
-            return arg;
-        }
-        // the following quoting rules are very similar to the rules that by libuv applies.
-        //
-        // 1) wrap the string in quotes
-        //
-        // 2) double-up quotes - i.e. " => ""
-        //
-        //    this is different from the libuv quoting rules. libuv replaces " with \", which unfortunately
-        //    doesn't work well with a cmd.exe command line.
-        //
-        //    note, replacing " with "" also works well if the arg is passed to a downstream .NET console app.
-        //    for example, the command line:
-        //          foo.exe "myarg:""my val"""
-        //    is parsed by a .NET console app into an arg array:
-        //          [ "myarg:\"my val\"" ]
-        //    which is the same end result when applying libuv quoting rules. although the actual
-        //    command line from libuv quoting rules would look like:
-        //          foo.exe "myarg:\"my val\""
-        //
-        // 3) double-up slashes that precede a quote,
-        //    e.g.  hello \world    => "hello \world"
-        //          hello\"world    => "hello\\""world"
-        //          hello\\"world   => "hello\\\\""world"
-        //          hello world\    => "hello world\\"
-        //
-        //    technically this is not required for a cmd.exe command line, or the batch argument parser.
-        //    the reasons for including this as a .cmd quoting rule are:
-        //
-        //    a) this is optimized for the scenario where the argument is passed from the .cmd file to an
-        //       external program. many programs (e.g. .NET console apps) rely on the slash-doubling rule.
-        //
-        //    b) it's what we've been doing previously (by deferring to node default behavior) and we
-        //       haven't heard any complaints about that aspect.
-        //
-        // note, a weakness of the quoting rules chosen here, is that % is not escaped. in fact, % cannot be
-        // escaped when used on the command line directly - even though within a .cmd file % can be escaped
-        // by using %%.
-        //
-        // the saving grace is, on the command line, %var% is left as-is if var is not defined. this contrasts
-        // the line parsing rules within a .cmd file, where if var is not defined it is replaced with nothing.
-        //
-        // one option that was explored was replacing % with ^% - i.e. %var% => ^%var^%. this hack would
-        // often work, since it is unlikely that var^ would exist, and the ^ character is removed when the
-        // variable is used. the problem, however, is that ^ is not removed when %* is used to pass the args
-        // to an external program.
-        //
-        // an unexplored potential solution for the % escaping problem, is to create a wrapper .cmd file.
-        // % can be escaped within a .cmd file.
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\'; // double the slash
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '"'; // double the quote
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _uvQuoteCmdArg(arg) {
-        // Tool runner wraps child_process.spawn() and needs to apply the same quoting as
-        // Node in certain cases where the undocumented spawn option windowsVerbatimArguments
-        // is used.
-        //
-        // Since this function is a port of quote_cmd_arg from Node 4.x (technically, lib UV,
-        // see https://github.com/nodejs/node/blob/v4.x/deps/uv/src/win/process.c for details),
-        // pasting copyright notice from Node within this function:
-        //
-        //      Copyright Joyent, Inc. and other Node contributors. All rights reserved.
-        //
-        //      Permission is hereby granted, free of charge, to any person obtaining a copy
-        //      of this software and associated documentation files (the "Software"), to
-        //      deal in the Software without restriction, including without limitation the
-        //      rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-        //      sell copies of the Software, and to permit persons to whom the Software is
-        //      furnished to do so, subject to the following conditions:
-        //
-        //      The above copyright notice and this permission notice shall be included in
-        //      all copies or substantial portions of the Software.
-        //
-        //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        //      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        //      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        //      AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        //      LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-        //      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-        //      IN THE SOFTWARE.
-        if (!arg) {
-            // Need double quotation for empty argument
-            return '""';
-        }
-        if (!arg.includes(' ') && !arg.includes('\t') && !arg.includes('"')) {
-            // No quotation needed
-            return arg;
-        }
-        if (!arg.includes('"') && !arg.includes('\\')) {
-            // No embedded double quotes or backslashes, so I can just wrap
-            // quote marks around the whole thing.
-            return `"${arg}"`;
-        }
-        // Expected input/output:
-        //   input : hello"world
-        //   output: "hello\"world"
-        //   input : hello""world
-        //   output: "hello\"\"world"
-        //   input : hello\world
-        //   output: hello\world
-        //   input : hello\\world
-        //   output: hello\\world
-        //   input : hello\"world
-        //   output: "hello\\\"world"
-        //   input : hello\\"world
-        //   output: "hello\\\\\"world"
-        //   input : hello world\
-        //   output: "hello world\\" - note the comment in libuv actually reads "hello world\"
-        //                             but it appears the comment is wrong, it should be "hello world\\"
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\';
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '\\';
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _cloneExecOptions(options) {
-        options = options || {};
-        const result = {
-            cwd: options.cwd || process.cwd(),
-            env: options.env || process.env,
-            silent: options.silent || false,
-            windowsVerbatimArguments: options.windowsVerbatimArguments || false,
-            failOnStdErr: options.failOnStdErr || false,
-            ignoreReturnCode: options.ignoreReturnCode || false,
-            delay: options.delay || 10000
-        };
-        result.outStream = options.outStream || process.stdout;
-        result.errStream = options.errStream || process.stderr;
-        return result;
-    }
-    _getSpawnOptions(options, toolPath) {
-        options = options || {};
-        const result = {};
-        result.cwd = options.cwd;
-        result.env = options.env;
-        result['windowsVerbatimArguments'] =
-            options.windowsVerbatimArguments || this._isCmdFile();
-        if (options.windowsVerbatimArguments) {
-            result.argv0 = `"${toolPath}"`;
-        }
-        return result;
-    }
-    /**
-     * Exec a tool.
-     * Output will be streamed to the live console.
-     * Returns promise with return code
-     *
-     * @param     tool     path to tool to exec
-     * @param     options  optional exec options.  See ExecOptions
-     * @returns   number
-     */
-    exec() {
-        return lib_toolrunner_awaiter(this, void 0, void 0, function* () {
-            // root the tool path if it is unrooted and contains relative pathing
-            if (!io_util_isRooted(this.toolPath) &&
-                (this.toolPath.includes('/') ||
-                    (lib_toolrunner_IS_WINDOWS && this.toolPath.includes('\\')))) {
-                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
-                this.toolPath = external_path_.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
-            }
-            // if the tool is only a file name, then resolve it from the PATH
-            // otherwise verify it exists (add extension on Windows if necessary)
-            this.toolPath = yield io_which(this.toolPath, true);
-            return new Promise((resolve, reject) => lib_toolrunner_awaiter(this, void 0, void 0, function* () {
-                this._debug(`exec tool: ${this.toolPath}`);
-                this._debug('arguments:');
-                for (const arg of this.args) {
-                    this._debug(`   ${arg}`);
-                }
-                const optionsNonNull = this._cloneExecOptions(this.options);
-                if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                    optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + external_os_.EOL);
-                }
-                const state = new toolrunner_ExecState(optionsNonNull, this.toolPath);
-                state.on('debug', (message) => {
-                    this._debug(message);
-                });
-                if (this.options.cwd && !(yield io_util_exists(this.options.cwd))) {
-                    return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
-                }
-                const fileName = this._getSpawnFileName();
-                const cp = external_child_process_.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
-                let stdbuffer = '';
-                if (cp.stdout) {
-                    cp.stdout.on('data', (data) => {
-                        if (this.options.listeners && this.options.listeners.stdout) {
-                            this.options.listeners.stdout(data);
-                        }
-                        if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                            optionsNonNull.outStream.write(data);
-                        }
-                        stdbuffer = this._processLineBuffer(data, stdbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.stdline) {
-                                this.options.listeners.stdline(line);
-                            }
-                        });
-                    });
-                }
-                let errbuffer = '';
-                if (cp.stderr) {
-                    cp.stderr.on('data', (data) => {
-                        state.processStderr = true;
-                        if (this.options.listeners && this.options.listeners.stderr) {
-                            this.options.listeners.stderr(data);
-                        }
-                        if (!optionsNonNull.silent &&
-                            optionsNonNull.errStream &&
-                            optionsNonNull.outStream) {
-                            const s = optionsNonNull.failOnStdErr
-                                ? optionsNonNull.errStream
-                                : optionsNonNull.outStream;
-                            s.write(data);
-                        }
-                        errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.errline) {
-                                this.options.listeners.errline(line);
-                            }
-                        });
-                    });
-                }
-                cp.on('error', (err) => {
-                    state.processError = err.message;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    state.CheckComplete();
-                });
-                cp.on('exit', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    this._debug(`Exit code ${code} received from tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                cp.on('close', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                state.on('done', (error, exitCode) => {
-                    if (stdbuffer.length > 0) {
-                        this.emit('stdline', stdbuffer);
-                    }
-                    if (errbuffer.length > 0) {
-                        this.emit('errline', errbuffer);
-                    }
-                    cp.removeAllListeners();
-                    if (error) {
-                        reject(error);
-                    }
-                    else {
-                        resolve(exitCode);
-                    }
-                });
-                if (this.options.input) {
-                    if (!cp.stdin) {
-                        throw new Error('child process missing stdin');
-                    }
-                    cp.stdin.end(this.options.input);
-                }
-            }));
-        });
-    }
-}
-/**
- * Convert an arg string to an array of args. Handles escaping
- *
- * @param    argString   string of arguments
- * @returns  string[]    array of arguments
- */
-function toolrunner_argStringToArray(argString) {
-    const args = [];
-    let inQuotes = false;
-    let escaped = false;
-    let arg = '';
-    function append(c) {
-        // we only escape double quotes.
-        if (escaped && c !== '"') {
-            arg += '\\';
-        }
-        arg += c;
-        escaped = false;
-    }
-    for (let i = 0; i < argString.length; i++) {
-        const c = argString.charAt(i);
-        if (c === '"') {
-            if (!escaped) {
-                inQuotes = !inQuotes;
-            }
-            else {
-                append(c);
-            }
-            continue;
-        }
-        if (c === '\\' && escaped) {
-            append(c);
-            continue;
-        }
-        if (c === '\\' && inQuotes) {
-            escaped = true;
-            continue;
-        }
-        if (c === ' ' && !inQuotes) {
-            if (arg.length > 0) {
-                args.push(arg);
-                arg = '';
-            }
-            continue;
-        }
-        append(c);
-    }
-    if (arg.length > 0) {
-        args.push(arg.trim());
-    }
-    return args;
-}
-class toolrunner_ExecState extends external_events_.EventEmitter {
-    constructor(options, toolPath) {
-        super();
-        this.processClosed = false; // tracks whether the process has exited and stdio is closed
-        this.processError = '';
-        this.processExitCode = 0;
-        this.processExited = false; // tracks whether the process has exited
-        this.processStderr = false; // tracks whether stderr was written to
-        this.delay = 10000; // 10 seconds
-        this.done = false;
-        this.timeout = null;
-        if (!toolPath) {
-            throw new Error('toolPath must not be empty');
-        }
-        this.options = options;
-        this.toolPath = toolPath;
-        if (options.delay) {
-            this.delay = options.delay;
-        }
-    }
-    CheckComplete() {
-        if (this.done) {
-            return;
-        }
-        if (this.processClosed) {
-            this._setResult();
-        }
-        else if (this.processExited) {
-            this.timeout = (0,external_timers_.setTimeout)(toolrunner_ExecState.HandleTimeout, this.delay, this);
-        }
-    }
-    _debug(message) {
-        this.emit('debug', message);
-    }
-    _setResult() {
-        // determine whether there is an error
-        let error;
-        if (this.processExited) {
-            if (this.processError) {
-                error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
-            }
-            else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
-                error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
-            }
-            else if (this.processStderr && this.options.failOnStdErr) {
-                error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
-            }
-        }
-        // clear the timeout
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-            this.timeout = null;
-        }
-        this.done = true;
-        this.emit('done', error, this.processExitCode);
-    }
-    static HandleTimeout(state) {
-        if (state.done) {
-            return;
-        }
-        if (!state.processClosed && state.processExited) {
-            const message = `The STDIO streams did not close within ${state.delay / 1000} seconds of the exit event from process '${state.toolPath}'. This may indicate a child process inherited the STDIO streams and has not yet exited.`;
-            state._debug(message);
-        }
-        state._setResult();
-    }
-}
-//# sourceMappingURL=toolrunner.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/cache/node_modules/@actions/exec/lib/exec.js
-var lib_exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-/**
- * Exec a command.
- * Output will be streamed to the live console.
- * Returns promise with return code
- *
- * @param     commandLine        command to execute (can include additional args). Must be correctly escaped.
- * @param     args               optional arguments for tool. Escaping is handled by the lib.
- * @param     options            optional exec options.  See ExecOptions
- * @returns   Promise<number>    exit code
- */
-function lib_exec_exec(commandLine, args, options) {
-    return lib_exec_awaiter(this, void 0, void 0, function* () {
-        const commandArgs = toolrunner_argStringToArray(commandLine);
-        if (commandArgs.length === 0) {
-            throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
-        }
-        // Path to tool to execute should be first arg
-        const toolPath = commandArgs[0];
-        args = commandArgs.slice(1).concat(args || []);
-        const runner = new toolrunner_ToolRunner(toolPath, args, options);
-        return runner.exec();
-    });
-}
-/**
- * Exec a command and get the output.
- * Output will be streamed to the live console.
- * Returns promise with the exit code and collected stdout and stderr
- *
- * @param     commandLine           command to execute (can include additional args). Must be correctly escaped.
- * @param     args                  optional arguments for tool. Escaping is handled by the lib.
- * @param     options               optional exec options.  See ExecOptions
- * @returns   Promise<ExecOutput>   exit code, stdout, and stderr
- */
-function exec_getExecOutput(commandLine, args, options) {
-    return lib_exec_awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
-        let stdout = '';
-        let stderr = '';
-        //Using string decoder covers the case where a mult-byte character is split
-        const stdoutDecoder = new StringDecoder('utf8');
-        const stderrDecoder = new StringDecoder('utf8');
-        const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
-        const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
-        const stdErrListener = (data) => {
-            stderr += stderrDecoder.write(data);
-            if (originalStdErrListener) {
-                originalStdErrListener(data);
-            }
-        };
-        const stdOutListener = (data) => {
-            stdout += stdoutDecoder.write(data);
-            if (originalStdoutListener) {
-                originalStdoutListener(data);
-            }
-        };
-        const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield lib_exec_exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
-        //flush any remaining characters
-        stdout += stdoutDecoder.end();
-        stderr += stderrDecoder.end();
-        return {
-            exitCode,
-            stdout,
-            stderr
-        };
-    });
-}
-//# sourceMappingURL=exec.js.map
 ;// CONCATENATED MODULE: ./node_modules/@actions/glob/lib/internal-glob-options-helper.js
 
 /**
@@ -48736,7 +46285,7 @@ class DefaultGlobber {
                 try {
                     // Intentionally using lstat. Detection for broken symlink
                     // will be performed later (if following symlinks).
-                    yield __await(external_fs_.promises.lstat(searchPath));
+                    yield __await(external_fs_namespaceObject.promises.lstat(searchPath));
                 }
                 catch (err) {
                     if (err.code === 'ENOENT') {
@@ -48781,7 +46330,7 @@ class DefaultGlobber {
                     }
                     // Push the child items in reverse
                     const childLevel = item.level + 1;
-                    const childItems = (yield __await(external_fs_.promises.readdir(item.path))).map(x => new SearchState(external_path_.join(item.path, x), childLevel));
+                    const childItems = (yield __await(external_fs_namespaceObject.promises.readdir(item.path))).map(x => new SearchState(external_path_.join(item.path, x), childLevel));
                     stack.push(...childItems.reverse());
                 }
                 // File
@@ -48825,7 +46374,7 @@ class DefaultGlobber {
             if (options.followSymbolicLinks) {
                 try {
                     // Use `stat` (following symlinks)
-                    stats = yield external_fs_.promises.stat(item.path);
+                    stats = yield external_fs_namespaceObject.promises.stat(item.path);
                 }
                 catch (err) {
                     if (err.code === 'ENOENT') {
@@ -48840,12 +46389,12 @@ class DefaultGlobber {
             }
             else {
                 // Use `lstat` (not following symlinks)
-                stats = yield external_fs_.promises.lstat(item.path);
+                stats = yield external_fs_namespaceObject.promises.lstat(item.path);
             }
             // Note, isDirectory() returns false for the lstat of a symlink
             if (stats.isDirectory() && options.followSymbolicLinks) {
                 // Get the realpath
-                const realPath = yield external_fs_.promises.realpath(item.path);
+                const realPath = yield external_fs_namespaceObject.promises.realpath(item.path);
                 // Fixup the traversal chain to match the item level
                 while (traversalChain.length >= item.level) {
                     traversalChain.pop();
@@ -49077,12 +46626,12 @@ function createTempDirectory() {
             tempDirectory = external_path_.join(baseLocation, 'actions', 'temp');
         }
         const dest = external_path_.join(tempDirectory, external_crypto_namespaceObject.randomUUID());
-        yield io_mkdirP(dest);
+        yield mkdirP(dest);
         return dest;
     });
 }
 function getArchiveFileSizeInBytes(filePath) {
-    return external_fs_.statSync(filePath).size;
+    return external_fs_namespaceObject.statSync(filePath).size;
 }
 function resolvePaths(patterns) {
     return cacheUtils_awaiter(this, void 0, void 0, function* () {
@@ -49123,7 +46672,7 @@ function resolvePaths(patterns) {
 }
 function unlinkFile(filePath) {
     return cacheUtils_awaiter(this, void 0, void 0, function* () {
-        return external_util_.promisify(external_fs_.unlink)(filePath);
+        return external_util_.promisify(external_fs_namespaceObject.unlink)(filePath);
     });
 }
 function getVersion(app_1) {
@@ -49132,7 +46681,7 @@ function getVersion(app_1) {
         additionalArgs.push('--version');
         core_debug(`Checking ${app} ${additionalArgs.join(' ')}`);
         try {
-            yield lib_exec_exec(`${app}`, additionalArgs, {
+            yield exec_exec(`${app}`, additionalArgs, {
                 ignoreReturnCode: true,
                 silent: true,
                 listeners: {
@@ -49170,11 +46719,11 @@ function getCacheFileName(compressionMethod) {
 }
 function getGnuTarPathOnWindows() {
     return cacheUtils_awaiter(this, void 0, void 0, function* () {
-        if (external_fs_.existsSync(GnuTarPathOnWindows)) {
+        if (external_fs_namespaceObject.existsSync(GnuTarPathOnWindows)) {
             return GnuTarPathOnWindows;
         }
         const versionOutput = yield getVersion('tar');
-        return versionOutput.toLowerCase().includes('gnu tar') ? io_which('tar') : '';
+        return versionOutput.toLowerCase().includes('gnu tar') ? which('tar') : '';
     });
 }
 function assertDefined(name, value) {
@@ -98771,7 +96320,7 @@ class DownloadProgress {
  */
 function downloadCacheHttpClient(archiveLocation, archivePath) {
     return downloadUtils_awaiter(this, void 0, void 0, function* () {
-        const writeStream = external_fs_.createWriteStream(archivePath);
+        const writeStream = external_fs_namespaceObject.createWriteStream(archivePath);
         const httpClient = new lib_HttpClient('actions/cache');
         const downloadResponse = yield retryHttpClientResponse('downloadCache', () => downloadUtils_awaiter(this, void 0, void 0, function* () { return httpClient.get(archiveLocation); }));
         // Abort download if no traffic received over the socket.
@@ -98803,7 +96352,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
 function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options) {
     return downloadUtils_awaiter(this, void 0, void 0, function* () {
         var _a;
-        const archiveDescriptor = yield external_fs_.promises.open(archivePath, 'w');
+        const archiveDescriptor = yield external_fs_namespaceObject.promises.open(archivePath, 'w');
         const httpClient = new lib_HttpClient('actions/cache', undefined, {
             socketTimeout: options.timeoutInMs,
             keepAlive: true
@@ -98938,7 +96487,7 @@ function downloadCacheStorageSDK(archiveLocation, archivePath, options) {
             // Updated segment size to 128MB = 134217728 bytes, to complete a segment faster and fail fast
             const maxSegmentSize = Math.min(134217728, external_buffer_namespaceObject.constants.MAX_LENGTH);
             const downloadProgress = new DownloadProgress(contentLength);
-            const fd = external_fs_.openSync(archivePath, 'w');
+            const fd = external_fs_namespaceObject.openSync(archivePath, 'w');
             try {
                 downloadProgress.startDisplayTimer();
                 const controller = new AbortController();
@@ -98957,13 +96506,13 @@ function downloadCacheStorageSDK(archiveLocation, archivePath, options) {
                         throw new Error('Aborting cache download as the download time exceeded the timeout.');
                     }
                     else if (Buffer.isBuffer(result)) {
-                        external_fs_.writeFileSync(fd, result);
+                        external_fs_namespaceObject.writeFileSync(fd, result);
                     }
                 }
             }
             finally {
                 downloadProgress.stopDisplayTimer();
-                external_fs_.closeSync(fd);
+                external_fs_namespaceObject.closeSync(fd);
             }
         }
     });
@@ -99297,7 +96846,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
         // Upload Chunks
         const fileSize = getArchiveFileSizeInBytes(archivePath);
         const resourceUrl = getCacheApiUrl(`caches/${cacheId.toString()}`);
-        const fd = external_fs_.openSync(archivePath, 'r');
+        const fd = external_fs_namespaceObject.openSync(archivePath, 'r');
         const uploadOptions = getUploadOptions(options);
         const concurrency = assertDefined('uploadConcurrency', uploadOptions.uploadConcurrency);
         const maxChunkSize = assertDefined('uploadChunkSize', uploadOptions.uploadChunkSize);
@@ -99311,7 +96860,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
                     const start = offset;
                     const end = offset + chunkSize - 1;
                     offset += maxChunkSize;
-                    yield uploadChunk(httpClient, resourceUrl, () => external_fs_.createReadStream(archivePath, {
+                    yield uploadChunk(httpClient, resourceUrl, () => external_fs_namespaceObject.createReadStream(archivePath, {
                         fd,
                         start,
                         end,
@@ -99324,7 +96873,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
             })));
         }
         finally {
-            external_fs_.closeSync(fd);
+            external_fs_namespaceObject.closeSync(fd);
         }
         return;
     });
@@ -100226,20 +97775,20 @@ function getTarPath() {
                     // Use GNUtar as default on windows
                     return { path: gnuTar, type: ArchiveToolType.GNU };
                 }
-                else if ((0,external_fs_.existsSync)(systemTar)) {
+                else if ((0,external_fs_namespaceObject.existsSync)(systemTar)) {
                     return { path: systemTar, type: ArchiveToolType.BSD };
                 }
                 break;
             }
             case 'darwin': {
-                const gnuTar = yield io_which('gtar', false);
+                const gnuTar = yield which('gtar', false);
                 if (gnuTar) {
                     // fix permission denied errors when extracting BSD tar archive with GNU tar - https://github.com/actions/cache/issues/527
                     return { path: gnuTar, type: ArchiveToolType.GNU };
                 }
                 else {
                     return {
-                        path: yield io_which('tar', true),
+                        path: yield which('tar', true),
                         type: ArchiveToolType.BSD
                     };
                 }
@@ -100249,7 +97798,7 @@ function getTarPath() {
         }
         // Default assumption is GNU tar is present in path
         return {
-            path: yield io_which('tar', true),
+            path: yield which('tar', true),
             type: ArchiveToolType.GNU
         };
     });
@@ -100404,7 +97953,7 @@ function execCommands(commands, cwd) {
     return tar_awaiter(this, void 0, void 0, function* () {
         for (const command of commands) {
             try {
-                yield lib_exec_exec(command, undefined, {
+                yield exec_exec(command, undefined, {
                     cwd,
                     env: Object.assign(Object.assign({}, process.env), { MSYS: 'winsymlinks:nativestrict' })
                 });
@@ -100427,7 +97976,7 @@ function extractTar(archivePath, compressionMethod) {
     return tar_awaiter(this, void 0, void 0, function* () {
         // Create directory to extract tar into
         const workingDirectory = getWorkingDirectory();
-        yield io_mkdirP(workingDirectory);
+        yield mkdirP(workingDirectory);
         const commands = yield getCommands(compressionMethod, 'extract', archivePath);
         yield execCommands(commands);
     });
@@ -100436,7 +97985,7 @@ function extractTar(archivePath, compressionMethod) {
 function createTar(archiveFolder, sourceDirectories, compressionMethod) {
     return tar_awaiter(this, void 0, void 0, function* () {
         // Write source directories to manifest.txt to avoid command length limits
-        (0,external_fs_.writeFileSync)(external_path_.join(archiveFolder, ManifestFilename), sourceDirectories.join('\n'));
+        (0,external_fs_namespaceObject.writeFileSync)(external_path_.join(archiveFolder, ManifestFilename), sourceDirectories.join('\n'));
         const commands = yield getCommands(compressionMethod, 'create');
         yield execCommands(commands, archiveFolder);
     });
@@ -101241,7 +98790,7 @@ async function installDebian(inputs) {
     const cacheHit = await restoreCache(CACHE_PATHS, cacheKey);
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
-        await lib_exec.exec("sudo", [
+        await exec_exec("sudo", [
             "apt-get",
             "install",
             "-y",
@@ -101259,7 +98808,7 @@ async function installDebian(inputs) {
         await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
         await cache_saveCache(CACHE_PATHS, cacheKey);
     }
-    await lib_exec.exec("sudo", [
+    await exec_exec("sudo", [
         "update-alternatives",
         "--install",
         "/usr/bin/gcc",
@@ -101284,7 +98833,7 @@ async function installDebian(inputs) {
 async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await lib_exec.exec("sudo", [
+            await exec_exec("sudo", [
                 "apt-get",
                 "update",
                 "-y",
@@ -101293,7 +98842,7 @@ async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
                 "-o",
                 "Acquire::Retries=3",
             ]);
-            await lib_exec.exec("sudo", [
+            await exec_exec("sudo", [
                 "apt-get",
                 "install",
                 "-y",
@@ -101324,7 +98873,7 @@ function needsPpa(version, osVersion) {
 async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await lib_exec.exec("sudo", ["add-apt-repository", "--yes", ppa]);
+            await exec_exec("sudo", ["add-apt-repository", "--yes", ppa]);
             return;
         }
         catch (err) {
@@ -101337,7 +98886,7 @@ async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
 }
 async function resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("gfortran", ["--version"], {
+    await exec_exec("gfortran", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -101364,7 +98913,7 @@ async function installDarwin(inputs) {
     info(`Installing GFortran ${version} on macOS (${inputs.arch}) via Homebrew...`);
     const formula = `gcc@${version}`;
     let listOutput = "";
-    await lib_exec.exec("brew", ["list", "--versions", formula], {
+    await exec_exec("brew", ["list", "--versions", formula], {
         listeners: {
             stdout: (data) => {
                 listOutput += data.toString();
@@ -101377,19 +98926,19 @@ async function installDarwin(inputs) {
         info(`${formula} is already installed, skipping brew install.`);
     }
     else {
-        const infoExitCode = await lib_exec.exec("brew", ["info", formula], {
+        const infoExitCode = await exec_exec("brew", ["info", formula], {
             ignoreReturnCode: true,
         });
         if (infoExitCode !== 0) {
             info(`${formula} not found in local index, running brew update...`);
-            await lib_exec.exec("brew", ["update"]);
+            await exec_exec("brew", ["update"]);
         }
         // Add --skip-post-install to ensure the hook failure doesn't crash the CI
-        await lib_exec.exec("brew", ["install", "--skip-post-install", formula]);
+        await exec_exec("brew", ["install", "--skip-post-install", formula]);
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
-    await lib_exec.exec("brew", ["--prefix", `gcc@${version}`], {
+    await exec_exec("brew", ["--prefix", `gcc@${version}`], {
         listeners: {
             stdout: (data) => (cellarPrefix += data.toString().trim()),
         },
@@ -101397,7 +98946,7 @@ async function installDarwin(inputs) {
     // Find the actual library directory dynamically and cast a wide symlink net
     const brewLibDir = external_path_.join(brewPrefix, "lib");
     const expectedDyldDir = external_path_.join(cellarPrefix, "lib", "gcc", version);
-    await lib_exec.exec("bash", [
+    await exec_exec("bash", [
         "-c",
         `
     # 1. Find the actual directory containing libgfortran within the cellar
@@ -101428,11 +98977,11 @@ async function installDarwin(inputs) {
     const gfortranBinary = external_path_.join(binDir, `gfortran-${version}`);
     const genericGfortran = external_path_.join(binDir, "gfortran");
     info(`Symlinking ${gfortranBinary} to ${genericGfortran}`);
-    await lib_exec.exec("ln", ["-sf", gfortranBinary, genericGfortran]);
+    await exec_exec("ln", ["-sf", gfortranBinary, genericGfortran]);
     // Help ld find -lSystem on newer macOS versions
     let sdkPath = "";
     try {
-        await lib_exec.exec("xcrun", ["--show-sdk-path"], {
+        await exec_exec("xcrun", ["--show-sdk-path"], {
             listeners: {
                 stdout: (data) => (sdkPath += data.toString().trim()),
             },
@@ -101462,14 +99011,14 @@ async function installDarwin(inputs) {
 }
 async function getBrewPrefix() {
     let output = "";
-    await lib_exec.exec("brew", ["--prefix"], {
+    await exec_exec("brew", ["--prefix"], {
         listeners: { stdout: (data) => (output += data.toString()) },
     });
     return output.trim();
 }
 async function darwin_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("gfortran", ["--version"], {
+    await exec_exec("gfortran", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -101479,458 +99028,6 @@ async function darwin_resolveInstalledVersion() {
     return output.trim();
 }
 
-;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/node_modules/@actions/io/lib/io-util.js
-var io_lib_io_util_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-const { chmod: lib_io_util_chmod, copyFile: lib_io_util_copyFile, lstat: lib_io_util_lstat, mkdir: lib_io_util_mkdir, open: io_lib_io_util_open, readdir: lib_io_util_readdir, rename: lib_io_util_rename, rm: lib_io_util_rm, rmdir: lib_io_util_rmdir, stat: lib_io_util_stat, symlink: lib_io_util_symlink, unlink: lib_io_util_unlink } = external_fs_.promises;
-// export const {open} = 'fs'
-const lib_io_util_IS_WINDOWS = process.platform === 'win32';
-/**
- * Custom implementation of readlink to ensure Windows junctions
- * maintain trailing backslash for backward compatibility with Node.js < 24
- *
- * In Node.js 20, Windows junctions (directory symlinks) always returned paths
- * with trailing backslashes. Node.js 24 removed this behavior, which breaks
- * code that relied on this format for path operations.
- *
- * This implementation restores the Node 20 behavior by adding a trailing
- * backslash to all junction results on Windows.
- */
-function lib_io_util_readlink(fsPath) {
-    return io_lib_io_util_awaiter(this, void 0, void 0, function* () {
-        const result = yield external_fs_.promises.readlink(fsPath);
-        // On Windows, restore Node 20 behavior: add trailing backslash to all results
-        // since junctions on Windows are always directory links
-        if (lib_io_util_IS_WINDOWS && !result.endsWith('\\')) {
-            return `${result}\\`;
-        }
-        return result;
-    });
-}
-// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
-const lib_io_util_UV_FS_O_EXLOCK = 0x10000000;
-const lib_io_util_READONLY = external_fs_.constants.O_RDONLY;
-function lib_io_util_exists(fsPath) {
-    return io_lib_io_util_awaiter(this, void 0, void 0, function* () {
-        try {
-            yield lib_io_util_stat(fsPath);
-        }
-        catch (err) {
-            if (err.code === 'ENOENT') {
-                return false;
-            }
-            throw err;
-        }
-        return true;
-    });
-}
-function lib_io_util_isDirectory(fsPath_1) {
-    return io_lib_io_util_awaiter(this, arguments, void 0, function* (fsPath, useStat = false) {
-        const stats = useStat ? yield lib_io_util_stat(fsPath) : yield lib_io_util_lstat(fsPath);
-        return stats.isDirectory();
-    });
-}
-/**
- * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
- * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
- */
-function lib_io_util_isRooted(p) {
-    p = lib_io_util_normalizeSeparators(p);
-    if (!p) {
-        throw new Error('isRooted() parameter "p" cannot be empty');
-    }
-    if (lib_io_util_IS_WINDOWS) {
-        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
-        ); // e.g. C: or C:\hello
-    }
-    return p.startsWith('/');
-}
-/**
- * Best effort attempt to determine whether a file exists and is executable.
- * @param filePath    file path to check
- * @param extensions  additional file extensions to try
- * @return if file exists and is executable, returns the file path. otherwise empty string.
- */
-function lib_io_util_tryGetExecutablePath(filePath, extensions) {
-    return io_lib_io_util_awaiter(this, void 0, void 0, function* () {
-        let stats = undefined;
-        try {
-            // test file exists
-            stats = yield lib_io_util_stat(filePath);
-        }
-        catch (err) {
-            if (err.code !== 'ENOENT') {
-                // eslint-disable-next-line no-console
-                console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-            }
-        }
-        if (stats && stats.isFile()) {
-            if (lib_io_util_IS_WINDOWS) {
-                // on Windows, test for valid extension
-                const upperExt = external_path_.extname(filePath).toUpperCase();
-                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
-                    return filePath;
-                }
-            }
-            else {
-                if (lib_io_util_isUnixExecutable(stats)) {
-                    return filePath;
-                }
-            }
-        }
-        // try each extension
-        const originalFilePath = filePath;
-        for (const extension of extensions) {
-            filePath = originalFilePath + extension;
-            stats = undefined;
-            try {
-                stats = yield lib_io_util_stat(filePath);
-            }
-            catch (err) {
-                if (err.code !== 'ENOENT') {
-                    // eslint-disable-next-line no-console
-                    console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
-                }
-            }
-            if (stats && stats.isFile()) {
-                if (lib_io_util_IS_WINDOWS) {
-                    // preserve the case of the actual file (since an extension was appended)
-                    try {
-                        const directory = external_path_.dirname(filePath);
-                        const upperName = external_path_.basename(filePath).toUpperCase();
-                        for (const actualName of yield lib_io_util_readdir(directory)) {
-                            if (upperName === actualName.toUpperCase()) {
-                                filePath = external_path_.join(directory, actualName);
-                                break;
-                            }
-                        }
-                    }
-                    catch (err) {
-                        // eslint-disable-next-line no-console
-                        console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
-                    }
-                    return filePath;
-                }
-                else {
-                    if (lib_io_util_isUnixExecutable(stats)) {
-                        return filePath;
-                    }
-                }
-            }
-        }
-        return '';
-    });
-}
-function lib_io_util_normalizeSeparators(p) {
-    p = p || '';
-    if (lib_io_util_IS_WINDOWS) {
-        // convert slashes on Windows
-        p = p.replace(/\//g, '\\');
-        // remove redundant slashes
-        return p.replace(/\\\\+/g, '\\');
-    }
-    // remove redundant slashes
-    return p.replace(/\/\/+/g, '/');
-}
-// on Mac/Linux, test the execute bit
-//     R   W  X  R  W X R W X
-//   256 128 64 32 16 8 4 2 1
-function lib_io_util_isUnixExecutable(stats) {
-    return ((stats.mode & 1) > 0 ||
-        ((stats.mode & 8) > 0 &&
-            process.getgid !== undefined &&
-            stats.gid === process.getgid()) ||
-        ((stats.mode & 64) > 0 &&
-            process.getuid !== undefined &&
-            stats.uid === process.getuid()));
-}
-// Get the path of cmd.exe in windows
-function lib_io_util_getCmdPath() {
-    var _a;
-    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
-}
-//# sourceMappingURL=io-util.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/node_modules/@actions/io/lib/io.js
-var io_lib_io_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-
-/**
- * Copies a file or folder.
- * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See CopyOptions.
- */
-function io_lib_io_cp(source_1, dest_1) {
-    return io_lib_io_awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        const { force, recursive, copySourceDirectory } = lib_io_readCopyOptions(options);
-        const destStat = (yield lib_io_util_exists(dest)) ? yield lib_io_util_stat(dest) : null;
-        // Dest is an existing file, but not forcing
-        if (destStat && destStat.isFile() && !force) {
-            return;
-        }
-        // If dest is an existing directory, should copy inside.
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
-            ? external_path_.join(dest, external_path_.basename(source))
-            : dest;
-        if (!(yield lib_io_util_exists(source))) {
-            throw new Error(`no such file or directory: ${source}`);
-        }
-        const sourceStat = yield lib_io_util_stat(source);
-        if (sourceStat.isDirectory()) {
-            if (!recursive) {
-                throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
-            }
-            else {
-                yield lib_io_cpDirRecursive(source, newDest, 0, force);
-            }
-        }
-        else {
-            if (external_path_.relative(source, newDest) === '') {
-                // a file cannot be copied to itself
-                throw new Error(`'${newDest}' and '${source}' are the same file`);
-            }
-            yield io_lib_io_copyFile(source, newDest, force);
-        }
-    });
-}
-/**
- * Moves a path.
- *
- * @param     source    source path
- * @param     dest      destination path
- * @param     options   optional. See MoveOptions.
- */
-function lib_io_mv(source_1, dest_1) {
-    return io_lib_io_awaiter(this, arguments, void 0, function* (source, dest, options = {}) {
-        if (yield ioUtil.exists(dest)) {
-            let destExists = true;
-            if (yield ioUtil.isDirectory(dest)) {
-                // If dest is directory copy src into dest
-                dest = path.join(dest, path.basename(source));
-                destExists = yield ioUtil.exists(dest);
-            }
-            if (destExists) {
-                if (options.force == null || options.force) {
-                    yield lib_io_rmRF(dest);
-                }
-                else {
-                    throw new Error('Destination already exists');
-                }
-            }
-        }
-        yield lib_io_mkdirP(path.dirname(dest));
-        yield ioUtil.rename(source, dest);
-    });
-}
-/**
- * Remove a path recursively with force
- *
- * @param inputPath path to remove
- */
-function lib_io_rmRF(inputPath) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        if (lib_io_util_IS_WINDOWS) {
-            // Check for invalid characters
-            // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-            if (/[*"<>|]/.test(inputPath)) {
-                throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
-            }
-        }
-        try {
-            // note if path does not exist, error is silent
-            yield lib_io_util_rm(inputPath, {
-                force: true,
-                maxRetries: 3,
-                recursive: true,
-                retryDelay: 300
-            });
-        }
-        catch (err) {
-            throw new Error(`File was unable to be removed ${err}`);
-        }
-    });
-}
-/**
- * Make a directory.  Creates the full path with folders in between
- * Will throw if it fails
- *
- * @param   fsPath        path to create
- * @returns Promise<void>
- */
-function lib_io_mkdirP(fsPath) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        (0,external_assert_.ok)(fsPath, 'a path argument must be provided');
-        yield lib_io_util_mkdir(fsPath, { recursive: true });
-    });
-}
-/**
- * Returns path of a tool had the tool actually been invoked.  Resolves via paths.
- * If you check and the tool does not exist, it will throw.
- *
- * @param     tool              name of the tool
- * @param     check             whether to check if tool exists
- * @returns   Promise<string>   path to tool
- */
-function lib_io_which(tool, check) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // recursive when check=true
-        if (check) {
-            const result = yield lib_io_which(tool, false);
-            if (!result) {
-                if (lib_io_util_IS_WINDOWS) {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.`);
-                }
-                else {
-                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
-                }
-            }
-            return result;
-        }
-        const matches = yield lib_io_findInPath(tool);
-        if (matches && matches.length > 0) {
-            return matches[0];
-        }
-        return '';
-    });
-}
-/**
- * Returns a list of all occurrences of the given tool on the system path.
- *
- * @returns   Promise<string[]>  the paths of the tool
- */
-function lib_io_findInPath(tool) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        if (!tool) {
-            throw new Error("parameter 'tool' is required");
-        }
-        // build the list of extensions to try
-        const extensions = [];
-        if (lib_io_util_IS_WINDOWS && process.env['PATHEXT']) {
-            for (const extension of process.env['PATHEXT'].split(external_path_.delimiter)) {
-                if (extension) {
-                    extensions.push(extension);
-                }
-            }
-        }
-        // if it's rooted, return it if exists. otherwise return empty.
-        if (lib_io_util_isRooted(tool)) {
-            const filePath = yield lib_io_util_tryGetExecutablePath(tool, extensions);
-            if (filePath) {
-                return [filePath];
-            }
-            return [];
-        }
-        // if any path separators, return empty
-        if (tool.includes(external_path_.sep)) {
-            return [];
-        }
-        // build the list of directories
-        //
-        // Note, technically "where" checks the current directory on Windows. From a toolkit perspective,
-        // it feels like we should not do this. Checking the current directory seems like more of a use
-        // case of a shell, and the which() function exposed by the toolkit should strive for consistency
-        // across platforms.
-        const directories = [];
-        if (process.env.PATH) {
-            for (const p of process.env.PATH.split(external_path_.delimiter)) {
-                if (p) {
-                    directories.push(p);
-                }
-            }
-        }
-        // find all matches
-        const matches = [];
-        for (const directory of directories) {
-            const filePath = yield lib_io_util_tryGetExecutablePath(external_path_.join(directory, tool), extensions);
-            if (filePath) {
-                matches.push(filePath);
-            }
-        }
-        return matches;
-    });
-}
-function lib_io_readCopyOptions(options) {
-    const force = options.force == null ? true : options.force;
-    const recursive = Boolean(options.recursive);
-    const copySourceDirectory = options.copySourceDirectory == null
-        ? true
-        : Boolean(options.copySourceDirectory);
-    return { force, recursive, copySourceDirectory };
-}
-function lib_io_cpDirRecursive(sourceDir, destDir, currentDepth, force) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        // Ensure there is not a run away recursive copy
-        if (currentDepth >= 255)
-            return;
-        currentDepth++;
-        yield lib_io_mkdirP(destDir);
-        const files = yield lib_io_util_readdir(sourceDir);
-        for (const fileName of files) {
-            const srcFile = `${sourceDir}/${fileName}`;
-            const destFile = `${destDir}/${fileName}`;
-            const srcFileStat = yield lib_io_util_lstat(srcFile);
-            if (srcFileStat.isDirectory()) {
-                // Recurse
-                yield lib_io_cpDirRecursive(srcFile, destFile, currentDepth, force);
-            }
-            else {
-                yield io_lib_io_copyFile(srcFile, destFile, force);
-            }
-        }
-        // Change the mode for the newly created directory
-        yield lib_io_util_chmod(destDir, (yield lib_io_util_stat(sourceDir)).mode);
-    });
-}
-// Buffered file copy
-function io_lib_io_copyFile(srcFile, destFile, force) {
-    return io_lib_io_awaiter(this, void 0, void 0, function* () {
-        if ((yield lib_io_util_lstat(srcFile)).isSymbolicLink()) {
-            // unlink/re-link it
-            try {
-                yield lib_io_util_lstat(destFile);
-                yield lib_io_util_unlink(destFile);
-            }
-            catch (e) {
-                // Try to override file permission
-                if (e.code === 'EPERM') {
-                    yield lib_io_util_chmod(destFile, '0666');
-                    yield lib_io_util_unlink(destFile);
-                }
-                // other errors = it doesn't exist, no work to do
-            }
-            // Copy over symlink
-            const symlinkFull = yield lib_io_util_readlink(srcFile);
-            yield lib_io_util_symlink(symlinkFull, destFile, lib_io_util_IS_WINDOWS ? 'junction' : null);
-        }
-        else if (!(yield lib_io_util_exists(destFile)) || force) {
-            yield lib_io_util_copyFile(srcFile, destFile);
-        }
-    });
-}
-//# sourceMappingURL=io.js.map
 // EXTERNAL MODULE: ./node_modules/@actions/tool-cache/node_modules/semver/index.js
 var tool_cache_node_modules_semver = __nccwpck_require__(885);
 ;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/lib/manifest.js
@@ -101954,11 +99051,11 @@ const _internal = {
         const lsbReleaseFile = '/etc/lsb-release';
         const osReleaseFile = '/etc/os-release';
         let contents = '';
-        if (external_fs_.existsSync(lsbReleaseFile)) {
-            contents = external_fs_.readFileSync(lsbReleaseFile).toString();
+        if (external_fs_namespaceObject.existsSync(lsbReleaseFile)) {
+            contents = external_fs_namespaceObject.readFileSync(lsbReleaseFile).toString();
         }
-        else if (external_fs_.existsSync(osReleaseFile)) {
-            contents = external_fs_.readFileSync(osReleaseFile).toString();
+        else if (external_fs_namespaceObject.existsSync(osReleaseFile)) {
+            contents = external_fs_namespaceObject.readFileSync(osReleaseFile).toString();
         }
         return contents;
     }
@@ -102039,674 +99136,6 @@ function _readLinuxVersionFile() {
     return _internal.readLinuxVersionFile();
 }
 //# sourceMappingURL=manifest.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/node_modules/@actions/exec/lib/toolrunner.js
-var exec_lib_toolrunner_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-
-
-
-
-
-/* eslint-disable @typescript-eslint/unbound-method */
-const exec_lib_toolrunner_IS_WINDOWS = process.platform === 'win32';
-/*
- * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
- */
-class lib_toolrunner_ToolRunner extends external_events_.EventEmitter {
-    constructor(toolPath, args, options) {
-        super();
-        if (!toolPath) {
-            throw new Error("Parameter 'toolPath' cannot be null or empty.");
-        }
-        this.toolPath = toolPath;
-        this.args = args || [];
-        this.options = options || {};
-    }
-    _debug(message) {
-        if (this.options.listeners && this.options.listeners.debug) {
-            this.options.listeners.debug(message);
-        }
-    }
-    _getCommandString(options, noPrefix) {
-        const toolPath = this._getSpawnFileName();
-        const args = this._getSpawnArgs(options);
-        let cmd = noPrefix ? '' : '[command]'; // omit prefix when piped to a second tool
-        if (exec_lib_toolrunner_IS_WINDOWS) {
-            // Windows + cmd file
-            if (this._isCmdFile()) {
-                cmd += toolPath;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows + verbatim
-            else if (options.windowsVerbatimArguments) {
-                cmd += `"${toolPath}"`;
-                for (const a of args) {
-                    cmd += ` ${a}`;
-                }
-            }
-            // Windows (regular)
-            else {
-                cmd += this._windowsQuoteCmdArg(toolPath);
-                for (const a of args) {
-                    cmd += ` ${this._windowsQuoteCmdArg(a)}`;
-                }
-            }
-        }
-        else {
-            // OSX/Linux - this can likely be improved with some form of quoting.
-            // creating processes on Unix is fundamentally different than Windows.
-            // on Unix, execvp() takes an arg array.
-            cmd += toolPath;
-            for (const a of args) {
-                cmd += ` ${a}`;
-            }
-        }
-        return cmd;
-    }
-    _processLineBuffer(data, strBuffer, onLine) {
-        try {
-            let s = strBuffer + data.toString();
-            let n = s.indexOf(external_os_.EOL);
-            while (n > -1) {
-                const line = s.substring(0, n);
-                onLine(line);
-                // the rest of the string ...
-                s = s.substring(n + external_os_.EOL.length);
-                n = s.indexOf(external_os_.EOL);
-            }
-            return s;
-        }
-        catch (err) {
-            // streaming lines to console is best effort.  Don't fail a build.
-            this._debug(`error processing line. Failed with error ${err}`);
-            return '';
-        }
-    }
-    _getSpawnFileName() {
-        if (exec_lib_toolrunner_IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                return process.env['COMSPEC'] || 'cmd.exe';
-            }
-        }
-        return this.toolPath;
-    }
-    _getSpawnArgs(options) {
-        if (exec_lib_toolrunner_IS_WINDOWS) {
-            if (this._isCmdFile()) {
-                let argline = `/D /S /C "${this._windowsQuoteCmdArg(this.toolPath)}`;
-                for (const a of this.args) {
-                    argline += ' ';
-                    argline += options.windowsVerbatimArguments
-                        ? a
-                        : this._windowsQuoteCmdArg(a);
-                }
-                argline += '"';
-                return [argline];
-            }
-        }
-        return this.args;
-    }
-    _endsWith(str, end) {
-        return str.endsWith(end);
-    }
-    _isCmdFile() {
-        const upperToolPath = this.toolPath.toUpperCase();
-        return (this._endsWith(upperToolPath, '.CMD') ||
-            this._endsWith(upperToolPath, '.BAT'));
-    }
-    _windowsQuoteCmdArg(arg) {
-        // for .exe, apply the normal quoting rules that libuv applies
-        if (!this._isCmdFile()) {
-            return this._uvQuoteCmdArg(arg);
-        }
-        // otherwise apply quoting rules specific to the cmd.exe command line parser.
-        // the libuv rules are generic and are not designed specifically for cmd.exe
-        // command line parser.
-        //
-        // for a detailed description of the cmd.exe command line parser, refer to
-        // http://stackoverflow.com/questions/4094699/how-does-the-windows-command-interpreter-cmd-exe-parse-scripts/7970912#7970912
-        // need quotes for empty arg
-        if (!arg) {
-            return '""';
-        }
-        // determine whether the arg needs to be quoted
-        const cmdSpecialChars = [
-            ' ',
-            '\t',
-            '&',
-            '(',
-            ')',
-            '[',
-            ']',
-            '{',
-            '}',
-            '^',
-            '=',
-            ';',
-            '!',
-            "'",
-            '+',
-            ',',
-            '`',
-            '~',
-            '|',
-            '<',
-            '>',
-            '"'
-        ];
-        let needsQuotes = false;
-        for (const char of arg) {
-            if (cmdSpecialChars.some(x => x === char)) {
-                needsQuotes = true;
-                break;
-            }
-        }
-        // short-circuit if quotes not needed
-        if (!needsQuotes) {
-            return arg;
-        }
-        // the following quoting rules are very similar to the rules that by libuv applies.
-        //
-        // 1) wrap the string in quotes
-        //
-        // 2) double-up quotes - i.e. " => ""
-        //
-        //    this is different from the libuv quoting rules. libuv replaces " with \", which unfortunately
-        //    doesn't work well with a cmd.exe command line.
-        //
-        //    note, replacing " with "" also works well if the arg is passed to a downstream .NET console app.
-        //    for example, the command line:
-        //          foo.exe "myarg:""my val"""
-        //    is parsed by a .NET console app into an arg array:
-        //          [ "myarg:\"my val\"" ]
-        //    which is the same end result when applying libuv quoting rules. although the actual
-        //    command line from libuv quoting rules would look like:
-        //          foo.exe "myarg:\"my val\""
-        //
-        // 3) double-up slashes that precede a quote,
-        //    e.g.  hello \world    => "hello \world"
-        //          hello\"world    => "hello\\""world"
-        //          hello\\"world   => "hello\\\\""world"
-        //          hello world\    => "hello world\\"
-        //
-        //    technically this is not required for a cmd.exe command line, or the batch argument parser.
-        //    the reasons for including this as a .cmd quoting rule are:
-        //
-        //    a) this is optimized for the scenario where the argument is passed from the .cmd file to an
-        //       external program. many programs (e.g. .NET console apps) rely on the slash-doubling rule.
-        //
-        //    b) it's what we've been doing previously (by deferring to node default behavior) and we
-        //       haven't heard any complaints about that aspect.
-        //
-        // note, a weakness of the quoting rules chosen here, is that % is not escaped. in fact, % cannot be
-        // escaped when used on the command line directly - even though within a .cmd file % can be escaped
-        // by using %%.
-        //
-        // the saving grace is, on the command line, %var% is left as-is if var is not defined. this contrasts
-        // the line parsing rules within a .cmd file, where if var is not defined it is replaced with nothing.
-        //
-        // one option that was explored was replacing % with ^% - i.e. %var% => ^%var^%. this hack would
-        // often work, since it is unlikely that var^ would exist, and the ^ character is removed when the
-        // variable is used. the problem, however, is that ^ is not removed when %* is used to pass the args
-        // to an external program.
-        //
-        // an unexplored potential solution for the % escaping problem, is to create a wrapper .cmd file.
-        // % can be escaped within a .cmd file.
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\'; // double the slash
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '"'; // double the quote
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _uvQuoteCmdArg(arg) {
-        // Tool runner wraps child_process.spawn() and needs to apply the same quoting as
-        // Node in certain cases where the undocumented spawn option windowsVerbatimArguments
-        // is used.
-        //
-        // Since this function is a port of quote_cmd_arg from Node 4.x (technically, lib UV,
-        // see https://github.com/nodejs/node/blob/v4.x/deps/uv/src/win/process.c for details),
-        // pasting copyright notice from Node within this function:
-        //
-        //      Copyright Joyent, Inc. and other Node contributors. All rights reserved.
-        //
-        //      Permission is hereby granted, free of charge, to any person obtaining a copy
-        //      of this software and associated documentation files (the "Software"), to
-        //      deal in the Software without restriction, including without limitation the
-        //      rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-        //      sell copies of the Software, and to permit persons to whom the Software is
-        //      furnished to do so, subject to the following conditions:
-        //
-        //      The above copyright notice and this permission notice shall be included in
-        //      all copies or substantial portions of the Software.
-        //
-        //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        //      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        //      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        //      AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        //      LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-        //      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-        //      IN THE SOFTWARE.
-        if (!arg) {
-            // Need double quotation for empty argument
-            return '""';
-        }
-        if (!arg.includes(' ') && !arg.includes('\t') && !arg.includes('"')) {
-            // No quotation needed
-            return arg;
-        }
-        if (!arg.includes('"') && !arg.includes('\\')) {
-            // No embedded double quotes or backslashes, so I can just wrap
-            // quote marks around the whole thing.
-            return `"${arg}"`;
-        }
-        // Expected input/output:
-        //   input : hello"world
-        //   output: "hello\"world"
-        //   input : hello""world
-        //   output: "hello\"\"world"
-        //   input : hello\world
-        //   output: hello\world
-        //   input : hello\\world
-        //   output: hello\\world
-        //   input : hello\"world
-        //   output: "hello\\\"world"
-        //   input : hello\\"world
-        //   output: "hello\\\\\"world"
-        //   input : hello world\
-        //   output: "hello world\\" - note the comment in libuv actually reads "hello world\"
-        //                             but it appears the comment is wrong, it should be "hello world\\"
-        let reverse = '"';
-        let quoteHit = true;
-        for (let i = arg.length; i > 0; i--) {
-            // walk the string in reverse
-            reverse += arg[i - 1];
-            if (quoteHit && arg[i - 1] === '\\') {
-                reverse += '\\';
-            }
-            else if (arg[i - 1] === '"') {
-                quoteHit = true;
-                reverse += '\\';
-            }
-            else {
-                quoteHit = false;
-            }
-        }
-        reverse += '"';
-        return reverse.split('').reverse().join('');
-    }
-    _cloneExecOptions(options) {
-        options = options || {};
-        const result = {
-            cwd: options.cwd || process.cwd(),
-            env: options.env || process.env,
-            silent: options.silent || false,
-            windowsVerbatimArguments: options.windowsVerbatimArguments || false,
-            failOnStdErr: options.failOnStdErr || false,
-            ignoreReturnCode: options.ignoreReturnCode || false,
-            delay: options.delay || 10000
-        };
-        result.outStream = options.outStream || process.stdout;
-        result.errStream = options.errStream || process.stderr;
-        return result;
-    }
-    _getSpawnOptions(options, toolPath) {
-        options = options || {};
-        const result = {};
-        result.cwd = options.cwd;
-        result.env = options.env;
-        result['windowsVerbatimArguments'] =
-            options.windowsVerbatimArguments || this._isCmdFile();
-        if (options.windowsVerbatimArguments) {
-            result.argv0 = `"${toolPath}"`;
-        }
-        return result;
-    }
-    /**
-     * Exec a tool.
-     * Output will be streamed to the live console.
-     * Returns promise with return code
-     *
-     * @param     tool     path to tool to exec
-     * @param     options  optional exec options.  See ExecOptions
-     * @returns   number
-     */
-    exec() {
-        return exec_lib_toolrunner_awaiter(this, void 0, void 0, function* () {
-            // root the tool path if it is unrooted and contains relative pathing
-            if (!lib_io_util_isRooted(this.toolPath) &&
-                (this.toolPath.includes('/') ||
-                    (exec_lib_toolrunner_IS_WINDOWS && this.toolPath.includes('\\')))) {
-                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
-                this.toolPath = external_path_.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
-            }
-            // if the tool is only a file name, then resolve it from the PATH
-            // otherwise verify it exists (add extension on Windows if necessary)
-            this.toolPath = yield lib_io_which(this.toolPath, true);
-            return new Promise((resolve, reject) => exec_lib_toolrunner_awaiter(this, void 0, void 0, function* () {
-                this._debug(`exec tool: ${this.toolPath}`);
-                this._debug('arguments:');
-                for (const arg of this.args) {
-                    this._debug(`   ${arg}`);
-                }
-                const optionsNonNull = this._cloneExecOptions(this.options);
-                if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                    optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + external_os_.EOL);
-                }
-                const state = new lib_toolrunner_ExecState(optionsNonNull, this.toolPath);
-                state.on('debug', (message) => {
-                    this._debug(message);
-                });
-                if (this.options.cwd && !(yield lib_io_util_exists(this.options.cwd))) {
-                    return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
-                }
-                const fileName = this._getSpawnFileName();
-                const cp = external_child_process_.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
-                let stdbuffer = '';
-                if (cp.stdout) {
-                    cp.stdout.on('data', (data) => {
-                        if (this.options.listeners && this.options.listeners.stdout) {
-                            this.options.listeners.stdout(data);
-                        }
-                        if (!optionsNonNull.silent && optionsNonNull.outStream) {
-                            optionsNonNull.outStream.write(data);
-                        }
-                        stdbuffer = this._processLineBuffer(data, stdbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.stdline) {
-                                this.options.listeners.stdline(line);
-                            }
-                        });
-                    });
-                }
-                let errbuffer = '';
-                if (cp.stderr) {
-                    cp.stderr.on('data', (data) => {
-                        state.processStderr = true;
-                        if (this.options.listeners && this.options.listeners.stderr) {
-                            this.options.listeners.stderr(data);
-                        }
-                        if (!optionsNonNull.silent &&
-                            optionsNonNull.errStream &&
-                            optionsNonNull.outStream) {
-                            const s = optionsNonNull.failOnStdErr
-                                ? optionsNonNull.errStream
-                                : optionsNonNull.outStream;
-                            s.write(data);
-                        }
-                        errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
-                            if (this.options.listeners && this.options.listeners.errline) {
-                                this.options.listeners.errline(line);
-                            }
-                        });
-                    });
-                }
-                cp.on('error', (err) => {
-                    state.processError = err.message;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    state.CheckComplete();
-                });
-                cp.on('exit', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    this._debug(`Exit code ${code} received from tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                cp.on('close', (code) => {
-                    state.processExitCode = code;
-                    state.processExited = true;
-                    state.processClosed = true;
-                    this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
-                    state.CheckComplete();
-                });
-                state.on('done', (error, exitCode) => {
-                    if (stdbuffer.length > 0) {
-                        this.emit('stdline', stdbuffer);
-                    }
-                    if (errbuffer.length > 0) {
-                        this.emit('errline', errbuffer);
-                    }
-                    cp.removeAllListeners();
-                    if (error) {
-                        reject(error);
-                    }
-                    else {
-                        resolve(exitCode);
-                    }
-                });
-                if (this.options.input) {
-                    if (!cp.stdin) {
-                        throw new Error('child process missing stdin');
-                    }
-                    cp.stdin.end(this.options.input);
-                }
-            }));
-        });
-    }
-}
-/**
- * Convert an arg string to an array of args. Handles escaping
- *
- * @param    argString   string of arguments
- * @returns  string[]    array of arguments
- */
-function lib_toolrunner_argStringToArray(argString) {
-    const args = [];
-    let inQuotes = false;
-    let escaped = false;
-    let arg = '';
-    function append(c) {
-        // we only escape double quotes.
-        if (escaped && c !== '"') {
-            arg += '\\';
-        }
-        arg += c;
-        escaped = false;
-    }
-    for (let i = 0; i < argString.length; i++) {
-        const c = argString.charAt(i);
-        if (c === '"') {
-            if (!escaped) {
-                inQuotes = !inQuotes;
-            }
-            else {
-                append(c);
-            }
-            continue;
-        }
-        if (c === '\\' && escaped) {
-            append(c);
-            continue;
-        }
-        if (c === '\\' && inQuotes) {
-            escaped = true;
-            continue;
-        }
-        if (c === ' ' && !inQuotes) {
-            if (arg.length > 0) {
-                args.push(arg);
-                arg = '';
-            }
-            continue;
-        }
-        append(c);
-    }
-    if (arg.length > 0) {
-        args.push(arg.trim());
-    }
-    return args;
-}
-class lib_toolrunner_ExecState extends external_events_.EventEmitter {
-    constructor(options, toolPath) {
-        super();
-        this.processClosed = false; // tracks whether the process has exited and stdio is closed
-        this.processError = '';
-        this.processExitCode = 0;
-        this.processExited = false; // tracks whether the process has exited
-        this.processStderr = false; // tracks whether stderr was written to
-        this.delay = 10000; // 10 seconds
-        this.done = false;
-        this.timeout = null;
-        if (!toolPath) {
-            throw new Error('toolPath must not be empty');
-        }
-        this.options = options;
-        this.toolPath = toolPath;
-        if (options.delay) {
-            this.delay = options.delay;
-        }
-    }
-    CheckComplete() {
-        if (this.done) {
-            return;
-        }
-        if (this.processClosed) {
-            this._setResult();
-        }
-        else if (this.processExited) {
-            this.timeout = (0,external_timers_.setTimeout)(lib_toolrunner_ExecState.HandleTimeout, this.delay, this);
-        }
-    }
-    _debug(message) {
-        this.emit('debug', message);
-    }
-    _setResult() {
-        // determine whether there is an error
-        let error;
-        if (this.processExited) {
-            if (this.processError) {
-                error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
-            }
-            else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
-                error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
-            }
-            else if (this.processStderr && this.options.failOnStdErr) {
-                error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
-            }
-        }
-        // clear the timeout
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-            this.timeout = null;
-        }
-        this.done = true;
-        this.emit('done', error, this.processExitCode);
-    }
-    static HandleTimeout(state) {
-        if (state.done) {
-            return;
-        }
-        if (!state.processClosed && state.processExited) {
-            const message = `The STDIO streams did not close within ${state.delay / 1000} seconds of the exit event from process '${state.toolPath}'. This may indicate a child process inherited the STDIO streams and has not yet exited.`;
-            state._debug(message);
-        }
-        state._setResult();
-    }
-}
-//# sourceMappingURL=toolrunner.js.map
-;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/node_modules/@actions/exec/lib/exec.js
-var exec_lib_exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-
-/**
- * Exec a command.
- * Output will be streamed to the live console.
- * Returns promise with return code
- *
- * @param     commandLine        command to execute (can include additional args). Must be correctly escaped.
- * @param     args               optional arguments for tool. Escaping is handled by the lib.
- * @param     options            optional exec options.  See ExecOptions
- * @returns   Promise<number>    exit code
- */
-function exec_lib_exec_exec(commandLine, args, options) {
-    return exec_lib_exec_awaiter(this, void 0, void 0, function* () {
-        const commandArgs = lib_toolrunner_argStringToArray(commandLine);
-        if (commandArgs.length === 0) {
-            throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
-        }
-        // Path to tool to execute should be first arg
-        const toolPath = commandArgs[0];
-        args = commandArgs.slice(1).concat(args || []);
-        const runner = new lib_toolrunner_ToolRunner(toolPath, args, options);
-        return runner.exec();
-    });
-}
-/**
- * Exec a command and get the output.
- * Output will be streamed to the live console.
- * Returns promise with the exit code and collected stdout and stderr
- *
- * @param     commandLine           command to execute (can include additional args). Must be correctly escaped.
- * @param     args                  optional arguments for tool. Escaping is handled by the lib.
- * @param     options               optional exec options.  See ExecOptions
- * @returns   Promise<ExecOutput>   exit code, stdout, and stderr
- */
-function lib_exec_getExecOutput(commandLine, args, options) {
-    return exec_lib_exec_awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
-        let stdout = '';
-        let stderr = '';
-        //Using string decoder covers the case where a mult-byte character is split
-        const stdoutDecoder = new StringDecoder('utf8');
-        const stderrDecoder = new StringDecoder('utf8');
-        const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
-        const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
-        const stdErrListener = (data) => {
-            stderr += stderrDecoder.write(data);
-            if (originalStdErrListener) {
-                originalStdErrListener(data);
-            }
-        };
-        const stdOutListener = (data) => {
-            stdout += stdoutDecoder.write(data);
-            if (originalStdoutListener) {
-                originalStdoutListener(data);
-            }
-        };
-        const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield exec_lib_exec_exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
-        //flush any remaining characters
-        stdout += stdoutDecoder.end();
-        stderr += stderrDecoder.end();
-        return {
-            exitCode,
-            stdout,
-            stderr
-        };
-    });
-}
-//# sourceMappingURL=exec.js.map
 ;// CONCATENATED MODULE: ./node_modules/@actions/tool-cache/lib/retry-helper.js
 var retry_helper_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -102814,7 +99243,7 @@ const userAgent = 'actions/tool-cache';
 function downloadTool(url, dest, auth, headers) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
         dest = dest || external_path_.join(_getTempDirectory(), external_crypto_namespaceObject.randomUUID());
-        yield lib_io_mkdirP(external_path_.dirname(dest));
+        yield mkdirP(external_path_.dirname(dest));
         core_debug(`Downloading ${url}`);
         core_debug(`Destination ${dest}`);
         const maxAttempts = 3;
@@ -102839,7 +99268,7 @@ function downloadTool(url, dest, auth, headers) {
 }
 function downloadToolAttempt(url, dest, auth, headers) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
-        if (external_fs_.existsSync(dest)) {
+        if (external_fs_namespaceObject.existsSync(dest)) {
             throw new Error(`Destination file path ${dest} already exists`);
         }
         // Get the response headers
@@ -102865,7 +99294,7 @@ function downloadToolAttempt(url, dest, auth, headers) {
         const readStream = responseMessageFactory();
         let succeeded = false;
         try {
-            yield pipeline(readStream, external_fs_.createWriteStream(dest));
+            yield pipeline(readStream, external_fs_namespaceObject.createWriteStream(dest));
             core_debug('download complete');
             succeeded = true;
             return dest;
@@ -102875,7 +99304,7 @@ function downloadToolAttempt(url, dest, auth, headers) {
             if (!succeeded) {
                 core_debug('download failed');
                 try {
-                    yield lib_io_rmRF(dest);
+                    yield rmRF(dest);
                 }
                 catch (err) {
                     core_debug(`Failed to delete '${dest}'. ${err.message}`);
@@ -102975,7 +99404,7 @@ function tool_cache_extractTar(file_1, dest_1) {
         // Determine whether GNU tar
         core_debug('Checking tar --version');
         let versionOutput = '';
-        yield exec_lib_exec_exec('tar --version', [], {
+        yield exec_exec('tar --version', [], {
             ignoreReturnCode: true,
             silent: true,
             listeners: {
@@ -103011,7 +99440,7 @@ function tool_cache_extractTar(file_1, dest_1) {
             args.push('--overwrite');
         }
         args.push('-C', destArg, '-f', fileArg);
-        yield exec_lib_exec_exec(`tar`, args);
+        yield exec_exec(`tar`, args);
         return dest;
     });
 }
@@ -103071,7 +99500,7 @@ function extractZipWin(file, dest) {
         // build the powershell command
         const escapedFile = file.replace(/'/g, "''").replace(/"|\n|\r/g, ''); // double-up single quotes, remove double quotes and newlines
         const escapedDest = dest.replace(/'/g, "''").replace(/"|\n|\r/g, '');
-        const pwshPath = yield lib_io_which('pwsh', false);
+        const pwshPath = yield which('pwsh', false);
         //To match the file overwrite behavior on nix systems, we use the overwrite = true flag for ExtractToDirectory
         //and the -Force flag for Expand-Archive as a fallback
         if (pwshPath) {
@@ -103092,7 +99521,7 @@ function extractZipWin(file, dest) {
                 pwshCommand
             ];
             core_debug(`Using pwsh at path: ${pwshPath}`);
-            yield exec_lib_exec_exec(`"${pwshPath}"`, args);
+            yield exec_exec(`"${pwshPath}"`, args);
         }
         else {
             const powershellCommand = [
@@ -103111,21 +99540,21 @@ function extractZipWin(file, dest) {
                 '-Command',
                 powershellCommand
             ];
-            const powershellPath = yield lib_io_which('powershell', true);
+            const powershellPath = yield which('powershell', true);
             core_debug(`Using powershell at path: ${powershellPath}`);
-            yield exec_lib_exec_exec(`"${powershellPath}"`, args);
+            yield exec_exec(`"${powershellPath}"`, args);
         }
     });
 }
 function extractZipNix(file, dest) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
-        const unzipPath = yield lib_io_which('unzip', true);
+        const unzipPath = yield which('unzip', true);
         const args = [file];
         if (!isDebug()) {
             args.unshift('-q');
         }
         args.unshift('-o'); //overwrite with -o, otherwise a prompt is shown which freezes the run
-        yield exec_lib_exec_exec(`"${unzipPath}"`, args, { cwd: dest });
+        yield exec_exec(`"${unzipPath}"`, args, { cwd: dest });
     });
 }
 /**
@@ -103142,16 +99571,16 @@ function cacheDir(sourceDir, tool, version, arch) {
         arch = arch || external_os_.arch();
         core_debug(`Caching tool ${tool} ${version} ${arch}`);
         core_debug(`source dir: ${sourceDir}`);
-        if (!external_fs_.statSync(sourceDir).isDirectory()) {
+        if (!external_fs_namespaceObject.statSync(sourceDir).isDirectory()) {
             throw new Error('sourceDir is not a directory');
         }
         // Create the tool dir
         const destPath = yield _createToolPath(tool, version, arch);
         // copy each child item. do not move. move can fail on Windows
         // due to anti-virus software having an open handle on a file.
-        for (const itemName of external_fs_.readdirSync(sourceDir)) {
+        for (const itemName of external_fs_namespaceObject.readdirSync(sourceDir)) {
             const s = external_path_.join(sourceDir, itemName);
-            yield io_lib_io_cp(s, destPath, { recursive: true });
+            yield io_cp(s, destPath, { recursive: true });
         }
         // write .complete
         _completeToolPath(tool, version, arch);
@@ -103216,7 +99645,7 @@ function find(toolName, versionSpec, arch) {
         versionSpec = tool_cache_node_modules_semver.clean(versionSpec) || '';
         const cachePath = external_path_.join(_getCacheDirectory(), toolName, versionSpec, arch);
         core_debug(`checking cache: ${cachePath}`);
-        if (external_fs_.existsSync(cachePath) && external_fs_.existsSync(`${cachePath}.complete`)) {
+        if (external_fs_namespaceObject.existsSync(cachePath) && external_fs_namespaceObject.existsSync(`${cachePath}.complete`)) {
             core_debug(`Found tool in cache ${toolName} ${versionSpec} ${arch}`);
             toolPath = cachePath;
         }
@@ -103236,12 +99665,12 @@ function findAllVersions(toolName, arch) {
     const versions = [];
     arch = arch || external_os_.arch();
     const toolPath = external_path_.join(_getCacheDirectory(), toolName);
-    if (external_fs_.existsSync(toolPath)) {
-        const children = external_fs_.readdirSync(toolPath);
+    if (external_fs_namespaceObject.existsSync(toolPath)) {
+        const children = external_fs_namespaceObject.readdirSync(toolPath);
         for (const child of children) {
             if (isExplicitVersion(child)) {
                 const fullPath = external_path_.join(toolPath, child, arch || '');
-                if (external_fs_.existsSync(fullPath) && external_fs_.existsSync(`${fullPath}.complete`)) {
+                if (external_fs_namespaceObject.existsSync(fullPath) && external_fs_namespaceObject.existsSync(`${fullPath}.complete`)) {
                     versions.push(child);
                 }
             }
@@ -103298,7 +99727,7 @@ function _createExtractFolder(dest) {
             // create a temp dir
             dest = external_path_.join(_getTempDirectory(), external_crypto_namespaceObject.randomUUID());
         }
-        yield lib_io_mkdirP(dest);
+        yield mkdirP(dest);
         return dest;
     });
 }
@@ -103307,16 +99736,16 @@ function _createToolPath(tool, version, arch) {
         const folderPath = external_path_.join(_getCacheDirectory(), tool, tool_cache_node_modules_semver.clean(version) || version, arch || '');
         core_debug(`destination ${folderPath}`);
         const markerPath = `${folderPath}.complete`;
-        yield lib_io_rmRF(folderPath);
-        yield lib_io_rmRF(markerPath);
-        yield lib_io_mkdirP(folderPath);
+        yield rmRF(folderPath);
+        yield rmRF(markerPath);
+        yield mkdirP(folderPath);
         return folderPath;
     });
 }
 function _completeToolPath(tool, version, arch) {
     const folderPath = external_path_.join(_getCacheDirectory(), tool, tool_cache_node_modules_semver.clean(version) || version, arch || '');
     const markerPath = `${folderPath}.complete`;
-    external_fs_.writeFileSync(markerPath, '');
+    external_fs_namespaceObject.writeFileSync(markerPath, '');
     core_debug('finished caching tool');
 }
 /**
@@ -103411,7 +99840,7 @@ async function setupMSYS2(msystem, packages) {
         return;
     const pkgList = packages.map((pkg) => msys2PkgName(msystem, pkg)).join(" ");
     info(`Installing MSYS2 packages (${msystem}): ${pkgList}`);
-    await lib_exec.exec("C:\\msys64\\usr\\bin\\bash.exe", [
+    await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", [
         "-lc",
         `pacman -S --noconfirm --needed ${pkgList}`,
     ]);
@@ -103541,7 +99970,7 @@ async function win32_resolveInstalledVersion() {
     let stdout = "";
     const tool = "gfortran";
     try {
-        await lib_exec.exec(tool, ["-dumpversion"], {
+        await exec_exec(tool, ["-dumpversion"], {
             silent: true,
             listeners: { stdout: (data) => (stdout += data.toString()) },
         });
@@ -103622,13 +100051,13 @@ async function debian_installDebian(inputs) {
     const ONEAPI_ROOT = "/opt/intel/oneapi";
     const cacheKey = `oneapi-ifx-${version}`;
     const cachePaths = [ONEAPI_ROOT];
-    if (!external_fs_.existsSync(ONEAPI_ROOT)) {
-        external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
+    if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
+        external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
     const cacheHit = await restoreCache(cachePaths, cacheKey);
     if (!cacheHit) {
         info("Adding Intel oneAPI apt repository...");
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             [
                 `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
@@ -103636,11 +100065,11 @@ async function debian_installDebian(inputs) {
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
         ]);
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await lib_exec.exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
+        await exec_exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
         const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
         const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
         const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) => version.startsWith(y))
@@ -103665,7 +100094,7 @@ async function debian_installDebian(inputs) {
     const setVarsScript = "/opt/intel/oneapi/setvars.sh";
     info(`Sourcing ${setVarsScript} and exporting environment...`);
     let envOutput = "";
-    await lib_exec.exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
+    await exec_exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -103694,7 +100123,7 @@ async function debian_installDebian(inputs) {
 }
 async function aptInstallWithRetry(args, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await lib_exec.exec("sudo", ["apt-get", ...args], {
+        const exitCode = await exec_exec("sudo", ["apt-get", ...args], {
             ignoreReturnCode: true,
         });
         if (exitCode === 0)
@@ -103708,7 +100137,7 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
 }
 async function debian_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("ifx", ["--version"], {
+    await exec_exec("ifx", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -103850,8 +100279,8 @@ async function win32_installWin32(inputs) {
     info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
     const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
     const cachePaths = [ONEAPI_ROOT];
-    if (!external_fs_.existsSync(ONEAPI_ROOT)) {
-        external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
+    if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
+        external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
     let cacheHit;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -103881,7 +100310,7 @@ async function win32_installWin32(inputs) {
     }
     // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_and_dump.bat");
-    external_fs_.writeFileSync(batFile, [
+    external_fs_namespaceObject.writeFileSync(batFile, [
         `@echo off`,
         `:: 1. Find MSVC Installation Path via vswhere`,
         `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
@@ -103893,7 +100322,7 @@ async function win32_installWin32(inputs) {
         `set`,
     ].join("\r\n"));
     let envOutput = "";
-    await lib_exec.exec("cmd", ["/C", batFile], {
+    await exec_exec("cmd", ["/C", batFile], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -103934,7 +100363,7 @@ async function win32_installWin32(inputs) {
 }
 async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await lib_exec.exec(`"${installerPath}"`, [
+        const exitCode = await exec_exec(`"${installerPath}"`, [
             "-s",
             "-a",
             "--silent",
@@ -103960,7 +100389,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
 async function ifx_win32_resolveInstalledVersion() {
     const versionCommand = process.platform === OS.Windows ? "/what" : "--version";
     let output = "";
-    await lib_exec.exec("ifx", [versionCommand], {
+    await exec_exec("ifx", [versionCommand], {
         ignoreReturnCode: true,
         listeners: {
             stdout: (data) => {
@@ -104028,14 +100457,14 @@ async function ifort_debian_installDebian(inputs) {
     const bundle = entry.bundle;
     const ONEAPI_ROOT = "/opt/intel/oneapi";
     const ONEAPI_CACHE_PATHS = [ONEAPI_ROOT];
-    if (!external_fs_.existsSync(ONEAPI_ROOT)) {
-        external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
+    if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
+        external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
     const cacheKey = `oneapi-ifort-${bundle}`;
     const cacheHit = await restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
     if (!cacheHit) {
         info("Adding Intel oneAPI apt repository...");
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             [
                 `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
@@ -104043,11 +100472,11 @@ async function ifort_debian_installDebian(inputs) {
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
         ]);
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await lib_exec.exec("sudo", [
+        await exec_exec("sudo", [
             "apt-get",
             "update",
             "-y",
@@ -104064,7 +100493,7 @@ async function ifort_debian_installDebian(inputs) {
             : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
         const cppPkg = `${cppPkgBase}-${bundle}`;
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-        await lib_exec.exec("sudo", [
+        await exec_exec("sudo", [
             "apt-get",
             "install",
             "-y",
@@ -104080,7 +100509,7 @@ async function ifort_debian_installDebian(inputs) {
     const setVarsScript = "/opt/intel/oneapi/setvars.sh";
     info(`Sourcing ${setVarsScript} and exporting environment...`);
     let envOutput = "";
-    await lib_exec.exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
+    await exec_exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -104117,7 +100546,7 @@ async function ifort_debian_installDebian(inputs) {
 }
 async function ifort_debian_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("ifort", ["--version"], {
+    await exec_exec("ifort", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -104198,7 +100627,7 @@ async function downloadInstaller(url, destPath) {
         }
     }
     warning("tc.downloadTool failed after all attempts. Falling back to curl...");
-    await lib_exec.exec("curl", [
+    await exec_exec("curl", [
         "-sS",
         "-L",
         "--retry",
@@ -104230,11 +100659,11 @@ async function darwin_installDarwin(inputs) {
     const cachePaths = [darwin_ONEAPI_ROOT];
     // 1. Ensure directory exists AND set ownership to current runner user
     // (Prevents gtar extraction failure during cache restoration)
-    if (!external_fs_.existsSync(darwin_ONEAPI_ROOT)) {
-        await lib_exec.exec("sudo", ["mkdir", "-p", darwin_ONEAPI_ROOT]);
+    if (!external_fs_namespaceObject.existsSync(darwin_ONEAPI_ROOT)) {
+        await exec_exec("sudo", ["mkdir", "-p", darwin_ONEAPI_ROOT]);
     }
     const currentUser = process.env.USER ?? "runner";
-    await lib_exec.exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
+    await exec_exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
     // 2. Restore from cache if present
     const cacheHit = await restoreCache(cachePaths, cacheKey);
     if (cacheHit) {
@@ -104247,7 +100676,7 @@ async function darwin_installDarwin(inputs) {
         const mountPoint = "/Volumes/Intel_oneAPI_Installer";
         try {
             info("Mounting DMG...");
-            await lib_exec.exec("hdiutil", [
+            await exec_exec("hdiutil", [
                 "attach",
                 dmgPath,
                 "-mountpoint",
@@ -104256,14 +100685,14 @@ async function darwin_installDarwin(inputs) {
                 "-nobrowse",
             ]);
             let installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "bootstrapper");
-            if (!external_fs_.existsSync(installScript)) {
+            if (!external_fs_namespaceObject.existsSync(installScript)) {
                 installScript = external_path_default().join(mountPoint, "bootstrapper.app", "Contents", "MacOS", "install.sh");
             }
-            if (!external_fs_.existsSync(installScript)) {
+            if (!external_fs_namespaceObject.existsSync(installScript)) {
                 installScript = external_path_default().join(mountPoint, "install.sh");
             }
             info(`Running silent install via ${installScript}...`);
-            await lib_exec.exec("sudo", [
+            await exec_exec("sudo", [
                 installScript,
                 "-s",
                 "--action",
@@ -104280,14 +100709,14 @@ async function darwin_installDarwin(inputs) {
         }
         finally {
             info("Unmounting DMG...");
-            await lib_exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
+            await exec_exec("hdiutil", ["detach", mountPoint, "-force"], {
                 ignoreReturnCode: true,
             });
         }
     }
     info(`Sourcing ${SETVARS_SH} and exporting environment...`);
     let envOutput = "";
-    await lib_exec.exec("bash", ["-c", `source "${SETVARS_SH}" --force && env`], {
+    await exec_exec("bash", ["-c", `source "${SETVARS_SH}" --force && env`], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -104316,7 +100745,7 @@ async function darwin_installDarwin(inputs) {
 }
 async function ifort_darwin_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("ifort", ["--version"], {
+    await exec_exec("ifort", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -104398,8 +100827,8 @@ async function ifort_win32_installWin32(inputs) {
     info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
     const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
     const cachePaths = [win32_ONEAPI_ROOT];
-    if (!external_fs_.existsSync(win32_ONEAPI_ROOT)) {
-        external_fs_.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
+    if (!external_fs_namespaceObject.existsSync(win32_ONEAPI_ROOT)) {
+        external_fs_namespaceObject.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
     }
     const cacheHit = await restoreCache(cachePaths, cacheKey);
     if (cacheHit) {
@@ -104409,7 +100838,7 @@ async function ifort_win32_installWin32(inputs) {
         info(`Downloading ifort installer...`);
         const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
         info("Running silent install (this may take several minutes)...");
-        await lib_exec.exec(`"${installerPath}"`, [
+        await exec_exec(`"${installerPath}"`, [
             "-s",
             "-a",
             "--silent",
@@ -104423,7 +100852,7 @@ async function ifort_win32_installWin32(inputs) {
     }
     // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
-    external_fs_.writeFileSync(batFile, [
+    external_fs_namespaceObject.writeFileSync(batFile, [
         `@echo off`,
         `:: 1. Find MSVC Installation Path via vswhere`,
         `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
@@ -104435,7 +100864,7 @@ async function ifort_win32_installWin32(inputs) {
         `set`,
     ].join("\r\n"));
     let envOutput = "";
-    await lib_exec.exec("cmd", ["/C", batFile], {
+    await exec_exec("cmd", ["/C", batFile], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -104476,7 +100905,7 @@ async function ifort_win32_installWin32(inputs) {
 }
 async function ifort_win32_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("ifort", ["/what"], {
+    await exec_exec("ifort", ["/what"], {
         ignoreReturnCode: true,
         listeners: {
             stdout: (data) => {
@@ -104626,7 +101055,7 @@ function compareNvhpcVersions(a, b) {
 async function execWithRetry(command, args, maxRetries = 5, delayMs = 5000) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            await lib_exec.exec(command, args);
+            await exec_exec(command, args);
             return;
         }
         catch (error) {
@@ -104639,7 +101068,7 @@ async function execWithRetry(command, args, maxRetries = 5, delayMs = 5000) {
     }
 }
 async function needsLegacyNcursesInstall() {
-    const result = await lib_exec.getExecOutput("dpkg-query", ["-W", "-f=${Status}", "libncursesw5", "libtinfo5"], { ignoreReturnCode: true });
+    const result = await getExecOutput("dpkg-query", ["-W", "-f=${Status}", "libncursesw5", "libtinfo5"], { ignoreReturnCode: true });
     const installedCount = (result.stdout.match(/install ok installed/g) ?? [])
         .length;
     return installedCount < 2;
@@ -104664,7 +101093,7 @@ async function installLegacyNcurses(inputs) {
     let ncursesUrl = "";
     try {
         let dirListing = "";
-        await lib_exec.exec("curl", [...CURL_RETRY_ARGS, baseUrl], {
+        await exec_exec("curl", [...CURL_RETRY_ARGS, baseUrl], {
             listeners: { stdout: (data) => (dirListing += data.toString()) },
         });
         const tinfoRegex = new RegExp(`href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
@@ -104691,9 +101120,9 @@ async function installLegacyNcurses(inputs) {
         const debFile = external_path_.basename(url);
         const dest = external_path_.join(external_os_.tmpdir(), debFile);
         info(`Downloading ${pkgName}...`);
-        await lib_exec.exec("curl", [...CURL_RETRY_ARGS, "-o", dest, url]);
+        await exec_exec("curl", [...CURL_RETRY_ARGS, "-o", dest, url]);
         info(`Installing ${debFile} via dpkg...`);
-        await lib_exec.exec("sudo", ["dpkg", "-i", dest]);
+        await exec_exec("sudo", ["dpkg", "-i", dest]);
     }
 }
 async function nvfortran_debian_installDebian(inputs) {
@@ -104702,7 +101131,7 @@ async function nvfortran_debian_installDebian(inputs) {
     const nvArch = NV_ARCH[inputs.arch];
     info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
     info("Configuring global APT settings (Force IPv4, Timeouts & Retries)...");
-    await lib_exec.exec("sudo", [
+    await exec_exec("sudo", [
         "bash",
         "-c",
         'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "10";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
@@ -104719,11 +101148,11 @@ async function nvfortran_debian_installDebian(inputs) {
         "s|http://ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
         filePath,
     ];
-    if (external_fs_.existsSync("/etc/apt/sources.list")) {
-        await lib_exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
+    if (external_fs_namespaceObject.existsSync("/etc/apt/sources.list")) {
+        await exec_exec("sudo", replaceMirrors("/etc/apt/sources.list"));
     }
-    if (external_fs_.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
-        await lib_exec.exec("sudo", replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"));
+    if (external_fs_namespaceObject.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
+        await exec_exec("sudo", replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"));
     }
     const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
     const binDir = `${installDir}/compilers/bin`;
@@ -104738,7 +101167,7 @@ async function nvfortran_debian_installDebian(inputs) {
         info("Adding NVIDIA HPC SDK apt repository...");
         const curlCmd = `curl ${CURL_RETRY_ARGS.join(" ")} https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`;
         await execWithRetry("bash", ["-c", curlCmd]);
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
                 ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
@@ -104766,7 +101195,7 @@ async function nvfortran_debian_installDebian(inputs) {
             pkgName,
         ]);
         info("Cleaning up apt archives...");
-        await lib_exec.exec("sudo", ["apt-get", "clean"]);
+        await exec_exec("sudo", ["apt-get", "clean"]);
         info(`Saving nvhpc ${version} to cache...`);
         await cache_saveCache([installDir], cacheKey);
     }
@@ -104786,14 +101215,14 @@ async function nvfortran_debian_installDebian(inputs) {
 }
 async function cleanupDisk() {
     let output = "";
-    await lib_exec.exec("df", ["--output=avail", "-BG", "/"], {
+    await exec_exec("df", ["--output=avail", "-BG", "/"], {
         listeners: { stdout: (data) => (output += data.toString()) },
         silent: true,
     });
     const availGb = parseInt(output.trim().split("\n")[1], 10);
     info(`${availGb.toString()}GB available. Running safe disk cleanup...`);
-    await lib_exec.exec("sudo", ["apt-get", "clean"]);
-    await lib_exec.exec("sudo", ["docker", "image", "prune", "--all", "--force"], {
+    await exec_exec("sudo", ["apt-get", "clean"]);
+    await exec_exec("sudo", ["docker", "image", "prune", "--all", "--force"], {
         ignoreReturnCode: true,
         silent: true,
     });
@@ -104804,10 +101233,10 @@ async function cleanupDisk() {
         "/opt/hostedtoolcache",
     ];
     for (const toolkit of toolkitsToRemove) {
-        if (external_fs_.existsSync(toolkit)) {
+        if (external_fs_namespaceObject.existsSync(toolkit)) {
             info(`Removing ${toolkit} to free up disk space...`);
             try {
-                await lib_exec.exec("sudo", ["rm", "-rf", toolkit], { silent: true });
+                await exec_exec("sudo", ["rm", "-rf", toolkit], { silent: true });
             }
             catch (e) {
                 core_debug(`Failed to remove ${toolkit}: ${String(e)}`);
@@ -104815,7 +101244,7 @@ async function cleanupDisk() {
         }
     }
     output = "";
-    await lib_exec.exec("df", ["--output=avail", "-BG", "/"], {
+    await exec_exec("df", ["--output=avail", "-BG", "/"], {
         listeners: { stdout: (data) => (output += data.toString()) },
         silent: true,
     });
@@ -104824,7 +101253,7 @@ async function cleanupDisk() {
 }
 async function nvfortran_debian_resolveInstalledVersion() {
     let output = "";
-    await lib_exec.exec("nvfortran", ["--version"], {
+    await exec_exec("nvfortran", ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -104904,11 +101333,11 @@ async function aocc_debian_installDebian(inputs) {
     const cacheHit = await restoreCache([tempInstallDir], cacheKey);
     if (cacheHit) {
         info("Restored from cache, moving to /opt...");
-        await lib_exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
-        await lib_exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
-        await lib_exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
+        await exec_exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
+        await exec_exec("sudo", ["rm", "-rf", metadata.installDir]);
+        await exec_exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
     }
-    else if (!external_fs_.existsSync(metadata.installDir)) {
+    else if (!external_fs_namespaceObject.existsSync(metadata.installDir)) {
         const debPath = external_path_.join(external_os_.tmpdir(), metadata.deb);
         info(`Downloading AOCC ${version} from ${metadata.url}...`);
         // Use tool-cache for resilient HTTP downloading with headers and retries
@@ -104916,17 +101345,17 @@ async function aocc_debian_installDebian(inputs) {
             "User-Agent": "Mozilla/5.0",
         });
         info(`Verifying checksum...`);
-        await lib_exec.exec("bash", [
+        await exec_exec("bash", [
             "-c",
             `echo "${metadata.sha256}  ${debPath}" | sha256sum -c -`,
         ]);
         info(`Installing AOCC ${version}...`);
-        await lib_exec.exec("sudo", ["dpkg", "-i", debPath]);
-        await lib_exec.exec("sudo", ["apt-get", "install", "-f", "-y"]);
+        await exec_exec("sudo", ["dpkg", "-i", debPath]);
+        await exec_exec("sudo", ["apt-get", "install", "-f", "-y"]);
         info(`Saving AOCC ${version} to cache...`);
-        await lib_exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
-        await lib_exec.exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
-        await lib_exec.exec("sudo", [
+        await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
+        await exec_exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
+        await exec_exec("sudo", [
             "chown",
             "-R",
             external_os_.userInfo().username,
@@ -104940,7 +101369,7 @@ async function aocc_debian_installDebian(inputs) {
     const setenvScript = external_path_.join(metadata.installDir, "setenv_AOCC.sh");
     info(`Sourcing ${setenvScript} and exporting environment...`);
     let envOutput = "";
-    await lib_exec.exec("bash", ["-c", `source "${setenvScript}" && env`], {
+    await exec_exec("bash", ["-c", `source "${setenvScript}" && env`], {
         listeners: {
             stdout: (data) => {
                 envOutput += data.toString();
@@ -104973,7 +101402,7 @@ async function aocc_debian_installDebian(inputs) {
 async function aocc_debian_resolveInstalledVersion(binDir) {
     let output = "";
     const flangBinary = external_path_.join(binDir, "flang");
-    await lib_exec.exec(flangBinary, ["--version"], {
+    await exec_exec(flangBinary, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105044,7 +101473,7 @@ function resolveFlangBinaryPath(major, version) {
         `/usr/bin/flang`, // last-resort bare path (15/16 jammy)
     ];
     for (const candidate of candidates) {
-        if (external_fs_.existsSync(candidate)) {
+        if (external_fs_namespaceObject.existsSync(candidate)) {
             info(`Found flang binary at: ${candidate}`);
             return candidate;
         }
@@ -105058,7 +101487,7 @@ async function flang_debian_installDebian(inputs) {
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     // 1. Force IPv4, retries, AND short socket timeouts (10s instead of default 120s)
     info("Configuring global APT settings (IPv4, Retries & 10s Timeouts)...");
-    await lib_exec.exec("sudo", [
+    await exec_exec("sudo", [
         "bash",
         "-c",
         'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "10";\nAcquire::https::Timeout "10";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
@@ -105081,13 +101510,13 @@ async function flang_debian_installDebian(inputs) {
         "/etc/apt/sources.list.d/ubuntu.sources",
     ];
     for (const target of mirrorTargets) {
-        if (external_fs_.existsSync(target)) {
-            await lib_exec.exec("sudo", replaceMirrors(target));
+        if (external_fs_namespaceObject.existsSync(target)) {
+            await exec_exec("sudo", replaceMirrors(target));
         }
     }
     info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
     // Add timeouts to curl so it fails fast if apt.llvm.org drops connection
-    await lib_exec.exec("bash", [
+    await exec_exec("bash", [
         "-c",
         [
             `curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh`,
@@ -105096,7 +101525,7 @@ async function flang_debian_installDebian(inputs) {
     ]);
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
-    await lib_exec.exec("sudo", [
+    await exec_exec("sudo", [
         "apt-get",
         "install",
         "-y",
@@ -105106,7 +101535,7 @@ async function flang_debian_installDebian(inputs) {
     const binaryPath = resolveFlangBinaryPath(major, version);
     if (binaryPath !== "/usr/bin/flang") {
         info(`Registering update-alternatives: /usr/bin/flang -> ${binaryPath}`);
-        await lib_exec.exec("sudo", [
+        await exec_exec("sudo", [
             "update-alternatives",
             "--install",
             "/usr/bin/flang",
@@ -105116,12 +101545,12 @@ async function flang_debian_installDebian(inputs) {
         ]);
     }
     const llvmBinDir = `/usr/lib/llvm-${version}/bin`;
-    if (external_fs_.existsSync(llvmBinDir)) {
+    if (external_fs_namespaceObject.existsSync(llvmBinDir)) {
         addPath(llvmBinDir);
     }
     exportVariable("FLANG_VERSION", major);
     const llvmLibDir = `/usr/lib/llvm-${version}/lib`;
-    if (external_fs_.existsSync(llvmLibDir)) {
+    if (external_fs_namespaceObject.existsSync(llvmLibDir)) {
         const existing = process.env.LIBRARY_PATH ?? "";
         exportVariable("LIBRARY_PATH", existing ? `${llvmLibDir}:${existing}` : llvmLibDir);
     }
@@ -105137,7 +101566,7 @@ async function flang_debian_installDebian(inputs) {
 }
 async function flang_debian_resolveInstalledVersion(fc) {
     let output = "";
-    await lib_exec.exec(fc, ["--version"], {
+    await exec_exec(fc, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105202,7 +101631,7 @@ async function installBrew(inputs) {
     info(`Installing Flang on macOS (${inputs.arch}) via Homebrew...`);
     info(`Note: the Homebrew flang formula is unversioned — the latest available ` +
         `release will be installed regardless of any version input.`);
-    await lib_exec.exec("brew", ["install", "flang"]);
+    await exec_exec("brew", ["install", "flang"]);
     const brewPrefix = await darwin_getBrewPrefix();
     const flangOptDir = external_path_.join(brewPrefix, "opt", "flang");
     const binDir = external_path_.join(flangOptDir, "bin");
@@ -105215,11 +101644,11 @@ async function installBrew(inputs) {
     const libDir = external_path_.join(flangOptDir, "lib");
     const libompDir = external_path_.join(brewPrefix, "opt", "llvm", "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
-    const libPaths = [libDir, libompDir].filter(external_fs_.existsSync).join(":");
+    const libPaths = [libDir, libompDir].filter(external_fs_namespaceObject.existsSync).join(":");
     exportVariable("LIBRARY_PATH", existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths);
     let sdkPath = "";
     try {
-        await lib_exec.exec("xcrun", ["--show-sdk-path"], {
+        await exec_exec("xcrun", ["--show-sdk-path"], {
             listeners: {
                 stdout: (data) => {
                     sdkPath += data.toString().trim();
@@ -105279,7 +101708,7 @@ async function installFromGitHub(inputs, major, patch) {
     exportVariable("FLANG_VERSION", major);
     let sdkPath = "";
     try {
-        await lib_exec.exec("xcrun", ["--show-sdk-path"], {
+        await exec_exec("xcrun", ["--show-sdk-path"], {
             listeners: {
                 stdout: (data) => {
                     sdkPath += data.toString().trim();
@@ -105308,14 +101737,14 @@ async function installFromGitHub(inputs, major, patch) {
 function resolveFlangBinary(binDir) {
     for (const name of ["flang", "flang-new"]) {
         const candidate = external_path_.join(binDir, name);
-        if (external_fs_.existsSync(candidate))
+        if (external_fs_namespaceObject.existsSync(candidate))
             return candidate;
     }
     throw new Error(`Could not find flang binary in ${binDir}. Checked: flang, flang-new.`);
 }
 async function darwin_getBrewPrefix() {
     let output = "";
-    await lib_exec.exec("brew", ["--prefix"], {
+    await exec_exec("brew", ["--prefix"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105326,7 +101755,7 @@ async function darwin_getBrewPrefix() {
 }
 async function flang_darwin_resolveInstalledVersion(flangBin) {
     let output = "";
-    await lib_exec.exec(flangBin, ["--version"], {
+    await exec_exec(flangBin, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105382,7 +101811,7 @@ const WINDOWS_INSTALLER_SUFFIX = {
 async function extractExe(installerPath, destDir) {
     const sevenZip = "C:\\Program Files\\7-Zip\\7z.exe";
     info("Extracting installer with 7-Zip...");
-    await lib_exec.exec(`"${sevenZip}"`, ["x", installerPath, `-o${destDir}`, "-y"]);
+    await exec_exec(`"${sevenZip}"`, ["x", installerPath, `-o${destDir}`, "-y"]);
 }
 // Locates the MSVC toolchain and Windows SDK library directories using vswhere
 // and adds them to the LIB environment variable so flang's linker backend can
@@ -105395,7 +101824,7 @@ async function setupMsvcLibs(arch) {
     info("Locating MSVC and Windows SDK libraries for flang linker...");
     const vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
     let vsInstallPath = "";
-    await lib_exec.exec(`"${vswhere}"`, ["-latest", "-property", "installationPath"], {
+    await exec_exec(`"${vswhere}"`, ["-latest", "-property", "installationPath"], {
         listeners: {
             stdout: (data) => {
                 vsInstallPath += data.toString();
@@ -105410,7 +101839,7 @@ async function setupMsvcLibs(arch) {
     info(`Found Visual Studio at: ${vsInstallPath}`);
     // Find the latest MSVC tools version (e.g. 14.38.33130).
     const vcToolsRoot = external_path_.join(vsInstallPath, "VC", "Tools", "MSVC");
-    const vcVersion = external_fs_.readdirSync(vcToolsRoot)
+    const vcVersion = external_fs_namespaceObject.readdirSync(vcToolsRoot)
         .filter((d) => /^\d+\.\d+\.\d+$/.test(d))
         .sort()
         .reverse()[0];
@@ -105423,7 +101852,7 @@ async function setupMsvcLibs(arch) {
     // Find the latest Windows SDK version under
     // C:\Program Files (x86)\Windows Kits\10\Lib\<version>\{um,ucrt}\<arch>.
     const winsdk10Root = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib";
-    const sdkVersion = external_fs_.readdirSync(winsdk10Root)
+    const sdkVersion = external_fs_namespaceObject.readdirSync(winsdk10Root)
         .filter((d) => /^\d+\.\d+\.\d+\.\d+$/.test(d))
         .sort()
         .reverse()[0];
@@ -105437,7 +101866,7 @@ async function setupMsvcLibs(arch) {
     info(`Windows SDK ucrt dir: ${winsdkUcrtDir}`);
     const existing = process.env.LIB ?? "";
     const libDirs = [msvcLibDir, winsdkUmDir, winsdkUcrtDir]
-        .filter(external_fs_.existsSync)
+        .filter(external_fs_namespaceObject.existsSync)
         .join(";");
     exportVariable("LIB", existing ? `${libDirs};${existing}` : libDirs);
 }
@@ -105476,7 +101905,7 @@ async function win32_installNative(inputs) {
         info(`Downloading ${filename}...`);
         const downloadPath = await downloadTool(downloadUrl);
         const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
-        external_fs_.mkdirSync(tempExtractDir, { recursive: true });
+        external_fs_namespaceObject.mkdirSync(tempExtractDir, { recursive: true });
         await extractExe(downloadPath, tempExtractDir);
         info("Caching...");
         toolRoot = await cacheDir(tempExtractDir, "flang", patch, inputs.arch);
@@ -105529,7 +101958,7 @@ async function win32_installMSYS2(inputs) {
 }
 async function flang_win32_resolveInstalledVersion(flangExe) {
     let output = "";
-    await lib_exec.exec(flangExe, ["--version"], {
+    await exec_exec(flangExe, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105602,7 +102031,7 @@ async function lfortran_debian_installDebian(inputs) {
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
     info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await lib_exec.exec("curl", [
+    await exec_exec("curl", [
         "-fsSL",
         "--retry",
         "3",
@@ -105613,7 +102042,7 @@ async function lfortran_debian_installDebian(inputs) {
         miniforgeUrl,
     ]);
     info(`Installing Miniforge to ${condaPrefix}...`);
-    await lib_exec.exec("bash", [
+    await exec_exec("bash", [
         miniforgeInstaller,
         "-b", // batch mode, no interactive prompts
         "-p",
@@ -105621,9 +102050,9 @@ async function lfortran_debian_installDebian(inputs) {
     ]);
     // Point conda at conda-forge only, to avoid the default channel.
     const condaBin = external_path_.join(condaPrefix, "bin", "conda");
-    await lib_exec.exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
+    await exec_exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
     info(`Installing lfortran==${version} from conda-forge...`);
-    await lib_exec.exec(condaBin, [
+    await exec_exec(condaBin, [
         "install",
         "-y",
         "-c",
@@ -105633,7 +102062,7 @@ async function lfortran_debian_installDebian(inputs) {
     // The lfortran binary lives in the conda prefix's bin directory.
     const lfortranBinDir = external_path_.join(condaPrefix, "bin");
     const lfortranBin = external_path_.join(lfortranBinDir, "lfortran");
-    if (!external_fs_.existsSync(lfortranBin)) {
+    if (!external_fs_namespaceObject.existsSync(lfortranBin)) {
         throw new Error(`lfortran binary not found at expected path: ${lfortranBin}`);
     }
     info(`Found lfortran binary at: ${lfortranBin}`);
@@ -105651,7 +102080,7 @@ async function lfortran_debian_installDebian(inputs) {
 }
 async function lfortran_debian_resolveInstalledVersion(binaryPath) {
     let output = "";
-    await lib_exec.exec(binaryPath, ["--version"], {
+    await exec_exec(binaryPath, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105719,7 +102148,7 @@ async function lfortran_darwin_installDarwin(inputs) {
     const arch = condaArch(inputs.arch);
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
     info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await lib_exec.exec("curl", [
+    await exec_exec("curl", [
         "-fsSL",
         "--retry",
         "3",
@@ -105730,16 +102159,16 @@ async function lfortran_darwin_installDarwin(inputs) {
         miniforgeUrl,
     ]);
     info(`Installing Miniforge to ${condaPrefix}...`);
-    await lib_exec.exec("bash", [
+    await exec_exec("bash", [
         miniforgeInstaller,
         "-b", // batch mode, no interactive prompts
         "-p",
         condaPrefix,
     ]);
     const condaBin = external_path_.join(condaPrefix, "bin", "conda");
-    await lib_exec.exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
+    await exec_exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
     info(`Installing lfortran==${version} from conda-forge...`);
-    await lib_exec.exec(condaBin, [
+    await exec_exec(condaBin, [
         "install",
         "-y",
         "-c",
@@ -105748,7 +102177,7 @@ async function lfortran_darwin_installDarwin(inputs) {
     ]);
     const lfortranBinDir = external_path_.join(condaPrefix, "bin");
     const lfortranBin = external_path_.join(lfortranBinDir, "lfortran");
-    if (!external_fs_.existsSync(lfortranBin)) {
+    if (!external_fs_namespaceObject.existsSync(lfortranBin)) {
         throw new Error(`lfortran binary not found at expected path: ${lfortranBin}`);
     }
     info(`Found lfortran binary at: ${lfortranBin}`);
@@ -105756,7 +102185,7 @@ async function lfortran_darwin_installDarwin(inputs) {
     // (like libxeus-zmq) when run outside of a conda environment.
     const libDir = external_path_.join(condaPrefix, "lib");
     try {
-        await lib_exec.exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+        await exec_exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
     }
     catch (e) {
         core_debug(`install_name_tool failed: ${String(e)}`);
@@ -105770,7 +102199,7 @@ async function lfortran_darwin_installDarwin(inputs) {
     // can find the right SDK headers when compiling generated C/C++ code.
     let sdkPath = "";
     try {
-        await lib_exec.exec("xcrun", ["--show-sdk-path"], {
+        await exec_exec("xcrun", ["--show-sdk-path"], {
             listeners: {
                 stdout: (data) => {
                     sdkPath += data.toString().trim();
@@ -105796,7 +102225,7 @@ async function lfortran_darwin_installDarwin(inputs) {
 }
 async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
     let output = "";
-    await lib_exec.exec(condaBin, ["run", "-p", condaPrefix, "lfortran", "--version"], {
+    await exec_exec(condaBin, ["run", "-p", condaPrefix, "lfortran", "--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -105866,10 +102295,10 @@ async function lfortran_win32_installWin32(inputs) {
 async function installConda(inputs) {
     const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
     const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
-    if (external_fs_.existsSync(gitLink)) {
+    if (external_fs_namespaceObject.existsSync(gitLink)) {
         info("Moving conflicting Git link.exe to link.exe.bak...");
         try {
-            external_fs_.renameSync(gitLink, `${gitLink}.bak`);
+            external_fs_namespaceObject.renameSync(gitLink, `${gitLink}.bak`);
         }
         catch (e) {
             const message = e instanceof Error ? e.message : String(e);
@@ -105882,7 +102311,7 @@ async function installConda(inputs) {
     const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
     const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
     info(`Downloading Miniforge from ${miniforgeUrl}...`);
-    await lib_exec.exec("curl", [
+    await exec_exec("curl", [
         "-fsSL",
         "--retry",
         "3",
@@ -105895,10 +102324,10 @@ async function installConda(inputs) {
     // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
     // install prefix and must be the last argument with no quotes around the path.
     info(`Installing Miniforge to ${condaPrefix}...`);
-    await lib_exec.exec(miniforgeInstaller, ["/S", `/D=${condaPrefix}`]);
+    await exec_exec(miniforgeInstaller, ["/S", `/D=${condaPrefix}`]);
     const condaExe = external_path_.join(condaPrefix, "Scripts", "conda.exe");
     info(`Installing lfortran==${version} from conda-forge...`);
-    await lib_exec.exec(`"${condaExe}"`, [
+    await exec_exec(`"${condaExe}"`, [
         "create",
         "-y",
         "-n",
@@ -105912,7 +102341,7 @@ async function installConda(inputs) {
     const envPrefix = external_path_.join(condaPrefix, "envs", "lfortran");
     const libraryBin = external_path_.join(envPrefix, "Library", "bin");
     const lfortranExe = external_path_.join(libraryBin, "lfortran.exe");
-    if (!external_fs_.existsSync(lfortranExe)) {
+    if (!external_fs_namespaceObject.existsSync(lfortranExe)) {
         throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
     }
     addPath(envPrefix);
@@ -105920,12 +102349,12 @@ async function installConda(inputs) {
     addPath(libraryBin);
     const lldLink = external_path_.join(libraryBin, "lld-link.exe");
     const proxyLink = external_path_.join(libraryBin, "link.exe");
-    if (external_fs_.existsSync(lldLink)) {
-        if (!external_fs_.existsSync(proxyLink)) {
+    if (external_fs_namespaceObject.existsSync(lldLink)) {
+        if (!external_fs_namespaceObject.existsSync(proxyLink)) {
             info("Creating link.exe proxy for lld-link.exe...");
             try {
                 // We copy instead of symlink to avoid potential permission issues on Windows
-                external_fs_.copyFileSync(lldLink, proxyLink);
+                external_fs_namespaceObject.copyFileSync(lldLink, proxyLink);
             }
             catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -105972,7 +102401,7 @@ async function lfortran_win32_installMSYS2(inputs) {
 }
 async function lfortran_win32_resolveInstalledVersion(binaryPath) {
     let output = "";
-    await lib_exec.exec(`"${binaryPath}"`, ["--version"], {
+    await exec_exec(`"${binaryPath}"`, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
