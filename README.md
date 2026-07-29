@@ -45,6 +45,8 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | windows-2025 | windows-2022 |
 |---------|--------------|--------------|--------------|--------------|
 | latest   | ✓ | ✓ | ✓ | ✓ |
+| 2026.1.1 |   |   | ✓ | ✓ |
+| 2026.1.0 | ✓ | ✓ | ✓ | ✓ |
 | 2026.1   | ✓ | ✓ | ✓ | ✓ |
 | 2026.0   | ✓ | ✓ | ✓ | ✓ |
 | 2025.3.3 |   |   | ✓ | ✓ |
