@@ -58,11 +58,8 @@ jobs:
           - { compiler: nvfortran, version: "21.2" }
           - { compiler: nvfortran, version: "21.1" }
           - { compiler: nvfortran, version: "20.11" }
-        exclude:
-          - image: ubuntu-24.04
-            toolchain: { compiler: nvfortran, version: "21.1" } # seems broken
-          - image: ubuntu-22.04
-            toolchain: { compiler: nvfortran, version: "21.1" } # seems broken
+          - { compiler: nvfortran, version: "20.9" }
+          - { compiler: nvfortran, version: "20.7" }
 
     steps:
       - uses: actions/checkout@v7

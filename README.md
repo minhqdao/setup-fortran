@@ -159,8 +159,10 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | 21.5   | ✓ | ✓ | ✓ | ✓ |
 | 21.3   | ✓ | ✓ | ✓ | ✓ |
 | 21.2   | ✓ | ✓ | ✓ | ✓ |
-| 21.1   |   |   | ✓ | ✓ |
+| 21.1   | ✓ | ✓ | ✓ | ✓ |
 | 20.11  | ✓ | ✓ | ✓ | ✓ |
+| 20.9   | ✓ | ✓ | ✓ | ✓ |
+| 20.7   | ✓ | ✓ | ✓ | ✓ |
 
 ---
 

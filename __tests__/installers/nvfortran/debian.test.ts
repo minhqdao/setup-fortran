@@ -154,4 +154,96 @@ describe("installDebian nvfortran", () => {
       cxx: "nvc++",
     });
   });
+
+  it("falls back to the versioned tarball after one apt install failure", async () => {
+    const inputs = { ...baseInputs, version: "26.3" };
+    mockedGetExecOutput.mockImplementation(async (command, args) => ({
+      stdout:
+        command === "dpkg-query"
+          ? "install ok installed install ok installed"
+          : "",
+      stderr: "",
+      exitCode:
+        command === "curl" &&
+        args?.some((arg) => arg.includes("_cuda_13.1.tar.gz"))
+          ? 0
+          : command === "dpkg-query"
+            ? 0
+            : 22,
+    }));
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 26.3-0"));
+      }
+      if (
+        commandLine === "sudo" &&
+        args?.[0] === "apt-get" &&
+        args.includes("nvhpc-26-3")
+      ) {
+        throw new Error("404 Not Found");
+      }
+      return 0;
+    });
+
+    await installDebian(inputs);
+
+    expect(
+      mockedExec.mock.calls.filter(
+        ([command, args]) =>
+          command === "sudo" &&
+          args?.[0] === "apt-get" &&
+          args.includes("nvhpc-26-3"),
+      ),
+    ).toHaveLength(1);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining(
+          "nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
+        ),
+        "https://developer.download.nvidia.com/hpc-sdk/26.3/nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "env",
+        "NVHPC_SILENT=true",
+        "NVHPC_INSTALL_DIR=/opt/nvidia/hpc_sdk",
+        "NVHPC_INSTALL_TYPE=single",
+        expect.stringContaining(
+          "nvhpc_2026_263_Linux_x86_64_cuda_13.1/install",
+        ),
+      ]),
+    );
+  });
+
+  it("uses the CUDA 11.0 Arm tarball directly for version 20.9", async () => {
+    const inputs = {
+      ...baseInputs,
+      version: "20.9",
+      arch: Arch.ARM64,
+    };
+
+    await installDebian(inputs);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "bash",
+      expect.arrayContaining([
+        "-c",
+        expect.stringContaining("nvidia-hpcsdk-archive-keyring"),
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining(
+          "nvhpc_2020_209_Linux_aarch64_cuda_11.0.tar.gz",
+        ),
+        "https://developer.download.nvidia.com/hpc-sdk/20.9/nvhpc_2020_209_Linux_aarch64_cuda_11.0.tar.gz",
+      ]),
+    );
+  });
 });

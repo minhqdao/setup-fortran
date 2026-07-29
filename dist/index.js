@@ -106427,7 +106427,10 @@ const nvfortran_debian_SUPPORTED_VERSIONS = {
         "21.5",
         "21.3",
         "21.2",
+        "21.1",
         "20.11",
+        "20.9",
+        "20.7",
     ],
     [Arch.ARM64]: [
         "26.5",
@@ -106466,6 +106469,8 @@ const nvfortran_debian_SUPPORTED_VERSIONS = {
         "21.2",
         "21.1",
         "20.11",
+        "20.9",
+        "20.7",
     ],
 };
 const APT_ARCH = {
@@ -106477,6 +106482,30 @@ const NV_ARCH = {
     [Arch.ARM64]: "Linux_aarch64",
 };
 const LEGACY_NCURSES_MAX_VERSION = "24.3";
+const CUDA_VERSIONS = [
+    "13.2",
+    "13.1",
+    "13.0",
+    "12.9",
+    "12.8",
+    "12.6",
+    "12.5",
+    "12.4",
+    "12.3",
+    "12.2",
+    "12.1",
+    "12.0",
+    "11.8",
+    "11.7",
+    "11.6",
+    "11.5",
+    "11.4",
+    "11.3",
+    "11.2",
+    "11.1",
+    "11.0",
+    "10.2",
+];
 const CURL_RETRY_ARGS = [
     "-4",
     "-L",
@@ -106571,6 +106600,58 @@ async function installLegacyNcurses(inputs) {
         await exec_exec("sudo", ["dpkg", "-i", dest]);
     }
 }
+async function installTarball(version, inputs) {
+    const year = `20${version.split(".")[0]}`;
+    const compactVersion = version.replace(".", "");
+    const archivePrefix = `nvhpc_${year}_${compactVersion}_${NV_ARCH[inputs.arch]}_cuda_`;
+    let cudaVersion = "11.0";
+    if (compareNvhpcVersions(version, "20.9") > 0) {
+        cudaVersion = await findTarballCudaVersion(version, archivePrefix);
+    }
+    const archiveBase = `${archivePrefix}${cudaVersion}`;
+    const archiveName = `${archiveBase}.tar.gz`;
+    const tempDir = external_fs_.mkdtempSync(external_path_.join(external_os_.tmpdir(), "setup-fortran-nvhpc-"));
+    const archivePath = external_path_.join(tempDir, archiveName);
+    const url = `https://developer.download.nvidia.com/hpc-sdk/${version}/` + archiveName;
+    try {
+        info(`Downloading NVIDIA HPC SDK tarball from ${url}...`);
+        await exec_exec("curl", [
+            ...CURL_RETRY_ARGS,
+            "--retry-max-time",
+            "3600",
+            "--max-time",
+            "3600",
+            "-o",
+            archivePath,
+            url,
+        ]);
+        info(`Extracting ${archiveName}...`);
+        await exec_exec("tar", ["-xzf", archivePath, "-C", tempDir]);
+        const installer = external_path_.join(tempDir, archiveBase, "install");
+        info("Installing NVIDIA HPC SDK from the tarball...");
+        await exec_exec("sudo", [
+            "env",
+            "NVHPC_SILENT=true",
+            "NVHPC_INSTALL_DIR=/opt/nvidia/hpc_sdk",
+            "NVHPC_INSTALL_TYPE=single",
+            installer,
+        ]);
+    }
+    finally {
+        external_fs_.rmSync(tempDir, { recursive: true, force: true });
+    }
+}
+async function findTarballCudaVersion(version, archivePrefix) {
+    for (const cudaVersion of CUDA_VERSIONS) {
+        const url = `https://developer.download.nvidia.com/hpc-sdk/${version}/` +
+            `${archivePrefix}${cudaVersion}.tar.gz`;
+        const result = await getExecOutput("curl", ["-4", "-fsSI", "--connect-timeout", "15", "--max-time", "30", url], { ignoreReturnCode: true, silent: true });
+        if (result.exitCode === 0) {
+            return cudaVersion;
+        }
+    }
+    throw new Error(`Could not locate a single-CUDA NVIDIA HPC SDK ${version} tarball for ${archivePrefix}.`);
+}
 async function nvfortran_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, nvfortran_debian_SUPPORTED_VERSIONS);
     const aptArch = APT_ARCH[inputs.arch];
@@ -106610,36 +106691,48 @@ async function nvfortran_debian_installDebian(inputs) {
     else {
         if (inputs.cleanupDisk)
             await cleanupDisk();
-        info("Adding NVIDIA HPC SDK apt repository...");
-        const curlCmd = `curl ${CURL_RETRY_ARGS.join(" ")} https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`;
-        await execWithRetry("bash", ["-c", curlCmd]);
-        await exec_exec("bash", [
-            "-c",
-            `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
-                ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
-                ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
-        ]);
-        info("Updating apt repositories with retry...");
-        await execWithRetry("sudo", ["apt-get", "update", "-y"]);
         info("Checking if legacy ncurses5 libs are needed...");
         if (compareNvhpcVersions(version, LEGACY_NCURSES_MAX_VERSION) <= 0 &&
             (await needsLegacyNcursesInstall())) {
             info(`nvhpc ${version} requires legacy ncurses5 libs; installing from jammy archive...`);
             await installLegacyNcurses(inputs);
         }
-        const pkgName = `nvhpc-${version.replace(".", "-")}`;
-        info(`Installing apt package ${pkgName} with retry...`);
-        await execWithRetry("sudo", [
-            "apt-get",
-            "install",
-            "-y",
-            "--no-install-recommends",
-            "-o",
-            "Dpkg::Options::=--force-confdef",
-            "-o",
-            "Dpkg::Options::=--force-confold",
-            pkgName,
-        ]);
+        if (compareNvhpcVersions(version, "20.11") < 0) {
+            info(`NVIDIA did not publish ${version} in its apt repository; using the tarball installer.`);
+            await installTarball(version, inputs);
+        }
+        else {
+            const pkgName = `nvhpc-${version.replace(".", "-")}`;
+            try {
+                info("Adding NVIDIA HPC SDK apt repository...");
+                const curlCmd = `curl ${CURL_RETRY_ARGS.join(" ")} https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg`;
+                await execWithRetry("bash", ["-c", curlCmd]);
+                await exec_exec("bash", [
+                    "-c",
+                    `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
+                        ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
+                        ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
+                ]);
+                info("Updating apt repositories with retry...");
+                await execWithRetry("sudo", ["apt-get", "update", "-y"]);
+                info(`Installing apt package ${pkgName}...`);
+                await exec_exec("sudo", [
+                    "apt-get",
+                    "install",
+                    "-y",
+                    "--no-install-recommends",
+                    "-o",
+                    "Dpkg::Options::=--force-confdef",
+                    "-o",
+                    "Dpkg::Options::=--force-confold",
+                    pkgName,
+                ]);
+            }
+            catch (aptErr) {
+                warning(`APT installation failed for ${pkgName} (${String(aptErr)}). Falling back to NVIDIA's versioned tarball installer...`);
+                await installTarball(version, inputs);
+            }
+        }
         info("Cleaning up apt archives...");
         await exec_exec("sudo", ["apt-get", "clean"]);
         info(`Saving nvhpc ${version} to cache...`);
