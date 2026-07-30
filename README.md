@@ -45,6 +45,8 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | Version | ubuntu-24.04 | ubuntu-22.04 | windows-2025 | windows-2022 |
 |---------|--------------|--------------|--------------|--------------|
 | latest   | ✓ | ✓ | ✓ | ✓ |
+| 2026.1.1 |   |   | ✓ | ✓ |
+| 2026.1.0 | ✓ | ✓ | ✓ | ✓ |
 | 2026.1   | ✓ | ✓ | ✓ | ✓ |
 | 2026.0   | ✓ | ✓ | ✓ | ✓ |
 | 2025.3.3 |   |   | ✓ | ✓ |
@@ -159,8 +161,10 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | 21.5   | ✓ | ✓ | ✓ | ✓ |
 | 21.3   | ✓ | ✓ | ✓ | ✓ |
 | 21.2   | ✓ | ✓ | ✓ | ✓ |
-| 21.1   |   |   | ✓ | ✓ |
+| 21.1   | ✓ | ✓ | ✓ | ✓ |
 | 20.11  | ✓ | ✓ | ✓ | ✓ |
+| 20.9   | ✓ | ✓ | ✓ | ✓ |
+| 20.7   | ✓ | ✓ | ✓ | ✓ |
 
 ---
 
@@ -296,7 +300,11 @@ GitHub Actions run the code straight from the `dist` folder. To bundle the conte
 
 The integration tests are bundled, cached and executed in the CI, so you do not need to run `npm run build:integration-test` locally.
 
-You can run `npm run all` to format, lint, run unit tests and bundle the code into the `dist` folder in one go.
+You can run `npm run all` to format, lint, run unit tests, bundle the code
+into the `dist` folder, and smoke-test the generated action in one go. The
+bundle smoke test loads the complete compiled dependency graph without starting
+a compiler installation, catching dependencies that bundle successfully but
+fail during Node.js startup.
 
 ## Reporting
 
