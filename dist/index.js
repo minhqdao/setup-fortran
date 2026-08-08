@@ -103909,6 +103909,7 @@ const Compiler = {
     AOCC: "aocc",
     Flang: "flang",
     LFortran: "lfortran",
+    ArmFlang: "armflang",
 };
 const OS = {
     Linux: "linux",
@@ -107970,6 +107971,324 @@ async function installLFortran(inputs) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/installers/armflang/debian.ts
+
+
+
+
+
+
+
+
+
+const armflang_debian_SUPPORTED_VERSIONS = {
+    [Arch.X64]: undefined,
+    [Arch.ARM64]: ["22.1", "21.1", "20.1"],
+};
+const PACKAGE = "arm-toolchain-for-linux";
+const ARM_ROOT = "/opt/arm";
+const INSTALL_DIR = "/opt/arm/arm-toolchain-for-linux";
+const debian_CURL_RETRY_ARGS = [
+    "-4",
+    "-L",
+    "--retry",
+    "5",
+    "--retry-delay",
+    "5",
+    "--retry-max-time",
+    "300",
+    "--retry-connrefused",
+    "--connect-timeout",
+    "30",
+    "--max-time",
+    "600",
+    "-fsSL",
+];
+const debian_APT_ACQUIRE_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=120",
+    "-o",
+    "Acquire::https::Timeout=120",
+    "-o",
+    "Acquire::Retries=5",
+    "-o",
+    "DPkg::Lock::Timeout=120",
+];
+function ubuntuRepository(osVersion) {
+    if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
+        return { release: "24", codename: "noble" };
+    }
+    if (osVersion.includes("22.04") || osVersion.includes("ubuntu22")) {
+        return { release: "22", codename: "jammy" };
+    }
+    throw new Error(`ArmFlang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
+}
+function computeSha256(filePath) {
+    const fileBuffer = external_fs_.readFileSync(filePath);
+    return external_crypto_.createHash("sha256").update(fileBuffer).digest("hex");
+}
+function parseRepositoryPackageMetadata(packagesIndex) {
+    const normalizedIndex = packagesIndex.replace(/\r\n/g, "\n");
+    const stanza = normalizedIndex
+        .split(/\n\s*\n/)
+        .find((entry) => /^Package: arm-toolchains-repository$/m.test(entry));
+    const filename = stanza?.match(/^Filename: (.+)$/m)?.[1]?.trim();
+    const sha256 = stanza?.match(/^SHA256: ([a-f0-9]{64})$/m)?.[1]?.trim();
+    if (!filename ||
+        !/^pool\/arm-toolchains-repository_[A-Za-z0-9.+:~_-]+_all\.deb$/.test(filename) ||
+        !sha256) {
+        throw new Error("Could not resolve valid Arm repository package metadata from the package index.");
+    }
+    return { filename, sha256 };
+}
+async function configureCurrentRepository(codename) {
+    const repositoryBaseUrl = "https://developer.arm.com/packages/arm-toolchains/ubuntu";
+    const packagesIndexPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${codename}-Packages`);
+    let repositoryPackagePath;
+    try {
+        await exec_exec("curl", [
+            ...debian_CURL_RETRY_ARGS,
+            "-o",
+            packagesIndexPath,
+            `${repositoryBaseUrl}/dists/${codename}/main/binary-arm64/Packages`,
+        ]);
+        const metadata = parseRepositoryPackageMetadata(external_fs_.readFileSync(packagesIndexPath, "utf8"));
+        repositoryPackagePath = external_path_.join(external_os_.tmpdir(), external_path_.basename(metadata.filename));
+        await exec_exec("curl", [
+            ...debian_CURL_RETRY_ARGS,
+            "-o",
+            repositoryPackagePath,
+            `${repositoryBaseUrl}/${metadata.filename}`,
+        ]);
+        const actualChecksum = computeSha256(repositoryPackagePath);
+        if (actualChecksum !== metadata.sha256) {
+            throw new Error(`Checksum verification failed for ${external_path_.basename(repositoryPackagePath)}. ` +
+                `Expected ${metadata.sha256}, got ${actualChecksum}.`);
+        }
+        await exec_exec("sudo", ["dpkg", "-i", repositoryPackagePath]);
+    }
+    finally {
+        external_fs_.rmSync(packagesIndexPath, { force: true });
+        if (repositoryPackagePath) {
+            external_fs_.rmSync(repositoryPackagePath, { force: true });
+        }
+    }
+}
+async function availablePackageVersion(version) {
+    const output = await getExecOutput("apt-cache", ["madison", PACKAGE]);
+    const versions = output.stdout
+        .split("\n")
+        .map((line) => line.split("|").at(1)?.trim() ?? "")
+        .filter((candidate) => candidate.length > 0);
+    const match = versions.find((candidate) => candidate === version ||
+        candidate.startsWith(`${version}-`) ||
+        candidate.startsWith(`${version}.`));
+    if (!match) {
+        throw new Error(`ArmFlang ${version} is not available from the configured Arm repository. ` +
+            `Available package versions: ${versions.join(", ") || "none"}`);
+    }
+    return match;
+}
+async function aptGetWithRetry(args, maxAttempts = 3) {
+    const execOptions = {
+        ignoreReturnCode: true,
+        env: {
+            ...process.env,
+            DEBIAN_FRONTEND: "noninteractive",
+        },
+    };
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("sudo", ["apt-get", ...debian_APT_ACQUIRE_OPTS, ...args], execOptions);
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get ${args[0] ?? "command"} failed after ${maxAttempts.toString()} attempts ` +
+                `with exit code ${exitCode.toString()}.`);
+        }
+        const delayMs = attempt * 10_000;
+        warning(`apt-get ${args[0] ?? "command"} failed ` +
+            `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
+            `Retrying in ${(delayMs / 1000).toString()} seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+}
+function findLibraryDirectories(baseDir) {
+    const results = [];
+    if (!external_fs_.existsSync(baseDir))
+        return results;
+    const candidateDirs = [
+        external_path_.join(baseDir, "lib"),
+        external_path_.join(baseDir, "lib64"),
+    ];
+    for (const candidate of candidateDirs) {
+        if (external_fs_.existsSync(candidate)) {
+            results.push(candidate);
+        }
+    }
+    try {
+        const entries = external_fs_.readdirSync(baseDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const subLib = external_path_.join(baseDir, entry.name, "lib");
+                const subLib64 = external_path_.join(baseDir, entry.name, "lib64");
+                if (external_fs_.existsSync(subLib))
+                    results.push(subLib);
+                if (external_fs_.existsSync(subLib64))
+                    results.push(subLib64);
+            }
+        }
+    }
+    catch {
+        // Ignore unreadable subdirectories
+    }
+    return Array.from(new Set(results));
+}
+function exportEnvVariable(name, value) {
+    exportVariable(name, value);
+    process.env[name] = value;
+}
+function prependEnvPath(name, newPaths) {
+    if (newPaths.length === 0)
+        return;
+    const existingValue = process.env[name];
+    const existing = existingValue ? existingValue.split(external_path_.delimiter) : [];
+    const combined = Array.from(new Set([...newPaths, ...existing])).filter(Boolean);
+    const result = combined.join(external_path_.delimiter);
+    exportEnvVariable(name, result);
+}
+async function restoreInstallationFromCache(cacheDir) {
+    info("Restoring Arm Toolchain and ArmPL under /opt/arm...");
+    await exec_exec("sudo", ["mkdir", "-p", ARM_ROOT]);
+    await exec_exec("sudo", ["cp", "-a", `${cacheDir}/.`, ARM_ROOT]);
+}
+async function stageInstallationForCache(cacheDir) {
+    info("Staging Arm Toolchain and ArmPL for caching...");
+    await exec_exec("sudo", ["rm", "-rf", cacheDir]);
+    await exec_exec("sudo", ["mkdir", "-p", cacheDir]);
+    await exec_exec("sudo", ["cp", "-a", `${ARM_ROOT}/.`, cacheDir]);
+    await exec_exec("sudo", ["chown", "-R", external_os_.userInfo().username, cacheDir]);
+}
+async function armflang_debian_installDebian(inputs) {
+    const version = resolveVersion(inputs, armflang_debian_SUPPORTED_VERSIONS);
+    const repository = ubuntuRepository(inputs.osVersion);
+    const legacyBaseUrl = `https://developer.arm.com/packages/arm-toolchains:ubuntu-${repository.release}` +
+        `/${repository.codename}`;
+    const keyring = "/usr/share/keyrings/obs-oss-arm-com.gpg";
+    const sourceList = "/etc/apt/sources.list.d/obs-oss-arm-com.list";
+    const cacheDir = external_path_.join(external_os_.homedir(), ".armflang-cache");
+    const cacheKey = `armflang-${version}-${inputs.arch}-${inputs.osVersion}`;
+    info(`Installing ArmFlang ${version} on Linux (${inputs.arch})...`);
+    const binDir = external_path_.join(INSTALL_DIR, "bin");
+    const fc = external_path_.join(binDir, "armflang");
+    const cc = external_path_.join(binDir, "armclang");
+    const cxx = external_path_.join(binDir, "armclang++");
+    const cacheHit = await cache.restoreCache([cacheDir], cacheKey);
+    let isCacheValid = false;
+    if (cacheHit) {
+        await restoreInstallationFromCache(cacheDir);
+        const libDirs = findLibraryDirectories(ARM_ROOT);
+        const hasArmMath = libDirs.some((dir) => external_fs_.existsSync(external_path_.join(dir, "libamath.so")) ||
+            external_fs_.existsSync(external_path_.join(dir, "libamath.a")));
+        isCacheValid = [fc, cc, cxx].every((binary) => external_fs_.existsSync(binary));
+        if (!hasArmMath) {
+            warning("Cached ArmPL installation does not contain libamath.");
+            isCacheValid = false;
+        }
+    }
+    if (isCacheValid) {
+        info(`Cache hit for ${cacheKey}; skipping package download.`);
+    }
+    else {
+        if (cacheHit) {
+            warning(`Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`);
+        }
+        await aptGetWithRetry(["update", "-y"]);
+        await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
+        if (version === "22.1") {
+            await configureCurrentRepository(repository.codename);
+        }
+        else {
+            const releaseKeyPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${repository.codename}-Release.key`);
+            try {
+                await exec_exec("curl", [
+                    ...debian_CURL_RETRY_ARGS,
+                    "-o",
+                    releaseKeyPath,
+                    `${legacyBaseUrl}/Release.key`,
+                ]);
+                await exec_exec("sudo", [
+                    "gpg",
+                    "--dearmor",
+                    "--yes",
+                    "-o",
+                    keyring,
+                    releaseKeyPath,
+                ]);
+            }
+            finally {
+                external_fs_.rmSync(releaseKeyPath, { force: true });
+            }
+            await exec_exec("sudo", [
+                "sh",
+                "-c",
+                `echo "deb [signed-by=${keyring}] ${legacyBaseUrl}/ ./" > "${sourceList}"`,
+            ]);
+        }
+        await aptGetWithRetry(["update", "-y"]);
+        const packageVersion = await availablePackageVersion(version);
+        await aptGetWithRetry([
+            "install",
+            "-y",
+            "--no-install-recommends",
+            "--fix-missing",
+            `${PACKAGE}=${packageVersion}`,
+        ]);
+        await stageInstallationForCache(cacheDir);
+        try {
+            await cache.saveCache([cacheDir], cacheKey);
+        }
+        catch (err) {
+            warning(`Failed to save ArmFlang installation to cache: ${err.message}`);
+        }
+    }
+    for (const binary of [fc, cc, cxx]) {
+        if (!external_fs_.existsSync(binary)) {
+            throw new Error(`Expected Arm Toolchain binary was not found: ${binary}`);
+        }
+    }
+    // 1. Add binary path
+    addPath(binDir);
+    prependEnvPath("PATH", [binDir]);
+    // ArmFlang links libamath automatically; ArmPL is a sibling under /opt/arm.
+    const libDirs = findLibraryDirectories(ARM_ROOT);
+    prependEnvPath("LIBRARY_PATH", libDirs);
+    prependEnvPath("LD_LIBRARY_PATH", libDirs);
+    let installedVersion = "";
+    await exec_exec(fc, ["--version"], {
+        listeners: {
+            stdout: (data) => {
+                installedVersion += data.toString();
+            },
+        },
+    });
+    return {
+        version: installedVersion.trim(),
+        fc,
+        cc,
+        cxx,
+    };
+}
+
+;// CONCATENATED MODULE: ./src/installers/armflang/index.ts
+
+
+async function installArmFlang(inputs) {
+    if (inputs.os !== OS.Linux) {
+        throw new Error(`ArmFlang is only supported on Linux ARM64 (got: ${inputs.os} ${inputs.arch})`);
+    }
+    return await armflang_debian_installDebian(inputs);
+}
+
 ;// CONCATENATED MODULE: ./src/installation_result.ts
 
 function exportInstallationVariables(result) {
@@ -107990,6 +108309,7 @@ function setInstallationOutputs(result) {
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
+
 
 
 
@@ -108034,6 +108354,9 @@ async function run() {
                 break;
             case Compiler.LFortran:
                 installationResult = await installLFortran(inputs);
+                break;
+            case Compiler.ArmFlang:
+                installationResult = await installArmFlang(inputs);
                 break;
         }
         setInstallationOutputs(installationResult);

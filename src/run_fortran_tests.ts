@@ -43,6 +43,7 @@ function getCompilerFlags(
     case Compiler.GFortran:
     case Compiler.AOCC:
     case Compiler.Flang:
+    case Compiler.ArmFlang:
       return {
         module: ["-J", "test_build"],
         openmp: ["-fopenmp"],
