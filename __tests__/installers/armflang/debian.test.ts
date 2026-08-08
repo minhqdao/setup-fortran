@@ -17,6 +17,7 @@ jest.mock("os", () => ({
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  readFileSync: jest.fn(),
   rmSync: jest.fn(),
 }));
 
@@ -42,11 +43,26 @@ describe("installDebian (ArmFlang)", () => {
     jest.clearAllMocks();
     mockedFs.existsSync.mockReturnValue(true);
     mockedCache.restoreCache.mockResolvedValue(undefined);
-    mockedGetExecOutput.mockResolvedValue({
-      stdout:
-        " arm-toolchain-for-linux | 22.1.0-123 | https://developer.arm.com\n",
-      stderr: "",
-      exitCode: 0,
+    mockedFs.readFileSync.mockReturnValue(
+      "Package: arm-toolchains-repository\n" +
+        "Version: 2-2~noble\n" +
+        "Filename: pool/arm-toolchains-repository_2-2~noble_all.deb\n" +
+        `SHA256: ${"a".repeat(64)}\n`,
+    );
+    mockedGetExecOutput.mockImplementation(async (command) => {
+      if (command === "sha256sum") {
+        return {
+          stdout: `${"a".repeat(64)}  repository.deb\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout:
+          " arm-toolchain-for-linux | 22.1.0-123 | https://developer.arm.com\n",
+        stderr: "",
+        exitCode: 0,
+      };
     });
     mockedExec.mockImplementation(async (command, args, options) => {
       if (command.endsWith("/armflang") && args?.[0] === "--version") {
@@ -62,7 +78,7 @@ describe("installDebian (ArmFlang)", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining([
-        expect.stringContaining("arm-toolchains-repository_2-1~noble_all.deb"),
+        expect.stringContaining("arm-toolchains-repository_2-2~noble_all.deb"),
       ]),
     );
     expect(mockedExec).toHaveBeenCalledWith(
@@ -189,14 +205,44 @@ describe("installDebian (ArmFlang)", () => {
   });
 
   it("fails when the requested package version is absent", async () => {
-    mockedGetExecOutput.mockResolvedValue({
-      stdout: " arm-toolchain-for-linux | 21.1-81 | repo\n",
-      stderr: "",
-      exitCode: 0,
+    mockedGetExecOutput.mockImplementation(async (command) => {
+      if (command === "sha256sum") {
+        return {
+          stdout: `${"a".repeat(64)}  repository.deb\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout: " arm-toolchain-for-linux | 21.1-81 | repo\n",
+        stderr: "",
+        exitCode: 0,
+      };
     });
 
     await expect(installDebian(inputs)).rejects.toThrow(
       "ArmFlang 22.1 is not available",
+    );
+  });
+
+  it("rejects a repository package with an invalid checksum", async () => {
+    mockedGetExecOutput.mockImplementation(async (command) => {
+      if (command === "sha256sum") {
+        return {
+          stdout: `${"b".repeat(64)}  repository.deb\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return { stdout: "", stderr: "", exitCode: 0 };
+    });
+
+    await expect(installDebian(inputs)).rejects.toThrow(
+      "Checksum verification failed",
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["dpkg", "-i"]),
     );
   });
 });

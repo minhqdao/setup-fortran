@@ -108034,6 +108034,55 @@ async function availablePackageVersion(version) {
     }
     return match;
 }
+function parseRepositoryPackageMetadata(packagesIndex) {
+    const stanza = packagesIndex
+        .split(/\n\s*\n/)
+        .find((entry) => /^Package: arm-toolchains-repository$/m.test(entry));
+    const filename = stanza?.match(/^Filename: (.+)$/m)?.[1]?.trim();
+    const sha256 = stanza?.match(/^SHA256: ([a-f0-9]{64})$/m)?.[1];
+    if (!filename ||
+        !/^pool\/arm-toolchains-repository_[A-Za-z0-9.+:~_-]+_all\.deb$/.test(filename) ||
+        !sha256) {
+        throw new Error("Could not resolve valid Arm repository package metadata from the package index.");
+    }
+    return { filename, sha256 };
+}
+async function configureCurrentRepository(codename) {
+    const repositoryBaseUrl = "https://developer.arm.com/packages/arm-toolchains/ubuntu";
+    const packagesIndexPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${codename}-Packages`);
+    let repositoryPackagePath;
+    try {
+        await exec_exec("curl", [
+            ...debian_CURL_RETRY_ARGS,
+            "-o",
+            packagesIndexPath,
+            `${repositoryBaseUrl}/dists/${codename}/main/binary-arm64/Packages`,
+        ]);
+        const metadata = parseRepositoryPackageMetadata(external_fs_.readFileSync(packagesIndexPath, "utf8"));
+        repositoryPackagePath = external_path_.join(external_os_.tmpdir(), external_path_.basename(metadata.filename));
+        await exec_exec("curl", [
+            ...debian_CURL_RETRY_ARGS,
+            "-o",
+            repositoryPackagePath,
+            `${repositoryBaseUrl}/${metadata.filename}`,
+        ]);
+        const checksumOutput = await getExecOutput("sha256sum", [
+            repositoryPackagePath,
+        ]);
+        const actualChecksum = checksumOutput.stdout.trim().split(/\s+/)[0];
+        if (actualChecksum !== metadata.sha256) {
+            throw new Error(`Checksum verification failed for ${external_path_.basename(repositoryPackagePath)}. ` +
+                `Expected ${metadata.sha256}, got ${actualChecksum || "no checksum"}.`);
+        }
+        await exec_exec("sudo", ["dpkg", "-i", repositoryPackagePath]);
+    }
+    finally {
+        external_fs_.rmSync(packagesIndexPath, { force: true });
+        if (repositoryPackagePath) {
+            external_fs_.rmSync(repositoryPackagePath, { force: true });
+        }
+    }
+}
 async function aptGetWithRetry(args, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const exitCode = await exec_exec("sudo", ["apt-get", ...debian_APT_ACQUIRE_OPTS, ...args], { ignoreReturnCode: true });
@@ -108082,20 +108131,7 @@ async function armflang_debian_installDebian(inputs) {
         await aptGetWithRetry(["update", "-y"]);
         await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
         if (version === "22.1") {
-            const repositoryPackage = `arm-toolchains-repository_2-1~${repository.codename}_all.deb`;
-            const repositoryPackagePath = external_path_.join(external_os_.tmpdir(), repositoryPackage);
-            try {
-                await exec_exec("curl", [
-                    ...debian_CURL_RETRY_ARGS,
-                    "-o",
-                    repositoryPackagePath,
-                    `https://developer.arm.com/packages/arm-toolchains/ubuntu/pool/${repositoryPackage}`,
-                ]);
-                await exec_exec("sudo", ["dpkg", "-i", repositoryPackagePath]);
-            }
-            finally {
-                external_fs_.rmSync(repositoryPackagePath, { force: true });
-            }
+            await configureCurrentRepository(repository.codename);
         }
         else {
             const releaseKeyPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${repository.codename}-Release.key`);
