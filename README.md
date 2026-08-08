@@ -19,7 +19,7 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `compiler` | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`) | `gfortran` |
+| `compiler` | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, `armflang`) | `gfortran` |
 | `version` | Compiler version to install | `latest` |
 | `msystem` | MSYS2 subsystem (`native`, `ucrt64`, `clang64`) | `native` |
 | `cleanup-disk` | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`) | `false` |
@@ -197,7 +197,6 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 
 ---
 
-
 ### `flang` (LLVM Flang)
 
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-11-arm | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
@@ -212,6 +211,19 @@ A GitHub Action to install and configure Fortran compilers across Linux, macOS, 
 | 16      |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
 
 > Specific patch versions (e.g. `21.1.6`) are also accepted on macOS and native Windows runners and are validated against available GitHub releases. If the requested patch does not exist, an error is thrown. Patches aren't specifically tested.
+
+---
+
+### `armflang` (Arm Toolchain for Linux)
+
+| Version | ubuntu-24.04-arm | ubuntu-22.04-arm |
+|---------|------------------|------------------|
+| latest  | ✓ | ✓ |
+| 22.1    | ✓ | ✓ |
+| 21.1    | ✓ | ✓ |
+| 20.1    | ✓ | ✓ |
+
+---
 
 ## Examples
 

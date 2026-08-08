@@ -8,6 +8,7 @@ import { installNVFortran } from "./installers/nvfortran";
 import { installAOCC } from "./installers/aocc";
 import { installFlang } from "./installers/flang";
 import { installLFortran } from "./installers/lfortran";
+import { installArmFlang } from "./installers/armflang";
 import {
   exportInstallationVariables,
   setInstallationOutputs,
@@ -50,6 +51,9 @@ async function run(): Promise<void> {
         break;
       case Compiler.LFortran:
         installationResult = await installLFortran(inputs);
+        break;
+      case Compiler.ArmFlang:
+        installationResult = await installArmFlang(inputs);
         break;
     }
 

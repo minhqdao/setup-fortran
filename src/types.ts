@@ -6,6 +6,7 @@ export const Compiler = {
   AOCC: "aocc",
   Flang: "flang",
   LFortran: "lfortran",
+  ArmFlang: "armflang",
 } as const;
 export type Compiler = (typeof Compiler)[keyof typeof Compiler];
 
