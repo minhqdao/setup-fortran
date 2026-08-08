@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/armflang/debian";
 import { Arch, Compiler, Msystem, OS, type Inputs } from "../../../src/types";
@@ -43,11 +44,19 @@ describe("installDebian (ArmFlang)", () => {
     jest.clearAllMocks();
     mockedFs.existsSync.mockReturnValue(true);
     mockedCache.restoreCache.mockResolvedValue(undefined);
-    mockedFs.readFileSync.mockReturnValue(
-      "Package: arm-toolchains-repository\n" +
-        "Version: 2-2~noble\n" +
-        "Filename: pool/arm-toolchains-repository_2-2~noble_all.deb\n" +
-        `SHA256: ${"a".repeat(64)}\n`,
+    const packageContents = Buffer.from("repository package");
+    const packageChecksum = crypto
+      .createHash("sha256")
+      .update(packageContents)
+      .digest("hex");
+    (mockedFs.readFileSync as jest.Mock).mockImplementation(
+      (_filePath: string, encoding?: string) =>
+        encoding === "utf8"
+          ? "Package: arm-toolchains-repository\n" +
+            "Version: 2-2~noble\n" +
+            "Filename: pool/arm-toolchains-repository_2-2~noble_all.deb\n" +
+            `SHA256: ${packageChecksum}\n`
+          : packageContents,
     );
     mockedGetExecOutput.mockImplementation(async (command) => {
       if (command === "sha256sum") {
@@ -89,7 +98,7 @@ describe("installDebian (ArmFlang)", () => {
         "arm-toolchain-for-linux=22.1.0-123",
         "Acquire::Retries=5",
       ]),
-      { ignoreReturnCode: true },
+      expect.objectContaining({ ignoreReturnCode: true }),
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
@@ -120,7 +129,7 @@ describe("installDebian (ArmFlang)", () => {
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "cp",
       "-a",
-      "/opt/arm/arm-toolchain-for-linux/.",
+      "/opt/arm/.",
       "/home/user/.armflang-cache",
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
@@ -138,7 +147,7 @@ describe("installDebian (ArmFlang)", () => {
       "cp",
       "-a",
       "/home/user/.armflang-cache/.",
-      "/opt/arm/arm-toolchain-for-linux",
+      "/opt/arm",
     ]);
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
     expect(mockedExec).not.toHaveBeenCalledWith(
@@ -226,16 +235,14 @@ describe("installDebian (ArmFlang)", () => {
   });
 
   it("rejects a repository package with an invalid checksum", async () => {
-    mockedGetExecOutput.mockImplementation(async (command) => {
-      if (command === "sha256sum") {
-        return {
-          stdout: `${"b".repeat(64)}  repository.deb\n`,
-          stderr: "",
-          exitCode: 0,
-        };
-      }
-      return { stdout: "", stderr: "", exitCode: 0 };
-    });
+    (mockedFs.readFileSync as jest.Mock).mockImplementation(
+      (_filePath: string, encoding?: string) =>
+        encoding === "utf8"
+          ? "Package: arm-toolchains-repository\n" +
+            "Filename: pool/arm-toolchains-repository_2-2~noble_all.deb\n" +
+            `SHA256: ${"b".repeat(64)}\n`
+          : Buffer.from("repository package"),
+    );
 
     await expect(installDebian(inputs)).rejects.toThrow(
       "Checksum verification failed",

@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -13,7 +14,9 @@ const SUPPORTED_VERSIONS = {
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 const PACKAGE = "arm-toolchain-for-linux";
+const ARM_ROOT = "/opt/arm";
 const INSTALL_DIR = "/opt/arm/arm-toolchain-for-linux";
+
 const CURL_RETRY_ARGS = [
   "-4",
   "-L",
@@ -30,6 +33,7 @@ const CURL_RETRY_ARGS = [
   "600",
   "-fsSL",
 ] as const;
+
 const APT_ACQUIRE_OPTS = [
   "-o",
   "Acquire::http::Timeout=120",
@@ -37,6 +41,8 @@ const APT_ACQUIRE_OPTS = [
   "Acquire::https::Timeout=120",
   "-o",
   "Acquire::Retries=5",
+  "-o",
+  "DPkg::Lock::Timeout=120",
 ] as const;
 
 function ubuntuRepository(osVersion: string): {
@@ -54,25 +60,9 @@ function ubuntuRepository(osVersion: string): {
   );
 }
 
-async function availablePackageVersion(version: string): Promise<string> {
-  const output = await exec.getExecOutput("apt-cache", ["madison", PACKAGE]);
-  const versions = output.stdout
-    .split("\n")
-    .map((line) => line.split("|").at(1)?.trim() ?? "")
-    .filter((candidate) => candidate.length > 0);
-  const match = versions.find(
-    (candidate) =>
-      candidate === version ||
-      candidate.startsWith(`${version}-`) ||
-      candidate.startsWith(`${version}.`),
-  );
-  if (!match) {
-    throw new Error(
-      `ArmFlang ${version} is not available from the configured Arm repository. ` +
-        `Available package versions: ${versions.join(", ") || "none"}`,
-    );
-  }
-  return match;
+function computeSha256(filePath: string): string {
+  const fileBuffer = fs.readFileSync(filePath);
+  return crypto.createHash("sha256").update(fileBuffer).digest("hex");
 }
 
 interface RepositoryPackageMetadata {
@@ -83,11 +73,13 @@ interface RepositoryPackageMetadata {
 function parseRepositoryPackageMetadata(
   packagesIndex: string,
 ): RepositoryPackageMetadata {
-  const stanza = packagesIndex
+  const normalizedIndex = packagesIndex.replace(/\r\n/g, "\n");
+  const stanza = normalizedIndex
     .split(/\n\s*\n/)
     .find((entry) => /^Package: arm-toolchains-repository$/m.test(entry));
+
   const filename = stanza?.match(/^Filename: (.+)$/m)?.[1]?.trim();
-  const sha256 = stanza?.match(/^SHA256: ([a-f0-9]{64})$/m)?.[1];
+  const sha256 = stanza?.match(/^SHA256: ([a-f0-9]{64})$/m)?.[1]?.trim();
 
   if (
     !filename ||
@@ -119,13 +111,16 @@ async function configureCurrentRepository(codename: string): Promise<void> {
       packagesIndexPath,
       `${repositoryBaseUrl}/dists/${codename}/main/binary-arm64/Packages`,
     ]);
+
     const metadata = parseRepositoryPackageMetadata(
       fs.readFileSync(packagesIndexPath, "utf8"),
     );
+
     repositoryPackagePath = path.join(
       os.tmpdir(),
       path.basename(metadata.filename),
     );
+
     await exec.exec("curl", [
       ...CURL_RETRY_ARGS,
       "-o",
@@ -133,16 +128,14 @@ async function configureCurrentRepository(codename: string): Promise<void> {
       `${repositoryBaseUrl}/${metadata.filename}`,
     ]);
 
-    const checksumOutput = await exec.getExecOutput("sha256sum", [
-      repositoryPackagePath,
-    ]);
-    const actualChecksum = checksumOutput.stdout.trim().split(/\s+/)[0];
+    const actualChecksum = computeSha256(repositoryPackagePath);
     if (actualChecksum !== metadata.sha256) {
       throw new Error(
         `Checksum verification failed for ${path.basename(repositoryPackagePath)}. ` +
-          `Expected ${metadata.sha256}, got ${actualChecksum || "no checksum"}.`,
+          `Expected ${metadata.sha256}, got ${actualChecksum}.`,
       );
     }
+
     await exec.exec("sudo", ["dpkg", "-i", repositoryPackagePath]);
   } finally {
     fs.rmSync(packagesIndexPath, { force: true });
@@ -152,20 +145,53 @@ async function configureCurrentRepository(codename: string): Promise<void> {
   }
 }
 
+async function availablePackageVersion(version: string): Promise<string> {
+  const output = await exec.getExecOutput("apt-cache", ["madison", PACKAGE]);
+  const versions = output.stdout
+    .split("\n")
+    .map((line) => line.split("|").at(1)?.trim() ?? "")
+    .filter((candidate) => candidate.length > 0);
+
+  const match = versions.find(
+    (candidate) =>
+      candidate === version ||
+      candidate.startsWith(`${version}-`) ||
+      candidate.startsWith(`${version}.`),
+  );
+
+  if (!match) {
+    throw new Error(
+      `ArmFlang ${version} is not available from the configured Arm repository. ` +
+        `Available package versions: ${versions.join(", ") || "none"}`,
+    );
+  }
+  return match;
+}
+
 async function aptGetWithRetry(args: string[], maxAttempts = 3): Promise<void> {
+  const execOptions = {
+    ignoreReturnCode: true,
+    env: {
+      ...process.env,
+      DEBIAN_FRONTEND: "noninteractive",
+    },
+  };
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const exitCode = await exec.exec(
       "sudo",
       ["apt-get", ...APT_ACQUIRE_OPTS, ...args],
-      { ignoreReturnCode: true },
+      execOptions,
     );
     if (exitCode === 0) return;
+
     if (attempt === maxAttempts) {
       throw new Error(
         `apt-get ${args[0] ?? "command"} failed after ${maxAttempts.toString()} attempts ` +
           `with exit code ${exitCode.toString()}.`,
       );
     }
+
     const delayMs = attempt * 10_000;
     core.warning(
       `apt-get ${args[0] ?? "command"} failed ` +
@@ -176,18 +202,65 @@ async function aptGetWithRetry(args: string[], maxAttempts = 3): Promise<void> {
   }
 }
 
+function findLibraryDirectories(baseDir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(baseDir)) return results;
+
+  const candidateDirs = [
+    path.join(baseDir, "lib"),
+    path.join(baseDir, "lib64"),
+  ];
+
+  for (const candidate of candidateDirs) {
+    if (fs.existsSync(candidate)) {
+      results.push(candidate);
+    }
+  }
+
+  try {
+    const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const subLib = path.join(baseDir, entry.name, "lib");
+        const subLib64 = path.join(baseDir, entry.name, "lib64");
+        if (fs.existsSync(subLib)) results.push(subLib);
+        if (fs.existsSync(subLib64)) results.push(subLib64);
+      }
+    }
+  } catch {
+    // Ignore unreadable subdirectories
+  }
+
+  return Array.from(new Set(results));
+}
+
+function exportEnvVariable(name: string, value: string): void {
+  core.exportVariable(name, value);
+  process.env[name] = value;
+}
+
+function prependEnvPath(name: string, newPaths: string[]): void {
+  if (newPaths.length === 0) return;
+  const existingValue = process.env[name];
+  const existing = existingValue ? existingValue.split(path.delimiter) : [];
+  const combined = Array.from(new Set([...newPaths, ...existing])).filter(
+    Boolean,
+  );
+  const result = combined.join(path.delimiter);
+  exportEnvVariable(name, result);
+}
+
 async function restoreInstallationFromCache(cacheDir: string): Promise<void> {
-  core.info("Restoring Arm Toolchain installation under /opt...");
-  await exec.exec("sudo", ["rm", "-rf", INSTALL_DIR]);
-  await exec.exec("sudo", ["mkdir", "-p", INSTALL_DIR]);
-  await exec.exec("sudo", ["cp", "-a", `${cacheDir}/.`, INSTALL_DIR]);
+  core.info("Restoring Arm Toolchain and ArmPL under /opt/arm...");
+  await exec.exec("sudo", ["mkdir", "-p", ARM_ROOT]);
+  await exec.exec("sudo", ["cp", "-a", `${cacheDir}/.`, ARM_ROOT]);
 }
 
 async function stageInstallationForCache(cacheDir: string): Promise<void> {
-  core.info("Staging Arm Toolchain installation for caching...");
+  core.info("Staging Arm Toolchain and ArmPL for caching...");
   await exec.exec("sudo", ["rm", "-rf", cacheDir]);
   await exec.exec("sudo", ["mkdir", "-p", cacheDir]);
-  await exec.exec("sudo", ["cp", "-a", `${INSTALL_DIR}/.`, cacheDir]);
+  await exec.exec("sudo", ["cp", "-a", `${ARM_ROOT}/.`, cacheDir]);
   await exec.exec("sudo", ["chown", "-R", os.userInfo().username, cacheDir]);
 }
 
@@ -205,12 +278,38 @@ export async function installDebian(
   const cacheKey = `armflang-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   core.info(`Installing ArmFlang ${version} on Linux (${inputs.arch})...`);
-  const cacheHit = await cache.restoreCache([cacheDir], cacheKey);
 
+  const binDir = path.join(INSTALL_DIR, "bin");
+  const fc = path.join(binDir, "armflang");
+  const cc = path.join(binDir, "armclang");
+  const cxx = path.join(binDir, "armclang++");
+
+  const cacheHit = await cache.restoreCache([cacheDir], cacheKey);
+  let isCacheValid = false;
   if (cacheHit) {
-    core.info(`Cache hit for ${cacheKey}; skipping repository setup.`);
     await restoreInstallationFromCache(cacheDir);
+    const libDirs = findLibraryDirectories(ARM_ROOT);
+    const hasArmMath = libDirs.some(
+      (dir) =>
+        fs.existsSync(path.join(dir, "libamath.so")) ||
+        fs.existsSync(path.join(dir, "libamath.a")),
+    );
+    isCacheValid = [fc, cc, cxx].every((binary) => fs.existsSync(binary));
+    if (!hasArmMath) {
+      core.warning("Cached ArmPL installation does not contain libamath.");
+      isCacheValid = false;
+    }
+  }
+
+  if (isCacheValid) {
+    core.info(`Cache hit for ${cacheKey}; skipping package download.`);
   } else {
+    if (cacheHit) {
+      core.warning(
+        `Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`,
+      );
+    }
+
     await aptGetWithRetry(["update", "-y"]);
     await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
 
@@ -245,9 +344,10 @@ export async function installDebian(
         `echo "deb [signed-by=${keyring}] ${legacyBaseUrl}/ ./" > "${sourceList}"`,
       ]);
     }
-    await aptGetWithRetry(["update", "-y"]);
 
+    await aptGetWithRetry(["update", "-y"]);
     const packageVersion = await availablePackageVersion(version);
+
     await aptGetWithRetry([
       "install",
       "-y",
@@ -257,21 +357,29 @@ export async function installDebian(
     ]);
 
     await stageInstallationForCache(cacheDir);
-    await cache.saveCache([cacheDir], cacheKey);
+    try {
+      await cache.saveCache([cacheDir], cacheKey);
+    } catch (err) {
+      core.warning(
+        `Failed to save ArmFlang installation to cache: ${(err as Error).message}`,
+      );
+    }
   }
 
-  const binDir = path.join(INSTALL_DIR, "bin");
-  const fc = path.join(binDir, "armflang");
-  const cc = path.join(binDir, "armclang");
-  const cxx = path.join(binDir, "armclang++");
   for (const binary of [fc, cc, cxx]) {
     if (!fs.existsSync(binary)) {
       throw new Error(`Expected Arm Toolchain binary was not found: ${binary}`);
     }
   }
 
+  // 1. Add binary path
   core.addPath(binDir);
-  process.env.PATH = `${binDir}:${process.env.PATH ?? ""}`;
+  prependEnvPath("PATH", [binDir]);
+
+  // ArmFlang links libamath automatically; ArmPL is a sibling under /opt/arm.
+  const libDirs = findLibraryDirectories(ARM_ROOT);
+  prependEnvPath("LIBRARY_PATH", libDirs);
+  prependEnvPath("LD_LIBRARY_PATH", libDirs);
 
   let installedVersion = "";
   await exec.exec(fc, ["--version"], {
