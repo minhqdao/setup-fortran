@@ -4,7 +4,10 @@
 
 # setup-fortran
 
-A GitHub Action to install and configure Fortran compilers across Linux, macOS, and Windows runners.
+Build and test Fortran projects across compilers, versions, architectures, and
+operating systems with one GitHub Action. `minhqdao/setup-fortran` provides
+reproducible toolchains for GNU, Intel, LLVM, NVIDIA, AMD, Arm, and
+LFortran on Linux, macOS, and Windows.
 
 ## Usage
 
