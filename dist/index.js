@@ -105594,7 +105594,25 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
+;// CONCATENATED MODULE: ./src/setup_msvc.ts
+
+function addMsvcBinFromPath(pathValue) {
+    const msvcBin = pathValue.split(";").find((entry) => {
+        const normalized = entry.toLowerCase();
+        return (normalized.includes("\\vc\\tools\\msvc\\") &&
+            normalized.includes("\\bin\\host"));
+    });
+    if (msvcBin) {
+        addPath(msvcBin);
+    }
+    else {
+        warning("Could not find the MSVC executable directory in PATH.");
+    }
+    return msvcBin;
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+
 
 
 
@@ -105796,6 +105814,7 @@ async function win32_installWin32(inputs) {
                     .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
                     .join(";");
                 exportVariable("PATH", filteredPath);
+                addMsvcBinFromPath(filteredPath);
             }
             else {
                 exportVariable(key, val);
@@ -106217,6 +106236,7 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 
 
+
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry
@@ -106338,6 +106358,7 @@ async function ifort_win32_installWin32(inputs) {
                     .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
                     .join(";");
                 exportVariable("PATH", filteredPath);
+                addMsvcBinFromPath(filteredPath);
             }
             else {
                 exportVariable(key, val);
@@ -107318,6 +107339,7 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107393,6 +107415,9 @@ async function setupMsvcLibs(arch) {
     }
     const msvcLibDir = external_path_.join(vcToolsRoot, vcVersion, "lib", arch);
     info(`MSVC lib dir: ${msvcLibDir}`);
+    const hostArch = arch === Arch.ARM64 ? "arm64" : "x64";
+    const msvcBinDir = external_path_.join(vcToolsRoot, vcVersion, "bin", `Host${hostArch}`, arch);
+    addMsvcBinFromPath(msvcBinDir);
     // Find the latest Windows SDK version under
     // C:\Program Files (x86)\Windows Kits\10\Lib\<version>\{um,ucrt}\<arch>.
     const winsdk10Root = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib";

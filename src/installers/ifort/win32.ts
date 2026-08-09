@@ -12,6 +12,7 @@ import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
+import { addMsvcBinFromPath } from "../../setup_msvc";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
@@ -164,6 +165,7 @@ export async function installWin32(
           .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
           .join(";");
         core.exportVariable("PATH", filteredPath);
+        addMsvcBinFromPath(filteredPath);
       } else {
         core.exportVariable(key, val);
       }

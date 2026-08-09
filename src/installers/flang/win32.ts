@@ -17,6 +17,7 @@ import {
   verifyAssetExists,
 } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { addMsvcBinFromPath } from "../../setup_msvc";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -116,6 +117,16 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
 
   const msvcLibDir = path.join(vcToolsRoot, vcVersion, "lib", arch);
   core.info(`MSVC lib dir: ${msvcLibDir}`);
+
+  const hostArch = arch === Arch.ARM64 ? "arm64" : "x64";
+  const msvcBinDir = path.join(
+    vcToolsRoot,
+    vcVersion,
+    "bin",
+    `Host${hostArch}`,
+    arch,
+  );
+  addMsvcBinFromPath(msvcBinDir);
 
   // Find the latest Windows SDK version under
   // C:\Program Files (x86)\Windows Kits\10\Lib\<version>\{um,ucrt}\<arch>.

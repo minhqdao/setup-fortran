@@ -181,6 +181,7 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - name: Verify installation
+        shell: bash
         env:
           OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
           OUTPUT_FC: ${{ steps.setup.outputs.fc }}

@@ -13,6 +13,7 @@ import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
+import { addMsvcBinFromPath } from "../../setup_msvc";
 
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
@@ -240,6 +241,7 @@ export async function installWin32(
           .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
           .join(";");
         core.exportVariable("PATH", filteredPath);
+        addMsvcBinFromPath(filteredPath);
       } else {
         core.exportVariable(key, val);
       }
