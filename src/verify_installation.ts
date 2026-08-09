@@ -1,3 +1,29 @@
+import { execFileSync } from "child_process";
+
+function verifyNativeWindowsTools(): void {
+  if (
+    process.platform !== "win32" ||
+    process.env.WINDOWS_ENV ||
+    !/^(flang|ifort|ifx)$/.test(process.env.FORTRAN_COMPILER ?? "")
+  ) {
+    return;
+  }
+
+  for (const tool of ["link.exe", "lib.exe"]) {
+    const resolved = execFileSync("where.exe", [tool], {
+      encoding: "utf8",
+    })
+      .split(/\r?\n/)
+      .find(Boolean);
+
+    if (!resolved?.toLowerCase().includes("\\vc\\tools\\msvc\\")) {
+      throw new Error(
+        `${tool} does not resolve to the configured MSVC toolchain: ${resolved ?? "not found"}`,
+      );
+    }
+  }
+}
+
 function run(): void {
   try {
     const fc = process.env.FC;
@@ -83,6 +109,8 @@ function run(): void {
         )})`,
       );
     }
+
+    verifyNativeWindowsTools();
 
     console.log("Installation verification successful!");
   } catch (error) {
