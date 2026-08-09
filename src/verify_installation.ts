@@ -14,11 +14,15 @@ function verifyNativeWindowsTools(): void {
       encoding: "utf8",
     })
       .split(/\r?\n/)
-      .find(Boolean);
+      .filter(Boolean);
+    const msvcTool = resolved.find((candidate) =>
+      candidate.toLowerCase().includes("\\vc\\tools\\msvc\\"),
+    );
 
-    if (!resolved?.toLowerCase().includes("\\vc\\tools\\msvc\\")) {
+    if (!msvcTool) {
       throw new Error(
-        `${tool} does not resolve to the configured MSVC toolchain: ${resolved ?? "not found"}`,
+        `${tool} is not available from the configured MSVC toolchain. ` +
+          `Resolved paths: ${resolved.join(", ") || "none"}`,
       );
     }
   }
