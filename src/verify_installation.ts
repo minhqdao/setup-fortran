@@ -2,6 +2,7 @@ import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { normalizeWindowsExecutablePath } from "./windows_executable_path";
 
 function toBashPath(windowsPath: string): string {
   const normalized = windowsPath.replace(/\\/g, "/");
@@ -58,6 +59,29 @@ function verifyNativeWindowsTools(): void {
       ].join("\n"),
     );
 
+    const bashEnvironment = {
+      ...process.env,
+      VERIFY_SOURCE: toBashPath(source),
+      VERIFY_EXECUTABLE: toBashPath(executable),
+    };
+    const resolvedLink = execFileSync(
+      "bash.exe",
+      ["--noprofile", "--norc", "-c", "command -v link"],
+      {
+        encoding: "utf8",
+        env: bashEnvironment,
+      },
+    );
+    const expectedLink = toBashPath(msvcLink);
+    if (
+      normalizeWindowsExecutablePath(resolvedLink) !==
+      normalizeWindowsExecutablePath(expectedLink)
+    ) {
+      throw new Error(
+        `Bash resolved link to ${resolvedLink.trim()} instead of ${expectedLink}`,
+      );
+    }
+
     execFileSync(
       "bash.exe",
       [
@@ -67,26 +91,9 @@ function verifyNativeWindowsTools(): void {
         "-o",
         "pipefail",
         "-c",
-        [
-          "resolved_link=$(command -v link)",
-          'if [[ "${resolved_link,,}" != "${EXPECTED_MSVC_LINK,,}" ]]; then',
-          '  echo "Bash resolved link to $resolved_link instead of $EXPECTED_MSVC_LINK" >&2',
-          "  exit 1",
-          "fi",
-          '"$FC" "$VERIFY_SOURCE" -o "$VERIFY_EXECUTABLE"',
-          '"$VERIFY_EXECUTABLE"',
-        ].join("\n"),
+        '"$FC" "$VERIFY_SOURCE" -o "$VERIFY_EXECUTABLE"\n"$VERIFY_EXECUTABLE"',
       ],
-      {
-        encoding: "utf8",
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          EXPECTED_MSVC_LINK: toBashPath(msvcLink),
-          VERIFY_SOURCE: toBashPath(source),
-          VERIFY_EXECUTABLE: toBashPath(executable),
-        },
-      },
+      { stdio: "inherit", env: bashEnvironment },
     );
   } finally {
     rmSync(testDir, { recursive: true, force: true });
