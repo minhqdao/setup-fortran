@@ -1,4 +1,16 @@
 import { execFileSync } from "child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { normalizeWindowsExecutablePath } from "./windows_executable_path";
+
+function toBashPath(windowsPath: string): string {
+  const normalized = windowsPath.replace(/\\/g, "/");
+  return normalized.replace(
+    /^([a-z]):\//i,
+    (_, drive: string) => `/${drive.toLowerCase()}/`,
+  );
+}
 
 function verifyNativeWindowsTools(): void {
   if (
@@ -9,6 +21,7 @@ function verifyNativeWindowsTools(): void {
     return;
   }
 
+  let msvcLink: string | undefined;
   for (const tool of ["link.exe", "lib.exe"]) {
     const resolved = execFileSync("where.exe", [tool], {
       encoding: "utf8",
@@ -25,6 +38,65 @@ function verifyNativeWindowsTools(): void {
           `Resolved paths: ${resolved.join(", ") || "none"}`,
       );
     }
+
+    if (tool === "link.exe") msvcLink = msvcTool;
+  }
+
+  if (!msvcLink) throw new Error("Could not resolve the MSVC linker.");
+
+  const testDir = mkdtempSync(join(tmpdir(), "setup-fortran-link-"));
+  const source = join(testDir, "verify_link.f90");
+  const executable = join(testDir, "verify_link.exe");
+
+  try {
+    writeFileSync(
+      source,
+      [
+        "program verify_link",
+        '  print *, "setup-fortran link verification successful"',
+        "end program verify_link",
+        "",
+      ].join("\n"),
+    );
+
+    const bashEnvironment = {
+      ...process.env,
+      VERIFY_SOURCE: toBashPath(source),
+      VERIFY_EXECUTABLE: toBashPath(executable),
+    };
+    const resolvedLink = execFileSync(
+      "bash.exe",
+      ["--noprofile", "--norc", "-c", "command -v link"],
+      {
+        encoding: "utf8",
+        env: bashEnvironment,
+      },
+    );
+    const expectedLink = toBashPath(msvcLink);
+    if (
+      normalizeWindowsExecutablePath(resolvedLink) !==
+      normalizeWindowsExecutablePath(expectedLink)
+    ) {
+      throw new Error(
+        `Bash resolved link to ${resolvedLink.trim()} instead of ${expectedLink}`,
+      );
+    }
+
+    execFileSync(
+      "bash.exe",
+      [
+        "--noprofile",
+        "--norc",
+        "-e",
+        "-o",
+        "pipefail",
+        "-c",
+        '"$FC" "$VERIFY_SOURCE" -o "$VERIFY_EXECUTABLE"\n"$VERIFY_EXECUTABLE"',
+      ],
+      { stdio: "inherit", env: bashEnvironment },
+    );
+  } finally {
+    rmSync(testDir, { recursive: true, force: true });
   }
 }
 
