@@ -1,4 +1,15 @@
 import { execFileSync } from "child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+
+function toBashPath(windowsPath: string): string {
+  const normalized = windowsPath.replace(/\\/g, "/");
+  return normalized.replace(
+    /^([a-z]):\//i,
+    (_, drive: string) => `/${drive.toLowerCase()}/`,
+  );
+}
 
 function verifyNativeWindowsTools(): void {
   if (
@@ -9,6 +20,7 @@ function verifyNativeWindowsTools(): void {
     return;
   }
 
+  let msvcLink: string | undefined;
   for (const tool of ["link.exe", "lib.exe"]) {
     const resolved = execFileSync("where.exe", [tool], {
       encoding: "utf8",
@@ -25,6 +37,59 @@ function verifyNativeWindowsTools(): void {
           `Resolved paths: ${resolved.join(", ") || "none"}`,
       );
     }
+
+    if (tool === "link.exe") msvcLink = msvcTool;
+  }
+
+  if (!msvcLink) throw new Error("Could not resolve the MSVC linker.");
+
+  const testDir = mkdtempSync(join(tmpdir(), "setup-fortran-link-"));
+  const source = join(testDir, "verify_link.f90");
+  const executable = join(testDir, "verify_link.exe");
+
+  try {
+    writeFileSync(
+      source,
+      [
+        "program verify_link",
+        '  print *, "setup-fortran link verification successful"',
+        "end program verify_link",
+        "",
+      ].join("\n"),
+    );
+
+    execFileSync(
+      "bash.exe",
+      [
+        "--noprofile",
+        "--norc",
+        "-e",
+        "-o",
+        "pipefail",
+        "-c",
+        [
+          "resolved_link=$(command -v link)",
+          'if [[ "${resolved_link,,}" != "${EXPECTED_MSVC_LINK,,}" ]]; then',
+          '  echo "Bash resolved link to $resolved_link instead of $EXPECTED_MSVC_LINK" >&2',
+          "  exit 1",
+          "fi",
+          '"$FC" "$VERIFY_SOURCE" -o "$VERIFY_EXECUTABLE"',
+          '"$VERIFY_EXECUTABLE"',
+        ].join("\n"),
+      ],
+      {
+        encoding: "utf8",
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          EXPECTED_MSVC_LINK: toBashPath(msvcLink),
+          VERIFY_SOURCE: toBashPath(source),
+          VERIFY_EXECUTABLE: toBashPath(executable),
+        },
+      },
+    );
+  } finally {
+    rmSync(testDir, { recursive: true, force: true });
   }
 }
 

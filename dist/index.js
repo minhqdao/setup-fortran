@@ -105596,6 +105596,32 @@ async function debian_resolveInstalledVersion() {
 
 ;// CONCATENATED MODULE: ./src/setup_msvc.ts
 
+
+
+
+function toMsysPath(windowsPath) {
+    const match = /^([a-z]):[\\/](.*)$/i.exec(windowsPath);
+    if (!match)
+        return windowsPath.replace(/\\/g, "/");
+    return `/${match[1].toLowerCase()}/${match[2].replace(/\\/g, "/")}`;
+}
+function quoteForBash(value) {
+    return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+function persistMsvcBinForBash(msvcBin) {
+    const bashEnv = external_path_.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), "setup-fortran-msvc-bash-env.sh");
+    const bashEnvForBash = toMsysPath(bashEnv);
+    const previousBashEnv = process.env.BASH_ENV;
+    const lines = [
+        ...(previousBashEnv && toMsysPath(previousBashEnv) !== bashEnvForBash
+            ? [`. ${quoteForBash(toMsysPath(previousBashEnv))}`]
+            : []),
+        `export PATH=${quoteForBash(toMsysPath(msvcBin))}:"$PATH"`,
+    ];
+    external_fs_.writeFileSync(bashEnv, `${lines.join("\n")}\n`, { mode: 0o600 });
+    exportVariable("BASH_ENV", bashEnvForBash);
+    return bashEnv;
+}
 function addMsvcBinFromPath(pathValue) {
     const msvcBin = pathValue.split(";").find((entry) => {
         const normalized = entry.toLowerCase();
@@ -105604,6 +105630,7 @@ function addMsvcBinFromPath(pathValue) {
     });
     if (msvcBin) {
         addPath(msvcBin);
+        persistMsvcBinForBash(msvcBin);
     }
     else {
         warning("Could not find the MSVC executable directory in PATH.");
