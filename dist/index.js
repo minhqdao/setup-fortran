@@ -104216,40 +104216,75 @@ function githubHeaders() {
 
 
 
+
+
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
     [Arch.X64]: ["16", "15", "14", "13", "12", "11"],
     [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
-const CACHE_PATHS = ["/var/cache/apt/archives"];
-function aptCacheKey(version, osVersion) {
-    return `apt-gfortran-${osVersion}-${version}`;
+const CACHE_SCHEMA_VERSION = "v2";
+function aptCacheKey(inputs, version) {
+    return [
+        "apt-gfortran",
+        CACHE_SCHEMA_VERSION,
+        inputs.osVersion,
+        inputs.arch,
+        version,
+    ].join("-");
+}
+function aptCacheDir(inputs, version) {
+    return external_path_.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), "setup-fortran", "apt", "gfortran", inputs.osVersion, inputs.arch, version);
+}
+function aptCacheOptions(cacheDir) {
+    return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
 async function installDebian(inputs) {
     const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
     info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
-    const cacheKey = aptCacheKey(version, inputs.osVersion);
-    const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
+    const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
+    const cacheDir = aptCacheDir(inputs, version);
+    const cachePaths = [cacheDir];
+    const cacheKey = aptCacheKey(inputs, version);
+    // APT expects this directory to exist beneath its archive directory.
+    external_fs_.mkdirSync(external_path_.join(cacheDir, "partial"), { recursive: true });
+    let cacheHit;
+    try {
+        cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+    }
+    catch (err) {
+        warning(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
+    }
+    if (needsPpa(version, inputs.osVersion)) {
+        info(`Adding PPA for GFortran ${version}...`);
+        await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+    }
+    await aptGetUpdateWithRetry();
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
-        await exec_exec("sudo", [
-            "apt-get",
-            "install",
-            "-y",
-            "--no-download",
-            "--ignore-missing",
-            `gcc-${version}`,
-            `gfortran-${version}`,
-        ]);
+        try {
+            await aptGetInstallFromCache(packages, cacheDir);
+            await verifyInstalledToolchain(version);
+        }
+        catch (err) {
+            warning(`Cached GFortran packages were incomplete or invalid; ` +
+                `falling back to an online installation: ${String(err)}`);
+            await aptGetInstallWithRetry(packages, cacheDir);
+            await verifyInstalledToolchain(version);
+        }
     }
     else {
-        if (needsPpa(version, inputs.osVersion)) {
-            info(`Adding PPA for GFortran ${version}...`);
-            await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+        await aptGetInstallWithRetry(packages, cacheDir);
+        await verifyInstalledToolchain(version);
+        try {
+            await prepareCacheForSave(cacheDir);
+            await cache.saveCache(cachePaths, cacheKey);
         }
-        await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
-        await cache.saveCache(CACHE_PATHS, cacheKey);
+        catch (err) {
+            warning(`Could not save the GFortran package cache: ${String(err)}`);
+        }
     }
     await exec_exec("sudo", [
         "update-alternatives",
@@ -104273,7 +104308,42 @@ async function installDebian(inputs) {
     };
     return result;
 }
-async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
+async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 5) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "apt-get",
+                "install",
+                "-y",
+                "-o",
+                "Acquire::http::Timeout=60",
+                "-o",
+                "Acquire::Retries=3",
+                ...aptCacheOptions(cacheDir),
+                ...packages,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
+}
+async function prepareCacheForSave(cacheDir) {
+    // APT may leave root-owned lock and partial-download metadata behind. They
+    // are not reusable package data and can prevent the cache client from
+    // archiving the directory as the unprivileged runner user.
+    await exec_exec("sudo", ["chown", "-R", external_os_.userInfo().username, cacheDir]);
+    external_fs_.rmSync(external_path_.join(cacheDir, "lock"), { force: true });
+    external_fs_.rmSync(external_path_.join(cacheDir, "partial"), {
+        recursive: true,
+        force: true,
+    });
+}
+async function aptGetUpdateWithRetry(maxAttempts = 5) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
@@ -104285,24 +104355,29 @@ async function aptGetInstallWithRetry(packages, maxAttempts = 5) {
                 "-o",
                 "Acquire::Retries=3",
             ]);
-            await exec_exec("sudo", [
-                "apt-get",
-                "install",
-                "-y",
-                "-o",
-                "Acquire::http::Timeout=60",
-                "-o",
-                "Acquire::Retries=3",
-                ...packages,
-            ]);
             return;
         }
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
+    }
+}
+async function aptGetInstallFromCache(packages, cacheDir) {
+    await exec_exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "--no-download",
+        ...aptCacheOptions(cacheDir),
+        ...packages,
+    ]);
+}
+async function verifyInstalledToolchain(version) {
+    for (const tool of ["gcc", "g++", "gfortran"]) {
+        await exec_exec(`${tool}-${version}`, ["--version"], { silent: true });
     }
 }
 function needsPpa(version, osVersion) {
