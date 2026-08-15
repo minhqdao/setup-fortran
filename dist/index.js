@@ -102720,6 +102720,9 @@ var cache = __nccwpck_require__(5116);
 ;// CONCATENATED MODULE: ./src/resolve_version.ts
 
 
+const MAX_GITHUB_RATE_LIMIT_WAIT_MS = 30_000;
+class GitHubRateLimitError extends Error {
+}
 /**
  * A production-grade wrapper around native fetch that handles stream timeouts,
  * precise GitHub rate-limit reset windows, and exponential backoff.
@@ -102742,18 +102745,34 @@ async function fetchJsonWithRetry(url, options = {}) {
                 clearTimeout(timeoutId);
                 return { status: 404, data: null };
             }
-            // Handle Rate Limiting Intelligent Sleep
+            // A short reset window is worth waiting for, but an exhausted anonymous
+            // quota can otherwise suspend the action for close to an hour.
             if (response.status === 403 || response.status === 429) {
                 const resetHeader = response.headers.get("x-ratelimit-reset");
                 if (resetHeader) {
                     const resetTimeMs = parseInt(resetHeader, 10) * 1000;
                     const sleepTimeMs = Math.max(resetTimeMs - Date.now() + 1000, 2000);
+                    if (!Number.isFinite(resetTimeMs)) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit response contained an invalid x-ratelimit-reset value: ${resetHeader}.`);
+                    }
+                    if (sleepTimeMs > MAX_GITHUB_RATE_LIMIT_WAIT_MS) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit for ${url} resets at ${new Date(resetTimeMs).toISOString()} ` +
+                            `(${Math.ceil(sleepTimeMs / 1000).toString()} seconds away), which exceeds the ` +
+                            `${(MAX_GITHUB_RATE_LIMIT_WAIT_MS / 1000).toString()}-second maximum wait. ` +
+                            "Retry later or provide a GITHUB_TOKEN with available API quota.");
+                    }
+                    if (attempt === maxRetries) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit remained active after ${maxRetries.toString()} attempts for ${url}. ` +
+                            `Retry after ${new Date(resetTimeMs).toISOString()} or provide a GITHUB_TOKEN with available API quota.`);
+                    }
                     warning(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
                         `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`);
                     clearTimeout(timeoutId);
                     await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
                     continue;
                 }
+                throw new GitHubRateLimitError(`GitHub API returned status ${response.status.toString()} for ${url} without a usable ` +
+                    "x-ratelimit-reset header, so the action cannot retry safely. Check GITHUB_TOKEN permissions and quota, then retry.");
             }
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
@@ -102765,6 +102784,9 @@ async function fetchJsonWithRetry(url, options = {}) {
         catch (e) {
             clearTimeout(timeoutId);
             const error = e instanceof Error ? e : new Error(String(e));
+            if (error instanceof GitHubRateLimitError) {
+                throw error;
+            }
             const isAbort = error.name === "AbortError";
             const errorMessage = isAbort
                 ? `Request or body streaming timed out after ${timeoutMs.toString()}ms`
