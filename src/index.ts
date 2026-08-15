@@ -14,7 +14,7 @@ import {
   setInstallationOutputs,
 } from "./installation_result";
 
-async function run(): Promise<void> {
+export async function run(): Promise<void> {
   try {
     const inputs = parseInputs();
 

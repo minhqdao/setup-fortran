@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import {
   exportInstallationVariables,
+  normalizeVersionOutput,
   setInstallationOutputs,
 } from "../src/installation_result";
 import type { InstallationResult } from "../src/types";
@@ -9,7 +10,7 @@ jest.mock("@actions/core");
 
 describe("installation result helpers", () => {
   const result: InstallationResult = {
-    version: "compiler version",
+    version: "GNU Fortran (Ubuntu 14.2.0-1ubuntu2) 14.2.0\nCopyright GCC",
     fc: "fortran",
     cc: "c",
     cxx: "cxx",
@@ -22,10 +23,26 @@ describe("installation result helpers", () => {
   it("sets action outputs from the installation result", () => {
     setInstallationOutputs(result);
 
-    expect(core.setOutput).toHaveBeenCalledWith("version", "compiler version");
+    expect(core.setOutput).toHaveBeenCalledWith("version", "14.2.0");
     expect(core.setOutput).toHaveBeenCalledWith("fc", "fortran");
     expect(core.setOutput).toHaveBeenCalledWith("cc", "c");
     expect(core.setOutput).toHaveBeenCalledWith("cxx", "cxx");
+  });
+
+  it.each([
+    ["14", "14"],
+    ["ifort (IFORT) 2021.10.0 20230609", "2021.10.0"],
+    ["flang-new version 19.1.7\nTarget: x86_64-linux-gnu", "19.1.7"],
+    ["LFortran version: 0.64.0-12-gabcdef", "0.64.0"],
+    ["AMD clang version 17.0.0 (AOCC_5.0.0-Build#123)", "5.0.0"],
+  ])("normalizes compiler version output %p", (output, expected) => {
+    expect(normalizeVersionOutput(output)).toBe(expected);
+  });
+
+  it("rejects a banner without a numeric version", () => {
+    expect(() => normalizeVersionOutput("unknown compiler")).toThrow(
+      "Could not determine compiler version",
+    );
   });
 
   it("exports compiler, fpm, and alias variables from the installation result", () => {

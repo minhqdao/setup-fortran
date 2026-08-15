@@ -99623,6 +99623,13 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
 (() => {
 "use strict";
+// ESM COMPAT FLAG
+__nccwpck_require__.r(__webpack_exports__);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  run: () => (/* binding */ run)
+});
 
 // EXTERNAL MODULE: external "os"
 var external_os_ = __nccwpck_require__(70857);
@@ -108497,6 +108504,24 @@ async function installArmFlang(inputs) {
 
 ;// CONCATENATED MODULE: ./src/installation_result.ts
 
+function normalizeVersionOutput(output) {
+    const trimmed = output.trim();
+    if (/^\d+$/.test(trimmed)) {
+        return trimmed;
+    }
+    // AOCC reports its underlying LLVM version before the AOCC release, for
+    // example "AMD clang version 17.0.0 (AOCC_5.0.0-Build#...)". Prefer the
+    // distribution version users selected over the LLVM implementation detail.
+    const aoccMatch = /\bAOCC[_ -]?(\d+(?:\.\d+){1,3})\b/i.exec(trimmed);
+    if (aoccMatch?.[1]) {
+        return aoccMatch[1];
+    }
+    const match = /(?:^|[^\d])(\d+(?:\.\d+){1,3})(?![\d.])/.exec(trimmed);
+    if (!match?.[1]) {
+        throw new Error(`Could not determine compiler version from: ${trimmed}`);
+    }
+    return match[1];
+}
 function exportInstallationVariables(result) {
     exportVariable("FC", result.fc);
     exportVariable("CC", result.cc);
@@ -108508,7 +108533,7 @@ function exportInstallationVariables(result) {
     exportVariable("F90", result.fc);
 }
 function setInstallationOutputs(result) {
-    setOutput("version", result.version);
+    setOutput("version", normalizeVersionOutput(result.version));
     setOutput("fc", result.fc);
     setOutput("cc", result.cc);
     setOutput("cxx", result.cxx);
