@@ -6,6 +6,10 @@ import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
 import path from "path";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 // Intel dropped ifort support starting with the 2024 oneAPI release.
 // NOTE: Intel's macOS download GUIDs change frequently. These are the standard
@@ -150,7 +154,7 @@ export async function installDarwin(
     );
   }
 
-  const cacheKey = `ifort-darwin-verified-v1-${inputs.arch}-${version}`;
+  const cacheKey = `ifort-darwin-validated-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   // 1. Ensure directory exists AND set ownership to current runner user
@@ -163,9 +167,24 @@ export async function installDarwin(
 
   // 2. Restore from cache if present
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-  if (cacheHit) {
-    core.info(`Restored ifort installation from cache (${cacheHit}).`);
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `ifort ${version}`,
+        [SETVARS_SH],
+        "bash",
+        ["-c", `source "${SETVARS_SH}" --force && ifort --version`],
+      )
+    : false;
+  if (cacheValid) {
+    core.info(
+      `Restored ifort installation from cache (${cacheHit ?? cacheKey}).`,
+    );
   } else {
+    if (cacheHit) {
+      await exec.exec("sudo", ["rm", "-rf", ONEAPI_ROOT]);
+      await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+      await exec.exec("sudo", ["chown", "-R", currentUser, ONEAPI_ROOT]);
+    }
     core.info(`Downloading ifort DMG installer...`);
     const targetPath = path.join(
       process.env.RUNNER_TEMP ?? "/tmp",
@@ -213,7 +232,7 @@ export async function installDarwin(
       await runInstaller(installScript);
 
       core.info("Saving installation to cache...");
-      await cache.saveCache(cachePaths, cacheKey);
+      await saveCompilerCache(cachePaths, cacheKey);
     } finally {
       core.info("Unmounting DMG...");
       await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {

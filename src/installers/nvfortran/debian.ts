@@ -8,6 +8,10 @@ import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { verifySha256 } from "../../verify_download";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -347,12 +351,26 @@ export async function installDebian(
 
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
-  const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
+  const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   const cacheHit = await cache.restoreCache([installDir], cacheKey);
-  if (cacheHit) {
+  const compilerPaths = ["nvfortran", "nvc", "nvc++"].map(
+    (compiler) => `${binDir}/${compiler}`,
+  );
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `nvhpc ${version}`,
+        compilerPaths,
+        compilerPaths[0],
+        ["--version"],
+      )
+    : false;
+  if (cacheValid) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
+    if (cacheHit) {
+      await exec.exec("sudo", ["rm", "-rf", installDir]);
+    }
     if (inputs.cleanupDisk) await cleanupDisk();
 
     core.info("Checking if legacy ncurses5 libs are needed...");
@@ -412,7 +430,7 @@ export async function installDebian(
     await exec.exec("sudo", ["apt-get", "clean"]);
 
     core.info(`Saving nvhpc ${version} to cache...`);
-    await cache.saveCache([installDir], cacheKey);
+    await saveCompilerCache([installDir], cacheKey);
   }
 
   core.info(`Adding ${binDir} to PATH...`);

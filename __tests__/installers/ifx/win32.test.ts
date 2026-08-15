@@ -158,7 +158,7 @@ describe("installWin32 (ifx)", () => {
 
     expect(mockedRestoreCache).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringContaining("ifx-win32-authenticode-v1-x64-2025.3.3"),
+      expect.stringContaining("ifx-win32-validated-v1-x64-2025.3.3"),
     );
   });
 

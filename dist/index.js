@@ -105518,7 +105518,42 @@ async function installGFortran(inputs) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/cache_validation.ts
+
+
+
+
+async function validateRestoredCompilerCache(label, requiredPaths, command, args) {
+    const missing = requiredPaths.filter((entry) => !external_fs_.existsSync(entry));
+    if (missing.length > 0) {
+        warning(`Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`);
+        return false;
+    }
+    try {
+        const exitCode = await exec_exec(command, args, {
+            ignoreReturnCode: true,
+            silent: true,
+        });
+        if (exitCode === 0)
+            return true;
+        warning(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
+    }
+    catch (error) {
+        warning(`Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`);
+    }
+    return false;
+}
+async function saveCompilerCache(paths, key) {
+    try {
+        await cache.saveCache(paths, key);
+    }
+    catch (error) {
+        warning(`Could not save compiler cache ${key}: ${String(error)}`);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
+
 
 
 
@@ -105570,13 +105605,24 @@ async function debian_installDebian(inputs) {
     });
     info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
     const ONEAPI_ROOT = "/opt/intel/oneapi";
-    const cacheKey = `oneapi-ifx-${version}`;
+    const cacheKey = `oneapi-ifx-validated-v1-${inputs.arch}-${version}`;
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-    if (!cacheHit) {
+    const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`ifx ${version}`, [setVarsScript], "bash", [
+            "-c",
+            `source "${setVarsScript}" --force && ifx --version && icx --version && icpx --version`,
+        ])
+        : false;
+    if (!cacheValid) {
+        if (cacheHit) {
+            await exec_exec("sudo", ["rm", "-rf", ONEAPI_ROOT]);
+            await exec_exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+        }
         info("Adding Intel oneAPI apt repository...");
         await exec_exec("bash", [
             "-c",
@@ -105607,12 +105653,11 @@ async function debian_installDebian(inputs) {
             fortranPkg,
             cppPkg,
         ]);
-        await cache.saveCache(cachePaths, cacheKey);
+        await saveCompilerCache(cachePaths, cacheKey);
     }
     else {
         info(`Cache hit for ${cacheKey}, skipping installation...`);
     }
-    const setVarsScript = "/opt/intel/oneapi/setvars.sh";
     info(`Sourcing ${setVarsScript} and exporting environment...`);
     let envOutput = "";
     await exec_exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
@@ -105713,6 +105758,7 @@ function addMsvcBinFromPath(pathValue) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+
 
 
 
@@ -105848,7 +105894,7 @@ async function win32_installWin32(inputs) {
             `This is a bug — please open an issue.`);
     }
     info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
-    const cacheKey = `ifx-win32-authenticode-v1-${inputs.arch}-${version}`;
+    const cacheKey = `ifx-win32-validated-v1-${inputs.arch}-${version}`;
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
@@ -105868,17 +105914,27 @@ async function win32_installWin32(inputs) {
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
-    if (cacheHit) {
-        info(`Restored ifx installation from cache (${cacheHit}).`);
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`ifx ${version}`, [SETVARS_BAT], "cmd", [
+            "/D",
+            "/S",
+            "/C",
+            `call "${SETVARS_BAT}" --force >nul && ifx /what >nul && icx --version >nul && icpx --version >nul`,
+        ])
+        : false;
+    if (cacheValid) {
+        info(`Restored ifx installation from cache (${cacheHit ?? cacheKey}).`);
     }
     else {
+        if (cacheHit)
+            external_fs_.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading installer...`);
         const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
         await runInstallerWithRetry(installerPath);
         info("Saving installation to cache...");
-        await cache.saveCache(cachePaths, cacheKey);
+        await saveCompilerCache(cachePaths, cacheKey);
     }
     // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_and_dump.bat");
@@ -105998,6 +106054,7 @@ async function installIFX(inputs) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -106033,9 +106090,17 @@ async function ifort_debian_installDebian(inputs) {
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
-    const cacheKey = `oneapi-ifort-${bundle}`;
+    const cacheKey = `oneapi-ifort-validated-v1-${inputs.arch}-${bundle}`;
     const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
-    if (!cacheHit) {
+    const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`ifort ${version}`, [setVarsScript], "bash", ["-c", `source "${setVarsScript}" --force && ifort --version`])
+        : false;
+    if (!cacheValid) {
+        if (cacheHit) {
+            await exec_exec("sudo", ["rm", "-rf", ONEAPI_ROOT]);
+            await exec_exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+        }
         info("Adding Intel oneAPI apt repository...");
         await exec_exec("bash", [
             "-c",
@@ -106074,12 +106139,11 @@ async function ifort_debian_installDebian(inputs) {
             fortranPkg,
             cppPkg,
         ]);
-        await cache.saveCache(ONEAPI_CACHE_PATHS, cacheKey);
+        await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
     }
     else {
         info(`Cache hit for ${cacheKey}, skipping installation...`);
     }
-    const setVarsScript = "/opt/intel/oneapi/setvars.sh";
     info(`Sourcing ${setVarsScript} and exporting environment...`);
     let envOutput = "";
     await exec_exec("bash", ["-c", `source "${setVarsScript}" --force && env`], {
@@ -106132,6 +106196,7 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
+
 
 
 
@@ -106257,7 +106322,7 @@ async function darwin_installDarwin(inputs) {
         throw new Error("Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
             "Please ensure your workflow uses an x64 runner or Intel environment.");
     }
-    const cacheKey = `ifort-darwin-verified-v1-${inputs.arch}-${version}`;
+    const cacheKey = `ifort-darwin-validated-v1-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
     // 1. Ensure directory exists AND set ownership to current runner user
     // (Prevents gtar extraction failure during cache restoration)
@@ -106268,10 +106333,18 @@ async function darwin_installDarwin(inputs) {
     await exec_exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
     // 2. Restore from cache if present
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-    if (cacheHit) {
-        info(`Restored ifort installation from cache (${cacheHit}).`);
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`ifort ${version}`, [SETVARS_SH], "bash", ["-c", `source "${SETVARS_SH}" --force && ifort --version`])
+        : false;
+    if (cacheValid) {
+        info(`Restored ifort installation from cache (${cacheHit ?? cacheKey}).`);
     }
     else {
+        if (cacheHit) {
+            await exec_exec("sudo", ["rm", "-rf", darwin_ONEAPI_ROOT]);
+            await exec_exec("sudo", ["mkdir", "-p", darwin_ONEAPI_ROOT]);
+            await exec_exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
+        }
         info(`Downloading ifort DMG installer...`);
         const targetPath = external_path_default().join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`);
         const dmgPath = await downloadInstaller(release.url, targetPath);
@@ -106298,7 +106371,7 @@ async function darwin_installDarwin(inputs) {
             info(`Running silent install via ${installScript}...`);
             await runInstaller(installScript);
             info("Saving installation to cache...");
-            await cache.saveCache(cachePaths, cacheKey);
+            await saveCompilerCache(cachePaths, cacheKey);
         }
         finally {
             info("Unmounting DMG...");
@@ -106350,6 +106423,7 @@ async function ifort_darwin_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
+
 
 
 
@@ -106420,16 +106494,26 @@ async function ifort_win32_installWin32(inputs) {
             `This is likely a legacy version issue — please check release compatibility.`);
     }
     info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
-    const cacheKey = `ifort-win32-authenticode-v1-${inputs.arch}-${version}`;
+    const cacheKey = `ifort-win32-validated-v1-${inputs.arch}-${version}`;
     const cachePaths = [win32_ONEAPI_ROOT];
     if (!external_fs_.existsSync(win32_ONEAPI_ROOT)) {
         external_fs_.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
     }
     const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-    if (cacheHit) {
-        info(`Restored ifort installation from cache (${cacheHit}).`);
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`ifort ${version}`, [win32_SETVARS_BAT], "cmd", [
+            "/D",
+            "/S",
+            "/C",
+            `call "${win32_SETVARS_BAT}" --force >nul && ifort /what >nul`,
+        ])
+        : false;
+    if (cacheValid) {
+        info(`Restored ifort installation from cache (${cacheHit ?? cacheKey}).`);
     }
     else {
+        if (cacheHit)
+            external_fs_.rmSync(win32_ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading ifort installer...`);
         const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
         await verifyIntelAuthenticode(installerPath);
@@ -106444,7 +106528,7 @@ async function ifort_win32_installWin32(inputs) {
             "-p=NEED_VS2022_INTEGRATION=0",
         ]);
         info("Saving installation to cache...");
-        await cache.saveCache(cachePaths, cacheKey);
+        await saveCompilerCache(cachePaths, cacheKey);
     }
     // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
@@ -106534,6 +106618,7 @@ async function installIFort(inputs) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
+
 
 
 
@@ -106818,12 +106903,19 @@ async function nvfortran_debian_installDebian(inputs) {
     }
     const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
     const binDir = `${installDir}/compilers/bin`;
-    const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
+    const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
     const cacheHit = await cache.restoreCache([installDir], cacheKey);
-    if (cacheHit) {
+    const compilerPaths = ["nvfortran", "nvc", "nvc++"].map((compiler) => `${binDir}/${compiler}`);
+    const cacheValid = cacheHit
+        ? await validateRestoredCompilerCache(`nvhpc ${version}`, compilerPaths, compilerPaths[0], ["--version"])
+        : false;
+    if (cacheValid) {
         info(`Restored nvhpc ${version} from cache.`);
     }
     else {
+        if (cacheHit) {
+            await exec_exec("sudo", ["rm", "-rf", installDir]);
+        }
         if (inputs.cleanupDisk)
             await cleanupDisk();
         info("Checking if legacy ncurses5 libs are needed...");
@@ -106871,7 +106963,7 @@ async function nvfortran_debian_installDebian(inputs) {
         info("Cleaning up apt archives...");
         await exec_exec("sudo", ["apt-get", "clean"]);
         info(`Saving nvhpc ${version} to cache...`);
-        await cache.saveCache([installDir], cacheKey);
+        await saveCompilerCache([installDir], cacheKey);
     }
     info(`Adding ${binDir} to PATH...`);
     addPath(binDir);

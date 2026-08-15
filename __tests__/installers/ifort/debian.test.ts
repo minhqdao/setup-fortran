@@ -3,13 +3,7 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/ifort/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -34,7 +28,7 @@ describe("installDebian (ifort)", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -92,7 +86,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-2023.2.4",
+      "oneapi-ifort-validated-v1-x64-2023.2.4",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "apt-get",
@@ -104,7 +98,7 @@ describe("installDebian (ifort)", () => {
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-2023.2.4",
+      "oneapi-ifort-validated-v1-x64-2023.2.4",
     );
   });
 
@@ -124,10 +118,7 @@ describe("installDebian (ifort)", () => {
     // But still sources setvars.sh
     expect(mockedExec).toHaveBeenCalledWith(
       "bash",
-      [
-        "-c",
-        expect.stringContaining('source "/opt/intel/oneapi/setvars.sh"'),
-      ],
+      ["-c", expect.stringContaining('source "/opt/intel/oneapi/setvars.sh"')],
       expect.anything(),
     );
   });
