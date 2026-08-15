@@ -1,6 +1,6 @@
 {
   "name": "setup-fortran",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Set up Fortran compilers on GitHub Actions runners",
   "homepage": "https://github.com/minhqdao/setup-fortran#readme",
   "repository": {
