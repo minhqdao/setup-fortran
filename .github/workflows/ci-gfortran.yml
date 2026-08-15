@@ -3,6 +3,10 @@ name: gfortran
 on:
   workflow_call:
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   integration-tests:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{

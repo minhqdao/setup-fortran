@@ -3,6 +3,9 @@ name: validation
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: "24"
 
@@ -25,6 +28,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
 
   unit-tests:
     name: unit tests

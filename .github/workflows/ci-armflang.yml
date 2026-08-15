@@ -1,22 +1,17 @@
 name: armflang
 
 on:
-  # push:
-  #   branches: [main]
-  # pull_request:
-  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
-  build:
-    name: validation
-    if: github.actor != 'dependabot[bot]'
-    uses: ./.github/workflows/validation.yml
-
   integration-tests:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }}
     if: github.actor != 'dependabot[bot]'
     runs-on: ${{ matrix.image }}
-    needs: [build]
     strategy:
       fail-fast: false
       matrix:
