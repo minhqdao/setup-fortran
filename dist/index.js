@@ -107846,7 +107846,7 @@ const INSTALLERS = {
         },
     },
 };
-function miniforge_miniforgeInstaller(os, arch) {
+function miniforgeInstaller(os, arch) {
     const installer = INSTALLERS[os][arch];
     if (!installer) {
         throw new Error(`Miniforge ${MINIFORGE_VERSION} is unavailable for ${os} ${arch}.`);
@@ -107855,6 +107855,70 @@ function miniforge_miniforgeInstaller(os, arch) {
         ...installer,
         url: `https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/${installer.filename}`,
     };
+}
+
+;// CONCATENATED MODULE: ./src/lfortran_environment.ts
+
+
+
+
+
+
+function lfortranEnvironment(inputs, version) {
+    const toolRoot = process.env.RUNNER_TOOL_CACHE ??
+        external_path_.join(external_os_.tmpdir(), "setup-fortran-tool-cache");
+    const root = external_path_.join(toolRoot, "setup-fortran", "lfortran", inputs.os, inputs.arch, version);
+    const miniforgePrefix = external_path_.join(root, "miniforge");
+    const envPrefix = external_path_.join(root, "env");
+    const windows = inputs.os === OS.Windows;
+    const binDir = windows
+        ? external_path_.join(envPrefix, "Library", "bin")
+        : external_path_.join(envPrefix, "bin");
+    return {
+        root,
+        miniforgePrefix,
+        conda: windows
+            ? external_path_.join(miniforgePrefix, "Scripts", "conda.exe")
+            : external_path_.join(miniforgePrefix, "bin", "conda"),
+        envPrefix,
+        binDir,
+        lfortran: external_path_.join(binDir, windows ? "lfortran.exe" : "lfortran"),
+    };
+}
+async function isReusableLFortranEnvironment(environment, version) {
+    if (!external_fs_.existsSync(environment.conda) ||
+        !external_fs_.existsSync(environment.lfortran)) {
+        return false;
+    }
+    let output = "";
+    try {
+        const exitCode = await exec_exec(environment.conda, ["run", "-p", environment.envPrefix, "lfortran", "--version"], {
+            ignoreReturnCode: true,
+            silent: true,
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+        return exitCode === 0 && output.includes(version);
+    }
+    catch (error) {
+        warning(`Could not validate existing LFortran ${version} environment: ${String(error)}`);
+        return false;
+    }
+}
+function resetLFortranEnvironment(environment) {
+    if (external_fs_.existsSync(environment.root)) {
+        warning(`Removing stale or incomplete LFortran environment at ${environment.root}.`);
+        external_fs_.rmSync(environment.root, { recursive: true, force: true });
+    }
+    external_fs_.mkdirSync(external_path_.dirname(environment.root), { recursive: true });
+}
+function createInstallerTempDir() {
+    const runnerTemp = process.env.RUNNER_TEMP ?? external_os_.tmpdir();
+    external_fs_.mkdirSync(runnerTemp, { recursive: true });
+    return external_fs_.mkdtempSync(external_path_.join(runnerTemp, "setup-fortran-lfortran-"));
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/debian.ts
@@ -107900,51 +107964,55 @@ async function lfortran_debian_installDebian(inputs) {
     }
     const version = resolveVersion(inputs, lfortran_debian_SUPPORTED_VERSIONS);
     info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
-    // Install Miniforge into a dedicated prefix under the runner's temp dir.
-    // Using a fixed path makes it easy to add to PATH later.
-    const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
-    const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const miniforge = miniforge_miniforgeInstaller(OS.Linux, inputs.arch);
-    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
-    await exec_exec("curl", [
-        "-fsSL",
-        "--retry",
-        "3",
-        "--retry-delay",
-        "15",
-        "-o",
-        miniforgeInstaller,
-        miniforge.url,
-    ]);
-    await verifySha256(miniforgeInstaller, miniforge.sha256);
-    info(`Installing Miniforge to ${condaPrefix}...`);
-    await exec_exec("bash", [
-        miniforgeInstaller,
-        "-b", // batch mode, no interactive prompts
-        "-p",
-        condaPrefix,
-    ]);
-    // Point conda at conda-forge only, to avoid the default channel.
-    const condaBin = external_path_.join(condaPrefix, "bin", "conda");
-    await exec_exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
-    info(`Installing lfortran==${version} from conda-forge...`);
-    await exec_exec(condaBin, [
-        "install",
-        "-y",
-        "-c",
-        "conda-forge",
-        `lfortran==${version}`,
-    ]);
-    // The lfortran binary lives in the conda prefix's bin directory.
-    const lfortranBinDir = external_path_.join(condaPrefix, "bin");
-    const lfortranBin = external_path_.join(lfortranBinDir, "lfortran");
-    if (!external_fs_.existsSync(lfortranBin)) {
-        throw new Error(`lfortran binary not found at expected path: ${lfortranBin}`);
+    const environment = lfortranEnvironment(inputs, version);
+    const miniforge = miniforgeInstaller(OS.Linux, inputs.arch);
+    if (await isReusableLFortranEnvironment(environment, version)) {
+        info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
-    info(`Found lfortran binary at: ${lfortranBin}`);
-    addPath(lfortranBinDir);
-    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(condaPrefix, "lib"));
-    const resolvedVersion = await lfortran_debian_resolveInstalledVersion(lfortranBin);
+    else {
+        resetLFortranEnvironment(environment);
+        const tempDir = createInstallerTempDir();
+        const miniforgeInstaller = external_path_.join(tempDir, "miniforge.sh");
+        try {
+            info(`Downloading pinned Miniforge from ${miniforge.url}...`);
+            await exec_exec("curl", [
+                "-fsSL",
+                "--retry",
+                "3",
+                "--retry-delay",
+                "15",
+                "-o",
+                miniforgeInstaller,
+                miniforge.url,
+            ]);
+            await verifySha256(miniforgeInstaller, miniforge.sha256);
+            await exec_exec("bash", [
+                miniforgeInstaller,
+                "-b",
+                "-p",
+                environment.miniforgePrefix,
+            ]);
+            await exec_exec(environment.conda, [
+                "create",
+                "-y",
+                "-p",
+                environment.envPrefix,
+                "-c",
+                "conda-forge",
+                "--strict-channel-priority",
+                `lfortran==${version}`,
+            ]);
+        }
+        finally {
+            external_fs_.rmSync(tempDir, { recursive: true, force: true });
+        }
+    }
+    if (!external_fs_.existsSync(environment.lfortran)) {
+        throw new Error(`lfortran binary not found at expected path: ${environment.lfortran}`);
+    }
+    addPath(environment.binDir);
+    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "lib"));
+    const resolvedVersion = await lfortran_debian_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
@@ -108010,56 +108078,66 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
 async function lfortran_darwin_installDarwin(inputs) {
     const version = resolveVersion(inputs, lfortran_darwin_SUPPORTED_VERSIONS);
     info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
-    // Install Miniforge into a dedicated prefix under the runner's temp dir to
-    // avoid interfering with any pre-existing conda installation on the runner.
-    const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
-    const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const miniforge = miniforge_miniforgeInstaller(OS.MacOS, inputs.arch);
-    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
-    await exec_exec("curl", [
-        "-fsSL",
-        "--retry",
-        "3",
-        "--retry-delay",
-        "15",
-        "-o",
-        miniforgeInstaller,
-        miniforge.url,
-    ]);
-    await verifySha256(miniforgeInstaller, miniforge.sha256);
-    info(`Installing Miniforge to ${condaPrefix}...`);
-    await exec_exec("bash", [
-        miniforgeInstaller,
-        "-b", // batch mode, no interactive prompts
-        "-p",
-        condaPrefix,
-    ]);
-    const condaBin = external_path_.join(condaPrefix, "bin", "conda");
-    await exec_exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
-    info(`Installing lfortran==${version} from conda-forge...`);
-    await exec_exec(condaBin, [
-        "install",
-        "-y",
-        "-c",
-        "conda-forge",
-        `lfortran==${version}`,
-    ]);
-    const lfortranBinDir = external_path_.join(condaPrefix, "bin");
-    const lfortranBin = external_path_.join(lfortranBinDir, "lfortran");
-    if (!external_fs_.existsSync(lfortranBin)) {
-        throw new Error(`lfortran binary not found at expected path: ${lfortranBin}`);
+    const environment = lfortranEnvironment(inputs, version);
+    const miniforge = miniforgeInstaller(OS.MacOS, inputs.arch);
+    if (await isReusableLFortranEnvironment(environment, version)) {
+        info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
-    info(`Found lfortran binary at: ${lfortranBin}`);
+    else {
+        resetLFortranEnvironment(environment);
+        const tempDir = createInstallerTempDir();
+        const miniforgeInstaller = external_path_.join(tempDir, "miniforge.sh");
+        try {
+            await exec_exec("curl", [
+                "-fsSL",
+                "--retry",
+                "3",
+                "--retry-delay",
+                "15",
+                "-o",
+                miniforgeInstaller,
+                miniforge.url,
+            ]);
+            await verifySha256(miniforgeInstaller, miniforge.sha256);
+            await exec_exec("bash", [
+                miniforgeInstaller,
+                "-b",
+                "-p",
+                environment.miniforgePrefix,
+            ]);
+            await exec_exec(environment.conda, [
+                "create",
+                "-y",
+                "-p",
+                environment.envPrefix,
+                "-c",
+                "conda-forge",
+                "--strict-channel-priority",
+                `lfortran==${version}`,
+            ]);
+        }
+        finally {
+            external_fs_.rmSync(tempDir, { recursive: true, force: true });
+        }
+    }
+    if (!external_fs_.existsSync(environment.lfortran)) {
+        throw new Error(`lfortran binary not found at expected path: ${environment.lfortran}`);
+    }
+    info(`Found lfortran binary at: ${environment.lfortran}`);
     // Fix rpath of lfortran binary to ensure it can find its shared libraries
     // (like libxeus-zmq) when run outside of a conda environment.
-    const libDir = external_path_.join(condaPrefix, "lib");
+    const libDir = external_path_.join(environment.envPrefix, "lib");
     try {
-        await exec_exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+        await exec_exec("install_name_tool", [
+            "-add_rpath",
+            libDir,
+            environment.lfortran,
+        ]);
     }
     catch (e) {
         core_debug(`install_name_tool failed: ${String(e)}`);
     }
-    addPath(lfortranBinDir);
+    addPath(environment.binDir);
     exportVariable("LFORTRAN_OMP_LIB_DIR", libDir);
     // As an additional safety measure, set DYLD_FALLBACK_LIBRARY_PATH.
     // Note: we use fallback to avoid overriding system libraries if possible.
@@ -108082,11 +108160,11 @@ async function lfortran_darwin_installDarwin(inputs) {
         const error = e instanceof Error ? e.message : String(e);
         warning(`Could not determine SDKROOT via xcrun: ${error}`);
     }
-    const resolvedVersion = await lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix);
+    const resolvedVersion = await lfortran_darwin_resolveInstalledVersion(environment.conda, environment.envPrefix);
     info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
     const result = {
         version: resolvedVersion,
-        fc: lfortranBin,
+        fc: environment.lfortran,
         cc: "clang",
         cxx: "clang++",
     };
@@ -108105,6 +108183,7 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/win32.ts
+
 
 
 
@@ -108165,61 +108244,56 @@ async function lfortran_win32_installWin32(inputs) {
 //   All three need to be on PATH for the toolchain to work correctly.
 async function installConda(inputs) {
     const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
-    const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
-    if (external_fs_.existsSync(gitLink)) {
-        info("Moving conflicting Git link.exe to link.exe.bak...");
-        try {
-            external_fs_.renameSync(gitLink, `${gitLink}.bak`);
-        }
-        catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            warning(`Could not move Git link.exe: ${message}`);
-        }
-    }
     info(`Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`);
-    const condaPrefix = "C:\\lfortran-conda";
-    const miniforgeInstaller = "C:\\miniforge-install.exe";
-    const miniforge = miniforge_miniforgeInstaller(OS.Windows, inputs.arch);
-    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
-    await exec_exec("curl", [
-        "-fsSL",
-        "--retry",
-        "3",
-        "--retry-delay",
-        "15",
-        "-o",
-        miniforgeInstaller,
-        miniforge.url,
-    ]);
-    await verifySha256(miniforgeInstaller, miniforge.sha256);
-    // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
-    // install prefix and must be the last argument with no quotes around the path.
-    info(`Installing Miniforge to ${condaPrefix}...`);
-    await exec_exec(miniforgeInstaller, ["/S", `/D=${condaPrefix}`]);
-    const condaExe = external_path_.join(condaPrefix, "Scripts", "conda.exe");
-    info(`Installing lfortran==${version} from conda-forge...`);
-    await exec_exec(`"${condaExe}"`, [
-        "create",
-        "-y",
-        "-n",
-        "lfortran",
-        "-c",
-        "conda-forge",
-        "--solver=classic",
-        `lfortran==${version}`,
-        "lld",
-    ]);
-    const envPrefix = external_path_.join(condaPrefix, "envs", "lfortran");
-    const libraryBin = external_path_.join(envPrefix, "Library", "bin");
-    const lfortranExe = external_path_.join(libraryBin, "lfortran.exe");
-    if (!external_fs_.existsSync(lfortranExe)) {
-        throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
+    const environment = lfortranEnvironment(inputs, version);
+    const miniforge = miniforgeInstaller(OS.Windows, inputs.arch);
+    if (await isReusableLFortranEnvironment(environment, version)) {
+        info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
-    addPath(envPrefix);
-    addPath(external_path_.join(envPrefix, "Scripts"));
-    addPath(libraryBin);
-    const lldLink = external_path_.join(libraryBin, "lld-link.exe");
-    const proxyLink = external_path_.join(libraryBin, "link.exe");
+    else {
+        resetLFortranEnvironment(environment);
+        const tempDir = createInstallerTempDir();
+        const miniforgeInstaller = external_path_.join(tempDir, "miniforge-install.exe");
+        try {
+            await exec_exec("curl", [
+                "-fsSL",
+                "--retry",
+                "3",
+                "--retry-delay",
+                "15",
+                "-o",
+                miniforgeInstaller,
+                miniforge.url,
+            ]);
+            await verifySha256(miniforgeInstaller, miniforge.sha256);
+            await exec_exec(miniforgeInstaller, [
+                "/S",
+                `/D=${environment.miniforgePrefix}`,
+            ]);
+            await exec_exec(environment.conda, [
+                "create",
+                "-y",
+                "-p",
+                environment.envPrefix,
+                "-c",
+                "conda-forge",
+                "--solver=classic",
+                `lfortran==${version}`,
+                "lld",
+            ]);
+        }
+        finally {
+            external_fs_.rmSync(tempDir, { recursive: true, force: true });
+        }
+    }
+    if (!external_fs_.existsSync(environment.lfortran)) {
+        throw new Error(`lfortran.exe not found at expected path: ${environment.lfortran}`);
+    }
+    addPath(environment.envPrefix);
+    addPath(external_path_.join(environment.envPrefix, "Scripts"));
+    addPath(environment.binDir);
+    const lldLink = external_path_.join(environment.binDir, "lld-link.exe");
+    const proxyLink = external_path_.join(environment.binDir, "link.exe");
     if (external_fs_.existsSync(lldLink)) {
         if (!external_fs_.existsSync(proxyLink)) {
             info("Creating link.exe proxy for lld-link.exe...");
@@ -108239,14 +108313,14 @@ async function installConda(inputs) {
     else {
         warning("lld-link.exe not found; LFortran may fail to link on Windows.");
     }
-    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(envPrefix, "Library", "lib"));
-    const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
+    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "Library", "lib"));
+    const resolvedVersion = await lfortran_win32_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
     const result = {
         version: resolvedVersion,
-        fc: lfortranExe,
-        cc: external_path_.join(libraryBin, "clang.exe"),
-        cxx: external_path_.join(libraryBin, "clang++.exe"),
+        fc: environment.lfortran,
+        cc: external_path_.join(environment.binDir, "clang.exe"),
+        cxx: external_path_.join(environment.binDir, "clang++.exe"),
     };
     return result;
 }
@@ -108254,13 +108328,28 @@ async function installConda(inputs) {
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
 async function lfortran_win32_installMSYS2(inputs) {
     info(`Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
-    await setupMSYS2(inputs.msystem, ["lfortran"]);
     const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
+    let resolvedVersion;
+    if (external_fs_.existsSync(lfortranExe)) {
+        try {
+            resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
+            info(`Reusing existing LFortran ${resolvedVersion} from ${lfortranExe}.`);
+        }
+        catch (error) {
+            warning(`Existing MSYS2 LFortran is unusable; reinstalling it: ${String(error)}`);
+        }
+    }
+    if (!resolvedVersion) {
+        await setupMSYS2(inputs.msystem, ["lfortran"]);
+        if (!external_fs_.existsSync(lfortranExe)) {
+            throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
+        }
+        resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
+    }
     addPath(msysBin);
     exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", inputs.msystem, "lib"));
     exportVariable("WINDOWS_ENV", inputs.msystem);
-    const resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${inputs.msystem}).`);
     const result = {
         version: resolvedVersion,

@@ -3,13 +3,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { installWin32 } from "../../../src/installers/lfortran/win32";
 import { setupMSYS2 } from "../../../src/setup_msys2";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -29,6 +23,7 @@ describe("installWin32 (LFortran)", () => {
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
+  let environmentCreated: boolean;
 
   const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
@@ -36,14 +31,25 @@ describe("installWin32 (LFortran)", () => {
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFs.existsSync.mockReturnValue(true);
+    environmentCreated = false;
+    mockedSetupMSYS2.mockImplementation(async () => {
+      environmentCreated = true;
+    });
+    mockedFs.existsSync.mockImplementation((filePath) => {
+      if (String(filePath).endsWith("lld-link.exe")) return environmentCreated;
+      return environmentCreated;
+    });
     mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (args?.[0] === "create") environmentCreated = true;
+      if (args?.[0] === "run" && args.includes("lfortran")) {
+        options?.listeners?.stdout?.(Buffer.from("LFortran version 0.63.0"));
+      }
       if (commandLine.includes("lfortran") && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("LFortran version 0.63.0"));
@@ -69,7 +75,7 @@ describe("installWin32 (LFortran)", () => {
       ]);
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining("miniforge-install.exe"),
-        ["/S", "/D=C:\\lfortran-conda"],
+        ["/S", expect.stringContaining("/D=")],
       );
     });
 
@@ -78,15 +84,36 @@ describe("installWin32 (LFortran)", () => {
 
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining("conda.exe"),
-        expect.arrayContaining(["create", "-y", "-n", "lfortran", "lfortran==0.63.0"]),
+        expect.arrayContaining([
+          "create",
+          "-y",
+          "-p",
+          expect.stringContaining("0.63.0"),
+          "lfortran==0.63.0",
+        ]),
       );
+    });
+
+    it("reuses a valid environment on a second invocation", async () => {
+      await installWin32(baseInputs);
+      await installWin32(baseInputs);
+
+      expect(
+        mockedExec.mock.calls.filter(([command]) => command === "curl"),
+      ).toHaveLength(1);
+      expect(mockedFs.renameSync).not.toHaveBeenCalled();
     });
 
     it("exports environment variables and sets linker", async () => {
       await installWin32(baseInputs);
 
-      expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("lfortran"));
-      expect(mockedExportVariable).toHaveBeenCalledWith("LFORTRAN_LINKER", expect.stringContaining("link.exe"));
+      expect(core.addPath).toHaveBeenCalledWith(
+        expect.stringContaining("lfortran"),
+      );
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "LFORTRAN_LINKER",
+        expect.stringContaining("link.exe"),
+      );
     });
   });
 
@@ -95,7 +122,17 @@ describe("installWin32 (LFortran)", () => {
       const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
       await installWin32(inputs);
 
-      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["lfortran"]);
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
+        "lfortran",
+      ]);
+    });
+
+    it("reuses a working MSYS2 installation on a second invocation", async () => {
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      await installWin32(inputs);
+      await installWin32(inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledTimes(1);
     });
   });
 });

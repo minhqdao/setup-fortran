@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { installDarwin } from "../../../src/installers/lfortran/darwin";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -24,6 +18,7 @@ describe("installDarwin (LFortran)", () => {
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
+  let environmentCreated: boolean;
 
   const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
@@ -31,14 +26,16 @@ describe("installDarwin (LFortran)", () => {
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFs.existsSync.mockReturnValue(true);
+    environmentCreated = false;
+    mockedFs.existsSync.mockImplementation(() => environmentCreated);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (args?.[0] === "create") environmentCreated = true;
       if (
         commandLine.includes("conda") &&
         args?.[0] === "run" &&
@@ -75,7 +72,7 @@ describe("installDarwin (LFortran)", () => {
       expect.stringContaining("miniforge.sh"),
       "-b",
       "-p",
-      expect.stringContaining("lfortran-conda"),
+      expect.stringContaining("miniforge"),
     ]);
   });
 
@@ -84,15 +81,33 @@ describe("installDarwin (LFortran)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith(
       expect.stringContaining("conda"),
-      ["install", "-y", "-c", "conda-forge", "lfortran==0.63.0"],
+      expect.arrayContaining([
+        "create",
+        "-y",
+        "-p",
+        expect.stringContaining("0.63.0"),
+        "lfortran==0.63.0",
+      ]),
     );
+  });
+
+  it("reuses a valid environment on a second invocation", async () => {
+    await installDarwin(baseInputs);
+    await installDarwin(baseInputs);
+
+    expect(
+      mockedExec.mock.calls.filter(([command]) => command === "curl"),
+    ).toHaveLength(1);
   });
 
   it("exports environment variables and SDKROOT", async () => {
     await installDarwin(baseInputs);
 
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
-    expect(mockedExportVariable).toHaveBeenCalledWith("SDKROOT", "/path/to/SDK");
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "SDKROOT",
+      "/path/to/SDK",
+    );
   });
 
   it("resolves and returns the installed version", async () => {

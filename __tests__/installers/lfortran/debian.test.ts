@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/lfortran/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -16,6 +10,7 @@ jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 
 describe("installDebian (LFortran)", () => {
@@ -24,6 +19,7 @@ describe("installDebian (LFortran)", () => {
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
+  let environmentCreated: boolean;
 
   const baseInputs: Inputs = {
     compiler: Compiler.LFortran,
@@ -31,14 +27,19 @@ describe("installDebian (LFortran)", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFs.existsSync.mockReturnValue(true);
+    environmentCreated = false;
+    mockedFs.existsSync.mockImplementation(() => environmentCreated);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (args?.[0] === "create") environmentCreated = true;
+      if (args?.[0] === "run" && args.includes("lfortran")) {
+        options?.listeners?.stdout?.(Buffer.from("LFortran version 0.63.0"));
+      }
       if (commandLine.includes("lfortran") && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("LFortran version 0.63.0"));
@@ -65,7 +66,7 @@ describe("installDebian (LFortran)", () => {
       expect.stringContaining("miniforge.sh"),
       "-b",
       "-p",
-      expect.stringContaining("lfortran-conda"),
+      expect.stringContaining("miniforge"),
     ]);
   });
 
@@ -74,8 +75,44 @@ describe("installDebian (LFortran)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith(
       expect.stringContaining("conda"),
-      ["install", "-y", "-c", "conda-forge", "lfortran==0.63.0"],
+      expect.arrayContaining([
+        "create",
+        "-y",
+        "-p",
+        expect.stringContaining("0.63.0"),
+        "lfortran==0.63.0",
+      ]),
     );
+  });
+
+  it("reuses a valid environment on a second invocation", async () => {
+    await installDebian(baseInputs);
+    await installDebian(baseInputs);
+
+    expect(
+      mockedExec.mock.calls.filter(([command]) => command === "curl"),
+    ).toHaveLength(1);
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining("Reusing LFortran 0.63.0"),
+    );
+  });
+
+  it("removes and rebuilds a partial versioned environment", async () => {
+    mockedFs.existsSync.mockImplementation((filePath) => {
+      if (environmentCreated) return true;
+      const value = String(filePath);
+      if (value.endsWith("/miniforge/bin/conda")) return true;
+      if (value.endsWith("/env/bin/lfortran")) return false;
+      return value.includes("/setup-fortran/lfortran/linux/x64/0.63.0");
+    });
+
+    await installDebian(baseInputs);
+
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(
+      expect.stringContaining("setup-fortran/lfortran/linux/x64/0.63.0"),
+      { recursive: true, force: true },
+    );
+    expect(mockedExec).toHaveBeenCalledWith("curl", expect.any(Array));
   });
 
   it("throws error on ARM64", async () => {
