@@ -258,11 +258,11 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
     toolchain:
       - { compiler: gfortran, version: "15" }
-      - { compiler: ifx, version: "2016.1" }
+      - { compiler: ifx, version: "2026.1" }
       - { compiler: lfortran, version: "0.64.0" }
     exclude:
       - os: macos-latest
-        toolchain: { compiler: ifx, version: "2016.1" }
+        toolchain: { compiler: ifx, version: "2026.1" }
     include:
       - os: windows-11-arm
         toolchain: { compiler: flang, version: "22"}
