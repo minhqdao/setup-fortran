@@ -103202,9 +103202,7 @@ async function installDarwin(inputs) {
         });
         if (sdkPath) {
             exportVariable("SDKROOT", sdkPath);
-            exportVariable("LIBRARY_PATH", [actualLibDir, `${sdkPath}/usr/lib`, existingLibraryPath]
-                .filter(Boolean)
-                .join(":"));
+            exportVariable("LIBRARY_PATH", [`${sdkPath}/usr/lib`, existingLibraryPath].filter(Boolean).join(":"));
         }
     }
     catch (e) {

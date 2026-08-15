@@ -110,6 +110,10 @@ describe("installDarwin (gfortran)", () => {
       "DYLD_FALLBACK_LIBRARY_PATH",
       expect.stringContaining("/lib/gcc/14"),
     );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "LIBRARY_PATH",
+      "/path/to/SDK/usr/lib",
+    );
   });
 
   it("resolves and returns the installed version", async () => {

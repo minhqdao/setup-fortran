@@ -99,9 +99,7 @@ export async function installDarwin(
       core.exportVariable("SDKROOT", sdkPath);
       core.exportVariable(
         "LIBRARY_PATH",
-        [actualLibDir, `${sdkPath}/usr/lib`, existingLibraryPath]
-          .filter(Boolean)
-          .join(":"),
+        [`${sdkPath}/usr/lib`, existingLibraryPath].filter(Boolean).join(":"),
       );
     }
   } catch (e) {
