@@ -118,7 +118,7 @@ export async function installDarwin(
     );
   }
 
-  const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
+  const cacheKey = `ifort-darwin-verified-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   // 1. Ensure directory exists AND set ownership to current runner user
@@ -141,6 +141,8 @@ export async function installDarwin(
     );
 
     const dmgPath = await downloadInstaller(release.url, targetPath);
+    core.info("Verifying the downloaded DMG integrity...");
+    await exec.exec("hdiutil", ["verify", dmgPath]);
 
     const mountPoint = "/Volumes/Intel_oneAPI_Installer";
 

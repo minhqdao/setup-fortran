@@ -14,6 +14,7 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 import { addMsvcBinFromPath } from "../../setup_msvc";
+import { verifyIntelAuthenticode } from "../../verify_download";
 
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
@@ -149,7 +150,7 @@ export async function installWin32(
 
   core.info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
+  const cacheKey = `ifx-win32-authenticode-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -183,6 +184,7 @@ export async function installWin32(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`),
     );
+    await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
     await runInstallerWithRetry(installerPath);

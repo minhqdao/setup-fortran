@@ -16,6 +16,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/tool-cache");
 jest.mock("../../../src/setup_msys2");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -25,11 +26,19 @@ jest.mock("fs", () => ({
 
 describe("installWin32 (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => ({
       ok: true,
       status: 200,
-      json: async () => [{ tag_name: "llvmorg-22.1.0", prerelease: false }],
-    } as unknown as Response);
+      json: async () =>
+        String(input).includes("/releases?")
+          ? [{ tag_name: "llvmorg-22.1.0", prerelease: false }]
+          : {
+              assets: [{
+                name: "LLVM-22.1.0-win64.exe",
+                digest: `sha256:${"a".repeat(64)}`,
+              }],
+            },
+    }) as unknown as Response);
   });
 
   afterEach(() => {

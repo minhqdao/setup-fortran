@@ -14,6 +14,7 @@ import {
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("../../../src/setup_msys2");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -64,7 +65,7 @@ describe("installWin32 (LFortran)", () => {
         "15",
         "-o",
         expect.stringContaining("miniforge-install.exe"),
-        expect.stringContaining("Miniforge3-Windows-x86_64.exe"),
+        expect.stringContaining("Miniforge3-26.3.2-2-Windows-x86_64.exe"),
       ]);
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining("miniforge-install.exe"),

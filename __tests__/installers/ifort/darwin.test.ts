@@ -16,6 +16,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
 jest.mock("@actions/tool-cache");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),

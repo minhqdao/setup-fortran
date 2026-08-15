@@ -104191,10 +104191,21 @@ async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `l
     if (!release) {
         throw new Error(`Failed to fetch release metadata for tag ${tag} in ${repo}.`);
     }
-    if (!release.assets.some((a) => a.name === filename)) {
+    const asset = release.assets.find((a) => a.name === filename);
+    if (!asset) {
         throw new Error(`Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
             `See https://github.com/${repo}/releases/tag/${tag} for available assets.`);
     }
+    if (!asset.digest?.startsWith("sha256:")) {
+        warning(`GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}; ` +
+            `download integrity cannot be verified automatically for this legacy asset.`);
+        return undefined;
+    }
+    const digest = asset.digest.slice("sha256:".length).toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(digest)) {
+        throw new Error(`GitHub returned an invalid SHA-256 digest for ${repo} release asset ${filename}.`);
+    }
+    return digest;
 }
 function githubHeaders() {
     const headers = {
@@ -105382,7 +105393,47 @@ function msys2PkgName(msystem, pkg) {
     return `${prefix}-${pkg}`;
 }
 
+;// CONCATENATED MODULE: ./src/verify_download.ts
+
+
+
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+async function computeSha256(filePath) {
+    const hash = external_crypto_.createHash("sha256");
+    const stream = external_fs_.createReadStream(filePath);
+    await new Promise((resolve, reject) => {
+        stream.on("data", (chunk) => hash.update(chunk));
+        stream.on("error", reject);
+        stream.on("end", resolve);
+    });
+    return hash.digest("hex");
+}
+async function verifySha256(filePath, expectedSha256) {
+    const expected = expectedSha256.toLowerCase();
+    if (!SHA256_PATTERN.test(expected)) {
+        throw new Error(`Invalid expected SHA-256 digest: ${expectedSha256}`);
+    }
+    const actual = await computeSha256(filePath);
+    if (actual !== expected) {
+        throw new Error(`SHA-256 verification failed for ${filePath}. Expected ${expected}, got ${actual}.`);
+    }
+}
+async function verifyIntelAuthenticode(installerPath) {
+    const script = [
+        "$signature = Get-AuthenticodeSignature -LiteralPath $env:SETUP_FORTRAN_INSTALLER",
+        "if ($signature.Status -ne 'Valid') { throw \"Invalid Authenticode signature: $($signature.Status)\" }",
+        "if ($signature.SignerCertificate.Subject -notmatch 'Intel Corporation') { throw \"Unexpected signer: $($signature.SignerCertificate.Subject)\" }",
+    ].join("; ");
+    await exec_exec("powershell", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
+        env: {
+            ...process.env,
+            SETUP_FORTRAN_INSTALLER: installerPath,
+        },
+    });
+}
+
 ;// CONCATENATED MODULE: ./src/installers/gfortran/win32.ts
+
 
 
 
@@ -105396,26 +105447,32 @@ const GCC_RELEASES = [
     {
         version: "16",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r1.zip",
+        sha256: "325771f545e89f62c0e1fafdbf0066cc49e3321aeca7b704c8d065e97a72f2fb",
     },
     {
         version: "15",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/15.2.0posix-14.0.0-ucrt-r7/winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-14.0.0-r7.zip",
+        sha256: "cb2fbad6162540cdf5e1facdce08d4dac359e8cf64f7f696a99274291763b815",
     },
     {
         version: "14",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/14.3.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-14.3.0-mingw-w64ucrt-12.0.0-r1.zip",
+        sha256: "d6e83bf3cfff02ddcb4ccb485a8a162e3852bf09976d0cb9d521f3d0d6855ea3",
     },
     {
         version: "13",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/13.3.0posix-11.0.1-ucrt-r1/winlibs-x86_64-posix-seh-gcc-13.3.0-mingw-w64ucrt-11.0.1-r1.zip",
+        sha256: "6c90485da4d9966683a83a1e5f3a0b1084d2a5ba2e57e8b27c0634afe3983776",
     },
     {
         version: "12",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/12.4.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-12.4.0-mingw-w64ucrt-12.0.0-r1.zip",
+        sha256: "5f8c427e555c3dc93364b83a107aca914774eda213acf42fe16dcd45bac91ff2",
     },
     {
         version: "11",
         url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/11.5.0posix-12.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64ucrt-12.0.0-r1.zip",
+        sha256: "cee970ee45be022e79f5b3409c41e0a37b3bf45f17c00343cb31ae7b2874e501",
     },
 ];
 const win32_SUPPORTED_VERSIONS = {
@@ -105449,15 +105506,16 @@ async function installNative(inputs, version) {
         throw new Error(`Unsupported GFortran version: ${version}`);
     }
     const downloadUrl = release.url;
-    let toolRoot = find(`gfortran-${inputs.msystem}`, version, inputs.arch);
+    let toolRoot = find(`gfortran-verified-${inputs.msystem}`, version, inputs.arch);
     if (!toolRoot) {
         info(`Downloading GFortran ${version} from ${downloadUrl}`);
         const downloadPath = await downloadTool(downloadUrl);
+        await verifySha256(downloadPath, release.sha256);
         info(`Extracting GFortran ${version} from ${downloadPath}...`);
         const extractPath = await extractZip(downloadPath);
         const actualToolDir = external_path_.join(extractPath, "mingw64");
         info(`Caching GFortran ${version} in ${actualToolDir}...`);
-        toolRoot = await cacheDir(actualToolDir, `gfortran-${inputs.msystem}`, version, inputs.arch);
+        toolRoot = await cacheDir(actualToolDir, `gfortran-verified-${inputs.msystem}`, version, inputs.arch);
     }
     const binPath = external_path_.join(toolRoot, "bin");
     addPath(binPath);
@@ -105724,6 +105782,7 @@ function addMsvcBinFromPath(pathValue) {
 
 
 
+
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
 const IFX_RELEASES = [
@@ -105848,7 +105907,7 @@ async function win32_installWin32(inputs) {
             `This is a bug — please open an issue.`);
     }
     info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
-    const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
+    const cacheKey = `ifx-win32-authenticode-v1-${inputs.arch}-${version}`;
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_.existsSync(ONEAPI_ROOT)) {
         external_fs_.mkdirSync(ONEAPI_ROOT, { recursive: true });
@@ -105874,6 +105933,7 @@ async function win32_installWin32(inputs) {
     else {
         info(`Downloading installer...`);
         const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
         await runInstallerWithRetry(installerPath);
         info("Saving installation to cache...");
@@ -106227,7 +106287,7 @@ async function darwin_installDarwin(inputs) {
         throw new Error("Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
             "Please ensure your workflow uses an x64 runner or Intel environment.");
     }
-    const cacheKey = `ifort-darwin-${inputs.arch}-${version}`;
+    const cacheKey = `ifort-darwin-verified-v1-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];
     // 1. Ensure directory exists AND set ownership to current runner user
     // (Prevents gtar extraction failure during cache restoration)
@@ -106245,6 +106305,8 @@ async function darwin_installDarwin(inputs) {
         info(`Downloading ifort DMG installer...`);
         const targetPath = external_path_default().join(process.env.RUNNER_TEMP ?? "/tmp", `ifort-${version}.dmg`);
         const dmgPath = await downloadInstaller(release.url, targetPath);
+        info("Verifying the downloaded DMG integrity...");
+        await exec_exec("hdiutil", ["verify", dmgPath]);
         const mountPoint = "/Volumes/Intel_oneAPI_Installer";
         try {
             info("Mounting DMG...");
@@ -106339,6 +106401,7 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 
 
+
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry
@@ -106398,7 +106461,7 @@ async function ifort_win32_installWin32(inputs) {
             `This is likely a legacy version issue — please check release compatibility.`);
     }
     info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
-    const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
+    const cacheKey = `ifort-win32-authenticode-v1-${inputs.arch}-${version}`;
     const cachePaths = [win32_ONEAPI_ROOT];
     if (!external_fs_.existsSync(win32_ONEAPI_ROOT)) {
         external_fs_.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
@@ -106410,6 +106473,7 @@ async function ifort_win32_installWin32(inputs) {
     else {
         info(`Downloading ifort installer...`);
         const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
+        await verifyIntelAuthenticode(installerPath);
         info("Running silent install (this may take several minutes)...");
         await exec_exec(`"${installerPath}"`, [
             "-s",
@@ -106511,6 +106575,7 @@ async function installIFort(inputs) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
+
 
 
 
@@ -106679,51 +106744,34 @@ async function needsLegacyNcursesInstall() {
 async function installLegacyNcurses(inputs) {
     info("Backfilling legacy ncurses5 libs...");
     const debArch = APT_ARCH[inputs.arch];
-    const baseUrl = inputs.arch === Arch.ARM64
-        ? "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
-        : "https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
-    const directUrls = {
+    const packages = {
         arm64: {
-            tinfo: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
-            ncurses: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+            libtinfo5: {
+                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
+                sha256: "bff6bf29035a4bbd5aa3584bfbc86c2d414cb468a22dbd09fe601b0d39ce4e67",
+            },
+            libncursesw5: {
+                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+                sha256: "4abc034de6d0fe55032bdee039603b7a361ca1980c4f7faf781b64496ef0412a",
+            },
         },
         amd64: {
-            tinfo: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
-            ncurses: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+            libtinfo5: {
+                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
+                sha256: "d2597b5aec92a930cf549e1b429ad892595813e72ec7814685ea146a9fb715e5",
+            },
+            libncursesw5: {
+                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+                sha256: "2cfb737d61b4243846ba3f8d70dac7307fab355aa43cbd2cb9d023bf8d606a5c",
+            },
         },
     };
-    let tinfoUrl = "";
-    let ncursesUrl = "";
-    try {
-        let dirListing = "";
-        await exec_exec("curl", [...CURL_RETRY_ARGS, baseUrl], {
-            listeners: { stdout: (data) => (dirListing += data.toString()) },
-        });
-        const tinfoRegex = new RegExp(`href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
-        const ncursesRegex = new RegExp(`href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`, "g");
-        const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
-        const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
-        if (tinfoMatches.length > 0 && ncursesMatches.length > 0) {
-            tinfoUrl = `${baseUrl}${tinfoMatches[tinfoMatches.length - 1][1]}`;
-            ncursesUrl = `${baseUrl}${ncursesMatches[ncursesMatches.length - 1][1]}`;
-        }
-    }
-    catch (e) {
-        warning(`Directory scraping failed (${String(e)}). Using direct Launchpad HTTPS mirror.`);
-    }
-    if (!tinfoUrl || !ncursesUrl) {
-        const fallbacks = directUrls[debArch];
-        tinfoUrl = fallbacks.tinfo;
-        ncursesUrl = fallbacks.ncurses;
-    }
-    for (const [pkgName, url] of [
-        ["libtinfo5", tinfoUrl],
-        ["libncursesw5", ncursesUrl],
-    ]) {
-        const debFile = external_path_.basename(url);
+    for (const [pkgName, metadata] of Object.entries(packages[debArch])) {
+        const debFile = external_path_.basename(metadata.url);
         const dest = external_path_.join(external_os_.tmpdir(), debFile);
         info(`Downloading ${pkgName}...`);
-        await exec_exec("curl", [...CURL_RETRY_ARGS, "-o", dest, url]);
+        await exec_exec("curl", [...CURL_RETRY_ARGS, "-o", dest, metadata.url]);
+        await verifySha256(dest, metadata.sha256);
         info(`Installing ${debFile} via dpkg...`);
         await exec_exec("sudo", ["dpkg", "-i", dest]);
     }
@@ -107095,6 +107143,9 @@ async function installAOCC(inputs) {
 
 
 
+
+
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107113,6 +107164,66 @@ const flang_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16"],
     [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
 };
+const LLVM_APT_KEY_SHA256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+function ubuntuCodename(osVersion) {
+    if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
+        return "noble";
+    }
+    if (osVersion.includes("22.04") || osVersion.includes("ubuntu22")) {
+        return "jammy";
+    }
+    throw new Error(`Flang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
+}
+async function configureLlvmAptRepository(version, osVersion) {
+    const codename = ubuntuCodename(osVersion);
+    const tempDir = external_fs_.mkdtempSync(external_path_.join(external_os_.tmpdir(), "setup-fortran-llvm-"));
+    const downloadedKey = external_path_.join(tempDir, "llvm-snapshot.gpg.key");
+    const keyring = external_path_.join(tempDir, "llvm-snapshot.gpg");
+    const sourceList = external_path_.join(tempDir, "llvm.list");
+    try {
+        await exec_exec("curl", [
+            "-4",
+            "-fsSL",
+            "--connect-timeout",
+            "10",
+            "--max-time",
+            "60",
+            "--retry",
+            "3",
+            "--retry-delay",
+            "5",
+            "-o",
+            downloadedKey,
+            "https://apt.llvm.org/llvm-snapshot.gpg.key",
+        ]);
+        await verifySha256(downloadedKey, LLVM_APT_KEY_SHA256);
+        await exec_exec("gpg", [
+            "--dearmor",
+            "--yes",
+            "--output",
+            keyring,
+            downloadedKey,
+        ]);
+        external_fs_.writeFileSync(sourceList, `deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] https://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${version} main\n`);
+        await exec_exec("sudo", [
+            "install",
+            "-m",
+            "0644",
+            keyring,
+            "/usr/share/keyrings/llvm-snapshot.gpg",
+        ]);
+        await exec_exec("sudo", [
+            "install",
+            "-m",
+            "0644",
+            sourceList,
+            "/etc/apt/sources.list.d/llvm.list",
+        ]);
+    }
+    finally {
+        external_fs_.rmSync(tempDir, { recursive: true, force: true });
+    }
+}
 // Returns the name of the canonical flang binary for a given major version.
 // This reflects the upstream rename from `flang-new` to `flang` in LLVM 20.
 function flangBinaryName(major) {
@@ -107181,15 +107292,9 @@ async function flang_debian_installDebian(inputs) {
             await exec_exec("sudo", replaceMirrors(target));
         }
     }
-    info(`Adding LLVM ${version} apt repository via apt.llvm.org...`);
-    // Add timeouts to curl so it fails fast if apt.llvm.org drops connection
-    await exec_exec("bash", [
-        "-c",
-        [
-            `curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh`,
-            `| sudo bash -s -- ${version}`,
-        ].join(" "),
-    ]);
+    info(`Adding the verified LLVM ${version} apt repository...`);
+    await configureLlvmAptRepository(version, inputs.osVersion);
+    await exec_exec("sudo", ["apt-get", "update", "-y"]);
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
     await exec_exec("sudo", [
@@ -107251,6 +107356,7 @@ async function flang_debian_resolveInstalledVersion(fc) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107282,14 +107388,14 @@ async function flang_darwin_installDarwin(inputs) {
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
     let patch;
     if (userPatch !== undefined) {
-        const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
-        await verifyAssetExists("llvm/llvm-project", userPatch, filename);
         patch = userPatch;
     }
     else {
         patch = await resolveLatestPatch("llvm/llvm-project", major);
     }
-    return await installFromGitHub(inputs, major, patch);
+    const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
+    const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
+    return await installFromGitHub(inputs, major, patch, expectedSha256);
 }
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
 // tracks the latest LLVM release. Any version input that resolved to LATEST
@@ -107341,17 +107447,20 @@ async function installBrew(inputs) {
 }
 // Downloads and installs a specific flang version from official LLVM GitHub
 // releases as a .tar.xz archive.
-async function installFromGitHub(inputs, major, patch) {
+async function installFromGitHub(inputs, major, patch, expectedSha256) {
     const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
     const filename = `LLVM-${patch}-${suffix}.tar.xz`;
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
     info(`Installing Flang ${major} (${patch}) on macOS (${inputs.arch})...`);
     // Key the cache on the full patch version so a new patch release always
     // triggers a fresh download rather than serving a stale cached binary.
-    let toolRoot = find("flang", patch, inputs.arch);
+    let toolRoot = find("flang-verified", patch, inputs.arch);
     if (!toolRoot) {
         info(`Downloading ${filename}...`);
         const downloadPath = await downloadTool(downloadUrl);
+        if (expectedSha256) {
+            await verifySha256(downloadPath, expectedSha256);
+        }
         info("Extracting archive...");
         // The archive has a single top-level directory; strip it so toolRoot is
         // directly the install dir containing bin/, lib/, etc.
@@ -107360,7 +107469,7 @@ async function installFromGitHub(inputs, major, patch) {
             "--strip-components=1",
         ]);
         info("Caching...");
-        toolRoot = await cacheDir(extractPath, "flang", patch, inputs.arch);
+        toolRoot = await cacheDir(extractPath, "flang-verified", patch, inputs.arch);
     }
     else {
         info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
@@ -107433,6 +107542,7 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/win32.ts
+
 
 
 
@@ -107560,8 +107670,6 @@ async function win32_installNative(inputs) {
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
     let patch;
     if (userPatch !== undefined) {
-        const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[inputs.arch]}.exe`;
-        await verifyAssetExists("llvm/llvm-project", userPatch, filename);
         patch = userPatch;
     }
     else {
@@ -107569,17 +107677,21 @@ async function win32_installNative(inputs) {
     }
     const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
     const filename = `LLVM-${patch}-${suffix}.exe`;
+    const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
     info(`Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`);
-    let toolRoot = find("flang", patch, inputs.arch);
+    let toolRoot = find("flang-verified", patch, inputs.arch);
     if (!toolRoot) {
         info(`Downloading ${filename}...`);
         const downloadPath = await downloadTool(downloadUrl);
+        if (expectedSha256) {
+            await verifySha256(downloadPath, expectedSha256);
+        }
         const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
         external_fs_.mkdirSync(tempExtractDir, { recursive: true });
         await extractExe(downloadPath, tempExtractDir);
         info("Caching...");
-        toolRoot = await cacheDir(tempExtractDir, "flang", patch, inputs.arch);
+        toolRoot = await cacheDir(tempExtractDir, "flang-verified", patch, inputs.arch);
     }
     else {
         info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
@@ -107655,7 +107767,47 @@ async function installFlang(inputs) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/miniforge.ts
+
+const MINIFORGE_VERSION = "26.3.2-2";
+const INSTALLERS = {
+    [OS.Linux]: {
+        [Arch.X64]: {
+            filename: `Miniforge3-${MINIFORGE_VERSION}-Linux-x86_64.sh`,
+            sha256: "42260ffe3830fb953d5eee1bbb32229ff06aa7c3833c1ed7a9a0420a95685d94",
+        },
+    },
+    [OS.MacOS]: {
+        [Arch.X64]: {
+            filename: `Miniforge3-${MINIFORGE_VERSION}-MacOSX-x86_64.sh`,
+            sha256: "a755192103de19bb2782685ac78820c2e00702e5f33e6e4f0a3bf3c214f45d69",
+        },
+        [Arch.ARM64]: {
+            filename: `Miniforge3-${MINIFORGE_VERSION}-MacOSX-arm64.sh`,
+            sha256: "2657d94152343cff7c06159ac9fc09624d7879fa9575c5a0a324c571c4df0ade",
+        },
+    },
+    [OS.Windows]: {
+        [Arch.X64]: {
+            filename: `Miniforge3-${MINIFORGE_VERSION}-Windows-x86_64.exe`,
+            sha256: "088884aafcbf2e3355671d4e9b227b0d1cfb278e3bbe74ba2ad213c553874d70",
+        },
+    },
+};
+function miniforge_miniforgeInstaller(os, arch) {
+    const installer = INSTALLERS[os][arch];
+    if (!installer) {
+        throw new Error(`Miniforge ${MINIFORGE_VERSION} is unavailable for ${os} ${arch}.`);
+    }
+    return {
+        ...installer,
+        url: `https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/${installer.filename}`,
+    };
+}
+
 ;// CONCATENATED MODULE: ./src/installers/lfortran/debian.ts
+
+
 
 
 
@@ -107700,8 +107852,8 @@ async function lfortran_debian_installDebian(inputs) {
     // Using a fixed path makes it easy to add to PATH later.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
-    info(`Downloading Miniforge from ${miniforgeUrl}...`);
+    const miniforge = miniforge_miniforgeInstaller(OS.Linux, inputs.arch);
+    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
     await exec_exec("curl", [
         "-fsSL",
         "--retry",
@@ -107710,8 +107862,9 @@ async function lfortran_debian_installDebian(inputs) {
         "15",
         "-o",
         miniforgeInstaller,
-        miniforgeUrl,
+        miniforge.url,
     ]);
+    await verifySha256(miniforgeInstaller, miniforge.sha256);
     info(`Installing Miniforge to ${condaPrefix}...`);
     await exec_exec("bash", [
         miniforgeInstaller,
@@ -107769,6 +107922,8 @@ async function lfortran_debian_resolveInstalledVersion(binaryPath) {
 
 
 
+
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107800,15 +107955,6 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
         "0.57.0",
     ],
 };
-// Returns the conda arch string for a given runner arch.
-function condaArch(arch) {
-    switch (arch) {
-        case Arch.X64:
-            return "x86_64";
-        case Arch.ARM64:
-            return "arm64";
-    }
-}
 async function lfortran_darwin_installDarwin(inputs) {
     const version = resolveVersion(inputs, lfortran_darwin_SUPPORTED_VERSIONS);
     info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
@@ -107816,9 +107962,8 @@ async function lfortran_darwin_installDarwin(inputs) {
     // avoid interfering with any pre-existing conda installation on the runner.
     const condaPrefix = external_path_.join(external_os_.tmpdir(), "lfortran-conda");
     const miniforgeInstaller = external_path_.join(external_os_.tmpdir(), "miniforge.sh");
-    const arch = condaArch(inputs.arch);
-    const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
-    info(`Downloading Miniforge from ${miniforgeUrl}...`);
+    const miniforge = miniforge_miniforgeInstaller(OS.MacOS, inputs.arch);
+    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
     await exec_exec("curl", [
         "-fsSL",
         "--retry",
@@ -107827,8 +107972,9 @@ async function lfortran_darwin_installDarwin(inputs) {
         "15",
         "-o",
         miniforgeInstaller,
-        miniforgeUrl,
+        miniforge.url,
     ]);
+    await verifySha256(miniforgeInstaller, miniforge.sha256);
     info(`Installing Miniforge to ${condaPrefix}...`);
     await exec_exec("bash", [
         miniforgeInstaller,
@@ -107914,6 +108060,8 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 
 
 
+
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107979,9 +108127,8 @@ async function installConda(inputs) {
     info(`Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`);
     const condaPrefix = "C:\\lfortran-conda";
     const miniforgeInstaller = "C:\\miniforge-install.exe";
-    const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
-    const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
-    info(`Downloading Miniforge from ${miniforgeUrl}...`);
+    const miniforge = miniforge_miniforgeInstaller(OS.Windows, inputs.arch);
+    info(`Downloading pinned Miniforge from ${miniforge.url}...`);
     await exec_exec("curl", [
         "-fsSL",
         "--retry",
@@ -107990,8 +108137,9 @@ async function installConda(inputs) {
         "15",
         "-o",
         miniforgeInstaller,
-        miniforgeUrl,
+        miniforge.url,
     ]);
+    await verifySha256(miniforgeInstaller, miniforge.sha256);
     // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
     // install prefix and must be the last argument with no quotes around the path.
     info(`Installing Miniforge to ${condaPrefix}...`);
@@ -108150,7 +108298,7 @@ function ubuntuRepository(osVersion) {
     }
     throw new Error(`ArmFlang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
 }
-function computeSha256(filePath) {
+function debian_computeSha256(filePath) {
     const fileBuffer = external_fs_.readFileSync(filePath);
     return external_crypto_.createHash("sha256").update(fileBuffer).digest("hex");
 }
@@ -108187,7 +108335,7 @@ async function configureCurrentRepository(codename) {
             repositoryPackagePath,
             `${repositoryBaseUrl}/${metadata.filename}`,
         ]);
-        const actualChecksum = computeSha256(repositoryPackagePath);
+        const actualChecksum = debian_computeSha256(repositoryPackagePath);
         if (actualChecksum !== metadata.sha256) {
             throw new Error(`Checksum verification failed for ${external_path_.basename(repositoryPackagePath)}. ` +
                 `Expected ${metadata.sha256}, got ${actualChecksum}.`);

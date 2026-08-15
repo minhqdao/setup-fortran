@@ -12,6 +12,7 @@ import {
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -68,7 +69,7 @@ describe("installDarwin (LFortran)", () => {
       "15",
       "-o",
       expect.stringContaining("miniforge.sh"),
-      expect.stringContaining("Miniforge3-MacOSX-x86_64.sh"),
+      expect.stringContaining("Miniforge3-26.3.2-2-MacOSX-x86_64.sh"),
     ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       expect.stringContaining("miniforge.sh"),

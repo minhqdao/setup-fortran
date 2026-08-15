@@ -13,6 +13,7 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 import { addMsvcBinFromPath } from "../../setup_msvc";
+import { verifyIntelAuthenticode } from "../../verify_download";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
@@ -83,7 +84,7 @@ export async function installWin32(
 
   core.info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
+  const cacheKey = `ifort-win32-authenticode-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -99,6 +100,7 @@ export async function installWin32(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`),
     );
+    await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install (this may take several minutes)...");
     await exec.exec(`"${installerPath}"`, [

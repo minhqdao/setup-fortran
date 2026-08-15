@@ -3,9 +3,11 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { Arch, type InstallationResult } from "../../types";
+import { Arch, OS, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -39,16 +41,6 @@ const SUPPORTED_VERSIONS = {
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
-// Returns the conda arch string for a given runner arch.
-function condaArch(arch: Arch): string {
-  switch (arch) {
-    case Arch.X64:
-      return "x86_64";
-    case Arch.ARM64:
-      return "arm64";
-  }
-}
-
 export async function installDarwin(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -60,11 +52,9 @@ export async function installDarwin(
   // avoid interfering with any pre-existing conda installation on the runner.
   const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
   const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
-  const arch = condaArch(inputs.arch);
+  const miniforge = resolveMiniforgeInstaller(OS.MacOS, inputs.arch);
 
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
-
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
+  core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
   await exec.exec("curl", [
     "-fsSL",
     "--retry",
@@ -73,8 +63,9 @@ export async function installDarwin(
     "15",
     "-o",
     miniforgeInstaller,
-    miniforgeUrl,
+    miniforge.url,
   ]);
+  await verifySha256(miniforgeInstaller, miniforge.sha256);
 
   core.info(`Installing Miniforge to ${condaPrefix}...`);
   await exec.exec("bash", [

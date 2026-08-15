@@ -373,6 +373,22 @@ describe("verifyAssetExists", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("returns the GitHub-provided SHA-256 digest", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    const digest = "a".repeat(64);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "fortran.tar.gz", digest: `sha256:${digest}` }],
+      }),
+    });
+
+    await expect(
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+    ).resolves.toBe(digest);
+  });
+
   it("throws error if release does not exist (404)", async () => {
     const mockFetch = global.fetch as jest.Mock;
     mockFetch.mockResolvedValueOnce({

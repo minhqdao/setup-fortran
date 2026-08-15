@@ -250,7 +250,7 @@ export async function resolveLatestPatch(
 }
 
 interface GitHubTagMetadata {
-  assets: { name: string }[];
+  assets: { name: string; digest?: string | null }[];
 }
 
 export async function verifyAssetExists(
@@ -258,7 +258,7 @@ export async function verifyAssetExists(
   patch: string,
   filename: string,
   tagFromPatch: (patch: string) => string = (p) => `llvmorg-${p}`,
-): Promise<void> {
+): Promise<string | undefined> {
   const tag = tagFromPatch(patch);
   core.info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
 
@@ -282,12 +282,29 @@ export async function verifyAssetExists(
     );
   }
 
-  if (!release.assets.some((a) => a.name === filename)) {
+  const asset = release.assets.find((a) => a.name === filename);
+  if (!asset) {
     throw new Error(
       `Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
         `See https://github.com/${repo}/releases/tag/${tag} for available assets.`,
     );
   }
+
+  if (!asset.digest?.startsWith("sha256:")) {
+    core.warning(
+      `GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}; ` +
+        `download integrity cannot be verified automatically for this legacy asset.`,
+    );
+    return undefined;
+  }
+
+  const digest = asset.digest.slice("sha256:".length).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new Error(
+      `GitHub returned an invalid SHA-256 digest for ${repo} release asset ${filename}.`,
+    );
+  }
+  return digest;
 }
 
 function githubHeaders(): Record<string, string> {

@@ -14,6 +14,7 @@ import {
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
+jest.mock("../../../src/verify_download");
 jest.mock("@actions/tool-cache", () => ({
   find: jest.fn(),
   downloadTool: jest.fn(),
@@ -28,11 +29,19 @@ jest.mock("fs", () => ({
 
 describe("installDarwin (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => ({
       ok: true,
       status: 200,
-      json: async () => [{ tag_name: "llvmorg-19.1.7", prerelease: false }],
-    } as unknown as Response);
+      json: async () =>
+        String(input).includes("/releases?")
+          ? [{ tag_name: "llvmorg-19.1.7", prerelease: false }]
+          : {
+              assets: [{
+                name: "LLVM-19.1.7-macOS-X64.tar.xz",
+                digest: `sha256:${"a".repeat(64)}`,
+              }],
+            },
+    }) as unknown as Response);
   });
 
   afterEach(() => {

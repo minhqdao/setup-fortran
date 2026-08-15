@@ -13,6 +13,7 @@ import {
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
+jest.mock("../../../src/verify_download");
 
 describe("installDebian nvfortran", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
@@ -59,39 +60,26 @@ describe("installDebian nvfortran", () => {
       exitCode: 0,
     });
 
-    // Simulate directory listing with valid .deb entries
-    const dirListing =
-      '<a href="libtinfo5_6.3-2ubuntu0.1_amd64.deb">libtinfo5_6.3-2ubuntu0.1_amd64.deb</a>\n' +
-      '<a href="libncursesw5_6.3-2ubuntu0.1_amd64.deb">libncursesw5_6.3-2ubuntu0.1_amd64.deb</a>\n';
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "nvfortran" && args?.[0] === "--version") {
         options?.listeners?.stdout?.(Buffer.from("nvfortran 24.1-0"));
-      }
-      if (commandLine === "curl" && args?.some(a => typeof a === "string" && a.includes("pool/universe/n/ncurses/"))) {
-        options?.listeners?.stdout?.(Buffer.from(dirListing));
       }
       return 0;
     });
 
     await installDebian(inputs);
 
-    // Should download the directory listing
-    expect(mockedExec).toHaveBeenCalledWith(
-      "curl",
-      expect.arrayContaining(["-4", "https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/"]),
-      expect.anything(),
-    );
-    // Should download each .deb
+    // Should download each pinned .deb
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining([
-        expect.stringContaining("libtinfo5_6.3-2ubuntu0.1_amd64.deb"),
+        expect.stringContaining("libtinfo5_6.3-2_amd64.deb"),
       ]),
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining([
-        expect.stringContaining("libncursesw5_6.3-2ubuntu0.1_amd64.deb"),
+        expect.stringContaining("libncursesw5_6.3-2_amd64.deb"),
       ]),
     );
     // Should install each .deb via dpkg

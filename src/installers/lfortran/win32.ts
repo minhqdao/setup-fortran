@@ -6,11 +6,14 @@ import {
   Arch,
   LATEST,
   Msystem,
+  OS,
   type InstallationResult,
   type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -89,10 +92,9 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   const condaPrefix = "C:\\lfortran-conda";
   const miniforgeInstaller = "C:\\miniforge-install.exe";
 
-  const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
+  const miniforge = resolveMiniforgeInstaller(OS.Windows, inputs.arch);
 
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
+  core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
   await exec.exec("curl", [
     "-fsSL",
     "--retry",
@@ -101,8 +103,9 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
     "15",
     "-o",
     miniforgeInstaller,
-    miniforgeUrl,
+    miniforge.url,
   ]);
+  await verifySha256(miniforgeInstaller, miniforge.sha256);
 
   // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
   // install prefix and must be the last argument with no quotes around the path.

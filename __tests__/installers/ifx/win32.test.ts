@@ -12,6 +12,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
 jest.mock("@actions/tool-cache");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   writeFileSync: jest.fn(),
@@ -157,7 +158,7 @@ describe("installWin32 (ifx)", () => {
 
     expect(mockedRestoreCache).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringContaining("ifx-win32-x64-2025.3.3"),
+      expect.stringContaining("ifx-win32-authenticode-v1-x64-2025.3.3"),
     );
   });
 

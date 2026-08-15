@@ -3,9 +3,11 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { Arch, type InstallationResult } from "../../types";
+import { Arch, OS, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -53,9 +55,9 @@ export async function installDebian(
   const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
   const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
 
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
+  const miniforge = resolveMiniforgeInstaller(OS.Linux, inputs.arch);
 
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
+  core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
   await exec.exec("curl", [
     "-fsSL",
     "--retry",
@@ -64,8 +66,9 @@ export async function installDebian(
     "15",
     "-o",
     miniforgeInstaller,
-    miniforgeUrl,
+    miniforge.url,
   ]);
+  await verifySha256(miniforgeInstaller, miniforge.sha256);
 
   core.info(`Installing Miniforge to ${condaPrefix}...`);
   await exec.exec("bash", [

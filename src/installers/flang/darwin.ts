@@ -11,6 +11,7 @@ import {
   verifyAssetExists,
 } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -50,14 +51,19 @@ export async function installDarwin(
 
   let patch: string;
   if (userPatch !== undefined) {
-    const filename = `LLVM-${userPatch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
-    await verifyAssetExists("llvm/llvm-project", userPatch, filename);
     patch = userPatch;
   } else {
     patch = await resolveLatestPatch("llvm/llvm-project", major);
   }
 
-  return await installFromGitHub(inputs, major, patch);
+  const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
+  const expectedSha256 = await verifyAssetExists(
+    "llvm/llvm-project",
+    patch,
+    filename,
+  );
+
+  return await installFromGitHub(inputs, major, patch, expectedSha256);
 }
 
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
@@ -128,6 +134,7 @@ async function installFromGitHub(
   inputs: Inputs,
   major: string,
   patch: string,
+  expectedSha256: string | undefined,
 ): Promise<InstallationResult> {
   const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
   const filename = `LLVM-${patch}-${suffix}.tar.xz`;
@@ -139,11 +146,14 @@ async function installFromGitHub(
 
   // Key the cache on the full patch version so a new patch release always
   // triggers a fresh download rather than serving a stale cached binary.
-  let toolRoot = tc.find("flang", patch, inputs.arch);
+  let toolRoot = tc.find("flang-verified", patch, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
     const downloadPath = await tc.downloadTool(downloadUrl);
+    if (expectedSha256) {
+      await verifySha256(downloadPath, expectedSha256);
+    }
 
     core.info("Extracting archive...");
     // The archive has a single top-level directory; strip it so toolRoot is
@@ -154,7 +164,12 @@ async function installFromGitHub(
     ]);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(extractPath, "flang", patch, inputs.arch);
+    toolRoot = await tc.cacheDir(
+      extractPath,
+      "flang-verified",
+      patch,
+      inputs.arch,
+    );
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,

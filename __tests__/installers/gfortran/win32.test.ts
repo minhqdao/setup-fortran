@@ -15,6 +15,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/tool-cache");
 jest.mock("../../../src/setup_msys2");
+jest.mock("../../../src/verify_download");
 
 describe("installWin32 (gfortran)", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;

@@ -18,6 +18,7 @@ jest.mock("@actions/core", () => ({
   }),
 }));
 jest.mock("@actions/exec");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -64,13 +65,21 @@ describe("installDebian (Flang)", () => {
     process.env = originalEnv;
   });
 
-  it("calls llvm.sh with the correct version", async () => {
+  it("configures the explicit LLVM repository without executing llvm.sh", async () => {
     await installDebian(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("bash", [
-      "-c",
-      "curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining("llvm-snapshot.gpg.key"),
+        "https://apt.llvm.org/llvm-snapshot.gpg.key",
+      ]),
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "bash",
+      expect.arrayContaining([expect.stringContaining("llvm.sh")]),
+    );
   });
 
   it("installs the correct flang package", async () => {
