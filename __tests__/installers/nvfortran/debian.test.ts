@@ -143,6 +143,17 @@ describe("installDebian nvfortran", () => {
     });
   });
 
+  it("does not write global APT settings or rewrite Ubuntu mirrors", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        expect.stringMatching(/apt\.conf\.d|sources\.list|ubuntu\.sources/),
+      ]),
+    );
+  });
+
   it("falls back to the versioned tarball after one apt install failure", async () => {
     const inputs = { ...baseInputs, version: "26.3" };
     mockedGetExecOutput.mockImplementation(async (command, args) => ({

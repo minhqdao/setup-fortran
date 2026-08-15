@@ -29,6 +29,16 @@ const SUPPORTED_VERSIONS = {
 
 const LLVM_APT_KEY_SHA256 =
   "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const APT_NETWORK_OPTIONS = [
+  "-o",
+  "Acquire::ForceIPv4=true",
+  "-o",
+  "Acquire::Retries=3",
+  "-o",
+  "Acquire::http::Timeout=10",
+  "-o",
+  "Acquire::https::Timeout=10",
+];
 
 function ubuntuCodename(osVersion: string): string {
   if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
@@ -151,44 +161,9 @@ export async function installDebian(
 
   core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
 
-  // 1. Force IPv4, retries, AND short socket timeouts (10s instead of default 120s)
-  core.info(
-    "Configuring global APT settings (IPv4, Retries & 10s Timeouts)...",
-  );
-  await exec.exec("sudo", [
-    "bash",
-    "-c",
-    'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "10";\nAcquire::https::Timeout "10";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
-  ]);
-
-  // 2. Fix apt mirrors across ALL possible location formats
-  core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
-  const replaceMirrors = (filePath: string): string[] => [
-    "sed",
-    "-i",
-    "-e",
-    "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-    "-e",
-    "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-    filePath,
-  ];
-
-  // Target legacy sources.list, new deb822 ubuntu.sources, and runner apt-mirrors.txt
-  const mirrorTargets = [
-    "/etc/apt/sources.list",
-    "/etc/apt/apt-mirrors.txt",
-    "/etc/apt/sources.list.d/ubuntu.sources",
-  ];
-
-  for (const target of mirrorTargets) {
-    if (fs.existsSync(target)) {
-      await exec.exec("sudo", replaceMirrors(target));
-    }
-  }
-
   core.info(`Adding the verified LLVM ${version} apt repository...`);
   await configureLlvmAptRepository(version, inputs.osVersion);
-  await exec.exec("sudo", ["apt-get", "update", "-y"]);
+  await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_NETWORK_OPTIONS]);
 
   const pkgName = `flang-${version}`;
 
@@ -199,6 +174,7 @@ export async function installDebian(
     "apt-get",
     "install",
     "-y",
+    ...APT_NETWORK_OPTIONS,
     pkgName,
     `libomp-${version}-dev`,
     `libclang-rt-${version}-dev`,

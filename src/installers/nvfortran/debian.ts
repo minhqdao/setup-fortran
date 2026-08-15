@@ -13,6 +13,17 @@ import {
   validateRestoredCompilerCache,
 } from "../../cache_validation";
 
+const APT_NETWORK_OPTIONS = [
+  "-o",
+  "Acquire::ForceIPv4=true",
+  "-o",
+  "Acquire::Retries=10",
+  "-o",
+  "Acquire::http::Timeout=60",
+  "-o",
+  "Acquire::https::Timeout=60",
+];
+
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "26.5",
@@ -317,38 +328,6 @@ export async function installDebian(
 
   core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
 
-  core.info(
-    "Configuring global APT settings (Force IPv4, Timeouts & Retries)...",
-  );
-  await exec.exec("sudo", [
-    "bash",
-    "-c",
-    'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "10";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
-  ]);
-
-  core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
-  const replaceMirrors = (filePath: string): string[] => [
-    "sed",
-    "-i",
-    "-e",
-    "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-    "-e",
-    "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-    "-e",
-    "s|http://ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-    filePath,
-  ];
-
-  if (fs.existsSync("/etc/apt/sources.list")) {
-    await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
-  }
-  if (fs.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
-    await exec.exec(
-      "sudo",
-      replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"),
-    );
-  }
-
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
   const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
@@ -404,13 +383,19 @@ export async function installDebian(
         ]);
 
         core.info("Updating apt repositories with retry...");
-        await execWithRetry("sudo", ["apt-get", "update", "-y"]);
+        await execWithRetry("sudo", [
+          "apt-get",
+          "update",
+          "-y",
+          ...APT_NETWORK_OPTIONS,
+        ]);
 
         core.info(`Installing apt package ${pkgName}...`);
         await exec.exec("sudo", [
           "apt-get",
           "install",
           "-y",
+          ...APT_NETWORK_OPTIONS,
           "--no-install-recommends",
           "-o",
           "Dpkg::Options::=--force-confdef",

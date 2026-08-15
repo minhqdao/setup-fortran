@@ -58,46 +58,34 @@ export async function installDarwin(
     },
   });
 
-  // Find the actual library directory dynamically and cast a wide symlink net
-  const brewLibDir = path.join(brewPrefix, "lib");
-  const expectedDyldDir = path.join(cellarPrefix, "lib", "gcc", version);
-
-  await exec.exec("bash", [
-    "-c",
-    `
-    # 1. Find the actual directory containing libgfortran within the cellar
-    ACTUAL_LIB_DIR=$(find "${cellarPrefix}/lib/gcc" -name "libgfortran*.dylib" -exec dirname {} \\; | head -n 1)
-
-    if [ -n "$ACTUAL_LIB_DIR" ]; then
-      echo "Found libgfortran in $ACTUAL_LIB_DIR"
-
-      # 2. Satisfy fpm's hardcoded dyld path if Homebrew put it somewhere else (like 'current')
-      if [ "$ACTUAL_LIB_DIR" != "${expectedDyldDir}" ]; then
-         sudo mkdir -p "${expectedDyldDir}"
-         sudo ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib "${expectedDyldDir}"/
-      fi
-
-      # 3. Symlink to brew's standard lib dir
-      ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib "${brewLibDir}"/
-
-      # 4. Provide the ultimate fallback for dyld (SIP safe)
-      sudo mkdir -p /usr/local/lib
-      sudo ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib /usr/local/lib/
-    else
-      echo "WARNING: Could not find libgfortran in ${cellarPrefix}"
-    fi
-    `,
-  ]);
+  let actualLibDir = "";
+  await exec.exec(
+    "bash",
+    [
+      "-c",
+      `find "${cellarPrefix}/lib/gcc" -name "libgfortran*.dylib" -exec dirname {} \\; | head -n 1`,
+    ],
+    {
+      listeners: {
+        stdout: (data: Buffer) => {
+          actualLibDir += data.toString().trim();
+        },
+      },
+    },
+  );
+  if (!actualLibDir) {
+    throw new Error(`Could not find libgfortran in ${cellarPrefix}.`);
+  }
 
   const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
 
   const binDir = path.join(brewPrefix, "bin");
   const gfortranBinary = path.join(binDir, `gfortran-${version}`);
-  const genericGfortran = path.join(binDir, "gfortran");
-
-  core.info(`Symlinking ${gfortranBinary} to ${genericGfortran}`);
-
-  await exec.exec("ln", ["-sf", gfortranBinary, genericGfortran]);
+  const existingDyldPath = process.env.DYLD_FALLBACK_LIBRARY_PATH ?? "";
+  core.exportVariable(
+    "DYLD_FALLBACK_LIBRARY_PATH",
+    existingDyldPath ? `${actualLibDir}:${existingDyldPath}` : actualLibDir,
+  );
 
   // Help ld find -lSystem on newer macOS versions
   let sdkPath = "";
@@ -111,9 +99,9 @@ export async function installDarwin(
       core.exportVariable("SDKROOT", sdkPath);
       core.exportVariable(
         "LIBRARY_PATH",
-        existingLibraryPath
-          ? `${sdkPath}/usr/lib:${existingLibraryPath}`
-          : `${sdkPath}/usr/lib`,
+        [actualLibDir, `${sdkPath}/usr/lib`, existingLibraryPath]
+          .filter(Boolean)
+          .join(":"),
       );
     }
   } catch (e) {
@@ -124,7 +112,7 @@ export async function installDarwin(
   const gccBinary = path.join(binDir, `gcc-${version}`);
   const gxxBinary = path.join(binDir, `g++-${version}`);
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion(gfortranBinary);
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
   const result = {
     version: resolvedVersion,
@@ -143,9 +131,9 @@ async function getBrewPrefix(): Promise<string> {
   return output.trim();
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(binary: string): Promise<string> {
   let output = "";
-  await exec.exec("gfortran", ["--version"], {
+  await exec.exec(binary, ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {
         output += data.toString();

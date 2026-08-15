@@ -83,10 +83,29 @@ describe("installDebian (Flang)", () => {
       "apt-get",
       "install",
       "-y",
+      "-o",
+      "Acquire::ForceIPv4=true",
+      "-o",
+      "Acquire::Retries=3",
+      "-o",
+      "Acquire::http::Timeout=10",
+      "-o",
+      "Acquire::https::Timeout=10",
       "flang-18",
       "libomp-18-dev",
       "libclang-rt-18-dev",
     ]);
+  });
+
+  it("does not write global APT settings or rewrite Ubuntu mirrors", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        expect.stringMatching(/apt\.conf\.d|ubuntu\.sources|apt-mirrors/),
+      ]),
+    );
   });
 
   it("configures update-alternatives for flang-new (15 <= major < 20)", async () => {

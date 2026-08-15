@@ -103173,41 +103173,25 @@ async function installDarwin(inputs) {
             stdout: (data) => (cellarPrefix += data.toString().trim()),
         },
     });
-    // Find the actual library directory dynamically and cast a wide symlink net
-    const brewLibDir = external_path_.join(brewPrefix, "lib");
-    const expectedDyldDir = external_path_.join(cellarPrefix, "lib", "gcc", version);
+    let actualLibDir = "";
     await exec_exec("bash", [
         "-c",
-        `
-    # 1. Find the actual directory containing libgfortran within the cellar
-    ACTUAL_LIB_DIR=$(find "${cellarPrefix}/lib/gcc" -name "libgfortran*.dylib" -exec dirname {} \\; | head -n 1)
-
-    if [ -n "$ACTUAL_LIB_DIR" ]; then
-      echo "Found libgfortran in $ACTUAL_LIB_DIR"
-
-      # 2. Satisfy fpm's hardcoded dyld path if Homebrew put it somewhere else (like 'current')
-      if [ "$ACTUAL_LIB_DIR" != "${expectedDyldDir}" ]; then
-         sudo mkdir -p "${expectedDyldDir}"
-         sudo ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib "${expectedDyldDir}"/
-      fi
-
-      # 3. Symlink to brew's standard lib dir
-      ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib "${brewLibDir}"/
-
-      # 4. Provide the ultimate fallback for dyld (SIP safe)
-      sudo mkdir -p /usr/local/lib
-      sudo ln -sf "$ACTUAL_LIB_DIR"/lib*.dylib /usr/local/lib/
-    else
-      echo "WARNING: Could not find libgfortran in ${cellarPrefix}"
-    fi
-    `,
-    ]);
+        `find "${cellarPrefix}/lib/gcc" -name "libgfortran*.dylib" -exec dirname {} \\; | head -n 1`,
+    ], {
+        listeners: {
+            stdout: (data) => {
+                actualLibDir += data.toString().trim();
+            },
+        },
+    });
+    if (!actualLibDir) {
+        throw new Error(`Could not find libgfortran in ${cellarPrefix}.`);
+    }
     const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
     const binDir = external_path_.join(brewPrefix, "bin");
     const gfortranBinary = external_path_.join(binDir, `gfortran-${version}`);
-    const genericGfortran = external_path_.join(binDir, "gfortran");
-    info(`Symlinking ${gfortranBinary} to ${genericGfortran}`);
-    await exec_exec("ln", ["-sf", gfortranBinary, genericGfortran]);
+    const existingDyldPath = process.env.DYLD_FALLBACK_LIBRARY_PATH ?? "";
+    exportVariable("DYLD_FALLBACK_LIBRARY_PATH", existingDyldPath ? `${actualLibDir}:${existingDyldPath}` : actualLibDir);
     // Help ld find -lSystem on newer macOS versions
     let sdkPath = "";
     try {
@@ -103218,9 +103202,9 @@ async function installDarwin(inputs) {
         });
         if (sdkPath) {
             exportVariable("SDKROOT", sdkPath);
-            exportVariable("LIBRARY_PATH", existingLibraryPath
-                ? `${sdkPath}/usr/lib:${existingLibraryPath}`
-                : `${sdkPath}/usr/lib`);
+            exportVariable("LIBRARY_PATH", [actualLibDir, `${sdkPath}/usr/lib`, existingLibraryPath]
+                .filter(Boolean)
+                .join(":"));
         }
     }
     catch (e) {
@@ -103229,7 +103213,7 @@ async function installDarwin(inputs) {
     }
     const gccBinary = external_path_.join(binDir, `gcc-${version}`);
     const gxxBinary = external_path_.join(binDir, `g++-${version}`);
-    const resolvedVersion = await darwin_resolveInstalledVersion();
+    const resolvedVersion = await darwin_resolveInstalledVersion(gfortranBinary);
     info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     const result = {
         version: resolvedVersion,
@@ -103246,9 +103230,9 @@ async function getBrewPrefix() {
     });
     return output.trim();
 }
-async function darwin_resolveInstalledVersion() {
+async function darwin_resolveInstalledVersion(binary) {
     let output = "";
-    await exec_exec("gfortran", ["--version"], {
+    await exec_exec(binary, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -106628,6 +106612,16 @@ async function installIFort(inputs) {
 
 
 
+const APT_NETWORK_OPTIONS = [
+    "-o",
+    "Acquire::ForceIPv4=true",
+    "-o",
+    "Acquire::Retries=10",
+    "-o",
+    "Acquire::http::Timeout=60",
+    "-o",
+    "Acquire::https::Timeout=60",
+];
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
         "26.5",
@@ -106877,30 +106871,6 @@ async function nvfortran_debian_installDebian(inputs) {
     const aptArch = APT_ARCH[inputs.arch];
     const nvArch = NV_ARCH[inputs.arch];
     info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
-    info("Configuring global APT settings (Force IPv4, Timeouts & Retries)...");
-    await exec_exec("sudo", [
-        "bash",
-        "-c",
-        'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "10";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
-    ]);
-    info("Fixing apt mirror to avoid Azure mirror timeouts...");
-    const replaceMirrors = (filePath) => [
-        "sed",
-        "-i",
-        "-e",
-        "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-        "-e",
-        "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-        "-e",
-        "s|http://ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-        filePath,
-    ];
-    if (external_fs_.existsSync("/etc/apt/sources.list")) {
-        await exec_exec("sudo", replaceMirrors("/etc/apt/sources.list"));
-    }
-    if (external_fs_.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
-        await exec_exec("sudo", replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"));
-    }
     const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
     const binDir = `${installDir}/compilers/bin`;
     const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
@@ -106941,12 +106911,18 @@ async function nvfortran_debian_installDebian(inputs) {
                         ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
                 ]);
                 info("Updating apt repositories with retry...");
-                await execWithRetry("sudo", ["apt-get", "update", "-y"]);
+                await execWithRetry("sudo", [
+                    "apt-get",
+                    "update",
+                    "-y",
+                    ...APT_NETWORK_OPTIONS,
+                ]);
                 info(`Installing apt package ${pkgName}...`);
                 await exec_exec("sudo", [
                     "apt-get",
                     "install",
                     "-y",
+                    ...APT_NETWORK_OPTIONS,
                     "--no-install-recommends",
                     "-o",
                     "Dpkg::Options::=--force-confdef",
@@ -107216,6 +107192,16 @@ const flang_debian_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
 };
 const LLVM_APT_KEY_SHA256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const debian_APT_NETWORK_OPTIONS = [
+    "-o",
+    "Acquire::ForceIPv4=true",
+    "-o",
+    "Acquire::Retries=3",
+    "-o",
+    "Acquire::http::Timeout=10",
+    "-o",
+    "Acquire::https::Timeout=10",
+];
 function ubuntuCodename(osVersion) {
     if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
         return "noble";
@@ -107314,44 +107300,16 @@ async function flang_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
     const major = parseInt(version, 10);
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
-    // 1. Force IPv4, retries, AND short socket timeouts (10s instead of default 120s)
-    info("Configuring global APT settings (IPv4, Retries & 10s Timeouts)...");
-    await exec_exec("sudo", [
-        "bash",
-        "-c",
-        'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "10";\nAcquire::https::Timeout "10";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
-    ]);
-    // 2. Fix apt mirrors across ALL possible location formats
-    info("Fixing apt mirror to avoid Azure mirror timeouts...");
-    const replaceMirrors = (filePath) => [
-        "sed",
-        "-i",
-        "-e",
-        "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-        "-e",
-        "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-        filePath,
-    ];
-    // Target legacy sources.list, new deb822 ubuntu.sources, and runner apt-mirrors.txt
-    const mirrorTargets = [
-        "/etc/apt/sources.list",
-        "/etc/apt/apt-mirrors.txt",
-        "/etc/apt/sources.list.d/ubuntu.sources",
-    ];
-    for (const target of mirrorTargets) {
-        if (external_fs_.existsSync(target)) {
-            await exec_exec("sudo", replaceMirrors(target));
-        }
-    }
     info(`Adding the verified LLVM ${version} apt repository...`);
     await configureLlvmAptRepository(version, inputs.osVersion);
-    await exec_exec("sudo", ["apt-get", "update", "-y"]);
+    await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_NETWORK_OPTIONS]);
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
     await exec_exec("sudo", [
         "apt-get",
         "install",
         "-y",
+        ...debian_APT_NETWORK_OPTIONS,
         pkgName,
         `libomp-${version}-dev`,
         `libclang-rt-${version}-dev`,
