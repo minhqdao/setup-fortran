@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/flang/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core", () => ({
   info: jest.fn(),
@@ -37,7 +31,7 @@ describe("installDebian (Flang)", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -91,6 +85,7 @@ describe("installDebian (Flang)", () => {
       "-y",
       "flang-18",
       "libomp-18-dev",
+      "libclang-rt-18-dev",
     ]);
   });
 
@@ -135,7 +130,6 @@ describe("installDebian (Flang)", () => {
   it("exports flang-20 for FC when version is 20", async () => {
     const inputs = { ...baseInputs, version: "20" };
     await installDebian(inputs);
-
   });
 
   it("resolves and returns the installed version", async () => {

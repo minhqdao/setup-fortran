@@ -99,6 +99,38 @@ async function downloadInstaller(
   return destPath;
 }
 
+async function runInstaller(installScript: string): Promise<void> {
+  const args = [
+    installScript,
+    "-s",
+    "--action",
+    "install",
+    "--eula",
+    "accept",
+    "--ignore-errors",
+    "--components",
+    "intel.oneapi.mac.ifort-compiler",
+  ];
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", args);
+      return;
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+      const delaySeconds = attempt * 10;
+      core.warning(
+        `ifort installer failed (attempt ${attempt.toString()}/${maxAttempts.toString()}): ${String(error)}. ` +
+          `Retrying in ${delaySeconds.toString()} seconds...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+}
+
 export async function installDarwin(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -178,18 +210,7 @@ export async function installDarwin(
       }
 
       core.info(`Running silent install via ${installScript}...`);
-      await exec.exec("sudo", [
-        installScript,
-        "-s",
-        "--action",
-        "install",
-        "--eula",
-        "accept",
-        "--continue-with-optional-error=yes",
-        "--ignore-errors",
-        "--components",
-        "intel.oneapi.mac.ifort-compiler",
-      ]);
+      await runInstaller(installScript);
 
       core.info("Saving installation to cache...");
       await cache.saveCache(cachePaths, cacheKey);

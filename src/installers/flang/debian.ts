@@ -192,13 +192,16 @@ export async function installDebian(
 
   const pkgName = `flang-${version}`;
 
-  core.info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
+  core.info(
+    `Installing apt package ${pkgName} with LLVM runtime dependencies...`,
+  );
   await exec.exec("sudo", [
     "apt-get",
     "install",
     "-y",
     pkgName,
     `libomp-${version}-dev`,
+    `libclang-rt-${version}-dev`,
   ]);
 
   const binaryPath = resolveFlangBinaryPath(major, version);

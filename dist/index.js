@@ -106188,6 +106188,35 @@ async function downloadInstaller(url, destPath) {
     ]);
     return destPath;
 }
+async function runInstaller(installScript) {
+    const args = [
+        installScript,
+        "-s",
+        "--action",
+        "install",
+        "--eula",
+        "accept",
+        "--ignore-errors",
+        "--components",
+        "intel.oneapi.mac.ifort-compiler",
+    ];
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", args);
+            return;
+        }
+        catch (error) {
+            if (attempt === maxAttempts) {
+                throw error;
+            }
+            const delaySeconds = attempt * 10;
+            warning(`ifort installer failed (attempt ${attempt.toString()}/${maxAttempts.toString()}): ${String(error)}. ` +
+                `Retrying in ${delaySeconds.toString()} seconds...`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+}
 async function darwin_installDarwin(inputs) {
     const version = resolveVersion(inputs, ifort_darwin_SUPPORTED_VERSIONS);
     const release = IFORT_RELEASES.find((r) => r.version === version);
@@ -106238,18 +106267,7 @@ async function darwin_installDarwin(inputs) {
                 installScript = external_path_default().join(mountPoint, "install.sh");
             }
             info(`Running silent install via ${installScript}...`);
-            await exec_exec("sudo", [
-                installScript,
-                "-s",
-                "--action",
-                "install",
-                "--eula",
-                "accept",
-                "--continue-with-optional-error=yes",
-                "--ignore-errors",
-                "--components",
-                "intel.oneapi.mac.ifort-compiler",
-            ]);
+            await runInstaller(installScript);
             info("Saving installation to cache...");
             await cache.saveCache(cachePaths, cacheKey);
         }
@@ -107208,13 +107226,14 @@ async function flang_debian_installDebian(inputs) {
     await configureLlvmAptRepository(version, inputs.osVersion);
     await exec_exec("sudo", ["apt-get", "update", "-y"]);
     const pkgName = `flang-${version}`;
-    info(`Installing apt package ${pkgName} with libomp-${version}-dev...`);
+    info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
     await exec_exec("sudo", [
         "apt-get",
         "install",
         "-y",
         pkgName,
         `libomp-${version}-dev`,
+        `libclang-rt-${version}-dev`,
     ]);
     const binaryPath = resolveFlangBinaryPath(major, version);
     if (binaryPath !== "/usr/bin/flang") {
