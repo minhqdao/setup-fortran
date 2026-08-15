@@ -1,22 +1,18 @@
 name: ifort
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
-  build:
-    name: ci
-    if: github.actor != 'dependabot[bot]'
-    uses: ./.github/workflows/ci.yml
-
   integration-tests:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
     if: github.actor != 'dependabot[bot]'
     runs-on: ${{ matrix.image }}
-    needs: [build]
     strategy:
       fail-fast: false
       matrix:

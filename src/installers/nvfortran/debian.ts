@@ -7,6 +7,22 @@ import * as os from "os";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { verifySha256 } from "../../verify_download";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
+
+const APT_NETWORK_OPTIONS = [
+  "-o",
+  "Acquire::ForceIPv4=true",
+  "-o",
+  "Acquire::Retries=10",
+  "-o",
+  "Acquire::http::Timeout=60",
+  "-o",
+  "Acquire::https::Timeout=60",
+];
 
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -188,75 +204,43 @@ async function installLegacyNcurses(inputs: Inputs): Promise<void> {
   core.info("Backfilling legacy ncurses5 libs...");
 
   const debArch = APT_ARCH[inputs.arch];
-  const baseUrl =
-    inputs.arch === Arch.ARM64
-      ? "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/"
-      : "https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/";
-
-  const directUrls: Record<
+  const packages: Record<
     "amd64" | "arm64",
-    { tinfo: string; ncurses: string }
+    Record<"libtinfo5" | "libncursesw5", { url: string; sha256: string }>
   > = {
     arm64: {
-      tinfo:
-        "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
-      ncurses:
-        "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+      libtinfo5: {
+        url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
+        sha256:
+          "bff6bf29035a4bbd5aa3584bfbc86c2d414cb468a22dbd09fe601b0d39ce4e67",
+      },
+      libncursesw5: {
+        url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+        sha256:
+          "4abc034de6d0fe55032bdee039603b7a361ca1980c4f7faf781b64496ef0412a",
+      },
     },
     amd64: {
-      tinfo:
-        "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
-      ncurses:
-        "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+      libtinfo5: {
+        url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
+        sha256:
+          "d2597b5aec92a930cf549e1b429ad892595813e72ec7814685ea146a9fb715e5",
+      },
+      libncursesw5: {
+        url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+        sha256:
+          "2cfb737d61b4243846ba3f8d70dac7307fab355aa43cbd2cb9d023bf8d606a5c",
+      },
     },
   };
 
-  let tinfoUrl = "";
-  let ncursesUrl = "";
-
-  try {
-    let dirListing = "";
-    await exec.exec("curl", [...CURL_RETRY_ARGS, baseUrl], {
-      listeners: { stdout: (data) => (dirListing += data.toString()) },
-    });
-
-    const tinfoRegex = new RegExp(
-      `href="(libtinfo5_6\\.3-[^"]+_${debArch}\\.deb)"`,
-      "g",
-    );
-    const ncursesRegex = new RegExp(
-      `href="(libncursesw5_6\\.3-[^"]+_${debArch}\\.deb)"`,
-      "g",
-    );
-
-    const tinfoMatches = Array.from(dirListing.matchAll(tinfoRegex));
-    const ncursesMatches = Array.from(dirListing.matchAll(ncursesRegex));
-
-    if (tinfoMatches.length > 0 && ncursesMatches.length > 0) {
-      tinfoUrl = `${baseUrl}${tinfoMatches[tinfoMatches.length - 1][1]}`;
-      ncursesUrl = `${baseUrl}${ncursesMatches[ncursesMatches.length - 1][1]}`;
-    }
-  } catch (e) {
-    core.warning(
-      `Directory scraping failed (${String(e)}). Using direct Launchpad HTTPS mirror.`,
-    );
-  }
-
-  if (!tinfoUrl || !ncursesUrl) {
-    const fallbacks = directUrls[debArch];
-    tinfoUrl = fallbacks.tinfo;
-    ncursesUrl = fallbacks.ncurses;
-  }
-
-  for (const [pkgName, url] of [
-    ["libtinfo5", tinfoUrl],
-    ["libncursesw5", ncursesUrl],
-  ]) {
-    const debFile = path.basename(url);
+  for (const [pkgName, metadata] of Object.entries(packages[debArch])) {
+    const debFile = path.basename(metadata.url);
     const dest = path.join(os.tmpdir(), debFile);
 
     core.info(`Downloading ${pkgName}...`);
-    await exec.exec("curl", [...CURL_RETRY_ARGS, "-o", dest, url]);
+    await exec.exec("curl", [...CURL_RETRY_ARGS, "-o", dest, metadata.url]);
+    await verifySha256(dest, metadata.sha256);
 
     core.info(`Installing ${debFile} via dpkg...`);
     await exec.exec("sudo", ["dpkg", "-i", dest]);
@@ -344,46 +328,28 @@ export async function installDebian(
 
   core.info(`Installing nvfortran ${version} on Linux (${inputs.arch})...`);
 
-  core.info(
-    "Configuring global APT settings (Force IPv4, Timeouts & Retries)...",
-  );
-  await exec.exec("sudo", [
-    "bash",
-    "-c",
-    'echo \'Acquire::ForceIPv4 "true";\nAcquire::Retries "10";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\' > /etc/apt/apt.conf.d/99force-ipv4-and-retries',
-  ]);
-
-  core.info("Fixing apt mirror to avoid Azure mirror timeouts...");
-  const replaceMirrors = (filePath: string): string[] => [
-    "sed",
-    "-i",
-    "-e",
-    "s|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g",
-    "-e",
-    "s|http://azure.ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-    "-e",
-    "s|http://ports.ubuntu.com/ubuntu-ports|https://ports.ubuntu.com/ubuntu-ports|g",
-    filePath,
-  ];
-
-  if (fs.existsSync("/etc/apt/sources.list")) {
-    await exec.exec("sudo", replaceMirrors("/etc/apt/sources.list"));
-  }
-  if (fs.existsSync("/etc/apt/sources.list.d/ubuntu.sources")) {
-    await exec.exec(
-      "sudo",
-      replaceMirrors("/etc/apt/sources.list.d/ubuntu.sources"),
-    );
-  }
-
   const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
   const binDir = `${installDir}/compilers/bin`;
-  const cacheKey = `nvhpc-${version}-${inputs.arch}-${inputs.osVersion}`;
+  const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   const cacheHit = await cache.restoreCache([installDir], cacheKey);
-  if (cacheHit) {
+  const compilerPaths = ["nvfortran", "nvc", "nvc++"].map(
+    (compiler) => `${binDir}/${compiler}`,
+  );
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `nvhpc ${version}`,
+        compilerPaths,
+        compilerPaths[0],
+        ["--version"],
+      )
+    : false;
+  if (cacheValid) {
     core.info(`Restored nvhpc ${version} from cache.`);
   } else {
+    if (cacheHit) {
+      await exec.exec("sudo", ["rm", "-rf", installDir]);
+    }
     if (inputs.cleanupDisk) await cleanupDisk();
 
     core.info("Checking if legacy ncurses5 libs are needed...");
@@ -417,13 +383,19 @@ export async function installDebian(
         ]);
 
         core.info("Updating apt repositories with retry...");
-        await execWithRetry("sudo", ["apt-get", "update", "-y"]);
+        await execWithRetry("sudo", [
+          "apt-get",
+          "update",
+          "-y",
+          ...APT_NETWORK_OPTIONS,
+        ]);
 
         core.info(`Installing apt package ${pkgName}...`);
         await exec.exec("sudo", [
           "apt-get",
           "install",
           "-y",
+          ...APT_NETWORK_OPTIONS,
           "--no-install-recommends",
           "-o",
           "Dpkg::Options::=--force-confdef",
@@ -443,7 +415,7 @@ export async function installDebian(
     await exec.exec("sudo", ["apt-get", "clean"]);
 
     core.info(`Saving nvhpc ${version} to cache...`);
-    await cache.saveCache([installDir], cacheKey);
+    await saveCompilerCache([installDir], cacheKey);
   }
 
   core.info(`Adding ${binDir} to PATH...`);

@@ -14,6 +14,11 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 import { addMsvcBinFromPath } from "../../setup_msvc";
+import { verifyIntelAuthenticode } from "../../verify_download";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
@@ -149,7 +154,7 @@ export async function installWin32(
 
   core.info(`Installing ifx ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifx-win32-${inputs.arch}-${version}`;
+  const cacheKey = `ifx-win32-validated-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -175,20 +180,38 @@ export async function installWin32(
     }
   }
 
-  if (cacheHit) {
-    core.info(`Restored ifx installation from cache (${cacheHit}).`);
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `ifx ${version}`,
+        [SETVARS_BAT],
+        "cmd",
+        [
+          "/D",
+          "/S",
+          "/C",
+          `call "${SETVARS_BAT}" --force >nul && ifx /what >nul && icx --version >nul && icpx --version >nul`,
+        ],
+      )
+    : false;
+
+  if (cacheValid) {
+    core.info(
+      `Restored ifx installation from cache (${cacheHit ?? cacheKey}).`,
+    );
   } else {
+    if (cacheHit) fs.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
     core.info(`Downloading installer...`);
     const installerPath = await tc.downloadTool(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`),
     );
+    await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
     await runInstallerWithRetry(installerPath);
 
     core.info("Saving installation to cache...");
-    await cache.saveCache(cachePaths, cacheKey);
+    await saveCompilerCache(cachePaths, cacheKey);
   }
 
   // Create a temporary batch file to capture the environment variables

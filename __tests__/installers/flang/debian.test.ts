@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/flang/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core", () => ({
   info: jest.fn(),
@@ -18,6 +12,7 @@ jest.mock("@actions/core", () => ({
   }),
 }));
 jest.mock("@actions/exec");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -36,7 +31,7 @@ describe("installDebian (Flang)", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -64,13 +59,21 @@ describe("installDebian (Flang)", () => {
     process.env = originalEnv;
   });
 
-  it("calls llvm.sh with the correct version", async () => {
+  it("configures the explicit LLVM repository without executing llvm.sh", async () => {
     await installDebian(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("bash", [
-      "-c",
-      "curl -4 -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 https://apt.llvm.org/llvm.sh | sudo bash -s -- 18",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining("llvm-snapshot.gpg.key"),
+        "https://apt.llvm.org/llvm-snapshot.gpg.key",
+      ]),
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "bash",
+      expect.arrayContaining([expect.stringContaining("llvm.sh")]),
+    );
   });
 
   it("installs the correct flang package", async () => {
@@ -80,9 +83,29 @@ describe("installDebian (Flang)", () => {
       "apt-get",
       "install",
       "-y",
+      "-o",
+      "Acquire::ForceIPv4=true",
+      "-o",
+      "Acquire::Retries=3",
+      "-o",
+      "Acquire::http::Timeout=10",
+      "-o",
+      "Acquire::https::Timeout=10",
       "flang-18",
       "libomp-18-dev",
+      "libclang-rt-18-dev",
     ]);
+  });
+
+  it("does not write global APT settings or rewrite Ubuntu mirrors", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        expect.stringMatching(/apt\.conf\.d|ubuntu\.sources|apt-mirrors/),
+      ]),
+    );
   });
 
   it("configures update-alternatives for flang-new (15 <= major < 20)", async () => {
@@ -126,7 +149,6 @@ describe("installDebian (Flang)", () => {
   it("exports flang-20 for FC when version is 20", async () => {
     const inputs = { ...baseInputs, version: "20" };
     await installDebian(inputs);
-
   });
 
   it("resolves and returns the installed version", async () => {

@@ -315,7 +315,7 @@ describe("resolveLatestPatch", () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
-  it("handles GitHub rate limits with intelligent sleep", async () => {
+  it("waits for a nearby GitHub rate-limit reset", async () => {
     const mockFetch = global.fetch as jest.Mock;
     const resetTime = Math.floor(Date.now() / 1000) + 2;
 
@@ -344,6 +344,54 @@ describe("resolveLatestPatch", () => {
     expect(result).toBe("19.1.7");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+
+  it("fails immediately when the GitHub rate-limit reset is too distant", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    const resetTime = Math.floor(Date.now() / 1000) + 60 * 60;
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      headers: new Headers({
+        "x-ratelimit-reset": resetTime.toString(),
+      }),
+    });
+
+    await expect(resolveLatestPatch("llvm/llvm-project", "19")).rejects.toThrow(
+      /exceeds the 30-second maximum wait.*GITHUB_TOKEN/,
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(core.warning).not.toHaveBeenCalledWith(
+      expect.stringContaining("Sleeping for"),
+    );
+  });
+
+  it("reports an invalid GitHub rate-limit reset header", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ "x-ratelimit-reset": "not-a-timestamp" }),
+    });
+
+    await expect(resolveLatestPatch("llvm/llvm-project", "19")).rejects.toThrow(
+      "invalid x-ratelimit-reset value",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails safely when a rate-limit response has no reset header", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers(),
+    });
+
+    await expect(resolveLatestPatch("llvm/llvm-project", "19")).rejects.toThrow(
+      /without a usable x-ratelimit-reset header.*cannot retry safely/,
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("verifyAssetExists", () => {
@@ -371,6 +419,22 @@ describe("verifyAssetExists", () => {
       verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
     ).resolves.not.toThrow();
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the GitHub-provided SHA-256 digest", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    const digest = "a".repeat(64);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [{ name: "fortran.tar.gz", digest: `sha256:${digest}` }],
+      }),
+    });
+
+    await expect(
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+    ).resolves.toBe(digest);
   });
 
   it("throws error if release does not exist (404)", async () => {

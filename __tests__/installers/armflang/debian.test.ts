@@ -158,6 +158,48 @@ describe("installDebian (ArmFlang)", () => {
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
 
+  it("reinstalls when a restored cache is incomplete", async () => {
+    mockedCache.restoreCache.mockResolvedValue("cache-key");
+    let installationReady = false;
+    mockedFs.existsSync.mockImplementation((filePath) => {
+      const value = String(filePath);
+      if (
+        value.includes("/bin/armflang") ||
+        value.includes("/bin/armclang") ||
+        value.includes("libamath")
+      ) {
+        return installationReady;
+      }
+      return true;
+    });
+    mockedExec.mockImplementation(async (command, args, options) => {
+      if (
+        command === "sudo" &&
+        args?.[0] === "apt-get" &&
+        args.includes("install") &&
+        args.some((arg) => arg.startsWith("arm-toolchain-for-linux="))
+      ) {
+        installationReady = true;
+      }
+      if (command.endsWith("/armflang") && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("ArmFlang 22.1.0"));
+      }
+      return 0;
+    });
+
+    await installDebian(inputs);
+
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining("binaries were incomplete"),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        expect.stringContaining("arm-toolchains-repository"),
+      ]),
+    );
+  });
+
   it("retries apt operations after a transient failure", async () => {
     const timeoutSpy = jest
       .spyOn(global, "setTimeout")

@@ -2,10 +2,17 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
-import { Arch, type InstallationResult } from "../../types";
+import { Arch, OS, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
+import {
+  createInstallerTempDir,
+  isReusableLFortranEnvironment,
+  lfortranEnvironment,
+  resetLFortranEnvironment,
+} from "../../lfortran_environment";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -39,16 +46,6 @@ const SUPPORTED_VERSIONS = {
   ],
 } as const satisfies Record<Arch, readonly string[]>;
 
-// Returns the conda arch string for a given runner arch.
-function condaArch(arch: Arch): string {
-  switch (arch) {
-    case Arch.X64:
-      return "x86_64";
-    case Arch.ARM64:
-      return "arm64";
-  }
-}
-
 export async function installDarwin(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -56,68 +53,69 @@ export async function installDarwin(
 
   core.info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
 
-  // Install Miniforge into a dedicated prefix under the runner's temp dir to
-  // avoid interfering with any pre-existing conda installation on the runner.
-  const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
-  const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
-  const arch = condaArch(inputs.arch);
+  const environment = lfortranEnvironment(inputs, version);
+  const miniforge = resolveMiniforgeInstaller(OS.MacOS, inputs.arch);
+  if (await isReusableLFortranEnvironment(environment, version)) {
+    core.info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
+  } else {
+    resetLFortranEnvironment(environment);
+    const tempDir = createInstallerTempDir();
+    const miniforgeInstaller = path.join(tempDir, "miniforge.sh");
+    try {
+      await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforge.url,
+      ]);
+      await verifySha256(miniforgeInstaller, miniforge.sha256);
+      await exec.exec("bash", [
+        miniforgeInstaller,
+        "-b",
+        "-p",
+        environment.miniforgePrefix,
+      ]);
+      await exec.exec(environment.conda, [
+        "create",
+        "-y",
+        "-p",
+        environment.envPrefix,
+        "-c",
+        "conda-forge",
+        "--strict-channel-priority",
+        `lfortran==${version}`,
+      ]);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-${arch}.sh`;
-
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-  await exec.exec("curl", [
-    "-fsSL",
-    "--retry",
-    "3",
-    "--retry-delay",
-    "15",
-    "-o",
-    miniforgeInstaller,
-    miniforgeUrl,
-  ]);
-
-  core.info(`Installing Miniforge to ${condaPrefix}...`);
-  await exec.exec("bash", [
-    miniforgeInstaller,
-    "-b", // batch mode, no interactive prompts
-    "-p",
-    condaPrefix,
-  ]);
-
-  const condaBin = path.join(condaPrefix, "bin", "conda");
-
-  await exec.exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
-
-  core.info(`Installing lfortran==${version} from conda-forge...`);
-  await exec.exec(condaBin, [
-    "install",
-    "-y",
-    "-c",
-    "conda-forge",
-    `lfortran==${version}`,
-  ]);
-
-  const lfortranBinDir = path.join(condaPrefix, "bin");
-  const lfortranBin = path.join(lfortranBinDir, "lfortran");
-
-  if (!fs.existsSync(lfortranBin)) {
+  if (!fs.existsSync(environment.lfortran)) {
     throw new Error(
-      `lfortran binary not found at expected path: ${lfortranBin}`,
+      `lfortran binary not found at expected path: ${environment.lfortran}`,
     );
   }
 
-  core.info(`Found lfortran binary at: ${lfortranBin}`);
+  core.info(`Found lfortran binary at: ${environment.lfortran}`);
 
   // Fix rpath of lfortran binary to ensure it can find its shared libraries
   // (like libxeus-zmq) when run outside of a conda environment.
-  const libDir = path.join(condaPrefix, "lib");
+  const libDir = path.join(environment.envPrefix, "lib");
   try {
-    await exec.exec("install_name_tool", ["-add_rpath", libDir, lfortranBin]);
+    await exec.exec("install_name_tool", [
+      "-add_rpath",
+      libDir,
+      environment.lfortran,
+    ]);
   } catch (e) {
     core.debug(`install_name_tool failed: ${String(e)}`);
   }
 
-  core.addPath(lfortranBinDir);
+  core.addPath(environment.binDir);
   core.exportVariable("LFORTRAN_OMP_LIB_DIR", libDir);
   // As an additional safety measure, set DYLD_FALLBACK_LIBRARY_PATH.
   // Note: we use fallback to avoid overriding system libraries if possible.
@@ -140,11 +138,14 @@ export async function installDarwin(
     core.warning(`Could not determine SDKROOT via xcrun: ${error}`);
   }
 
-  const resolvedVersion = await resolveInstalledVersion(condaBin, condaPrefix);
+  const resolvedVersion = await resolveInstalledVersion(
+    environment.conda,
+    environment.envPrefix,
+  );
   core.info(`LFortran ${resolvedVersion} installed successfully on macOS.`);
   const result = {
     version: resolvedVersion,
-    fc: lfortranBin,
+    fc: environment.lfortran,
     cc: "clang",
     cxx: "clang++",
   };

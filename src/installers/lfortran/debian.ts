@@ -1,11 +1,18 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
-import { Arch, type InstallationResult } from "../../types";
+import { Arch, OS, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
+import {
+  createInstallerTempDir,
+  isReusableLFortranEnvironment,
+  lfortranEnvironment,
+  resetLFortranEnvironment,
+} from "../../lfortran_environment";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -48,63 +55,61 @@ export async function installDebian(
 
   core.info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
 
-  // Install Miniforge into a dedicated prefix under the runner's temp dir.
-  // Using a fixed path makes it easy to add to PATH later.
-  const condaPrefix = path.join(os.tmpdir(), "lfortran-conda");
-  const miniforgeInstaller = path.join(os.tmpdir(), "miniforge.sh");
+  const environment = lfortranEnvironment(inputs, version);
+  const miniforge = resolveMiniforgeInstaller(OS.Linux, inputs.arch);
+  if (await isReusableLFortranEnvironment(environment, version)) {
+    core.info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
+  } else {
+    resetLFortranEnvironment(environment);
+    const tempDir = createInstallerTempDir();
+    const miniforgeInstaller = path.join(tempDir, "miniforge.sh");
+    try {
+      core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
+      await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforge.url,
+      ]);
+      await verifySha256(miniforgeInstaller, miniforge.sha256);
+      await exec.exec("bash", [
+        miniforgeInstaller,
+        "-b",
+        "-p",
+        environment.miniforgePrefix,
+      ]);
+      await exec.exec(environment.conda, [
+        "create",
+        "-y",
+        "-p",
+        environment.envPrefix,
+        "-c",
+        "conda-forge",
+        "--strict-channel-priority",
+        `lfortran==${version}`,
+      ]);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh`;
-
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-  await exec.exec("curl", [
-    "-fsSL",
-    "--retry",
-    "3",
-    "--retry-delay",
-    "15",
-    "-o",
-    miniforgeInstaller,
-    miniforgeUrl,
-  ]);
-
-  core.info(`Installing Miniforge to ${condaPrefix}...`);
-  await exec.exec("bash", [
-    miniforgeInstaller,
-    "-b", // batch mode, no interactive prompts
-    "-p",
-    condaPrefix,
-  ]);
-
-  // Point conda at conda-forge only, to avoid the default channel.
-  const condaBin = path.join(condaPrefix, "bin", "conda");
-  await exec.exec(condaBin, ["config", "--set", "channel_priority", "strict"]);
-
-  core.info(`Installing lfortran==${version} from conda-forge...`);
-  await exec.exec(condaBin, [
-    "install",
-    "-y",
-    "-c",
-    "conda-forge",
-    `lfortran==${version}`,
-  ]);
-
-  // The lfortran binary lives in the conda prefix's bin directory.
-  const lfortranBinDir = path.join(condaPrefix, "bin");
-  const lfortranBin = path.join(lfortranBinDir, "lfortran");
-
-  if (!fs.existsSync(lfortranBin)) {
+  if (!fs.existsSync(environment.lfortran)) {
     throw new Error(
-      `lfortran binary not found at expected path: ${lfortranBin}`,
+      `lfortran binary not found at expected path: ${environment.lfortran}`,
     );
   }
 
-  core.info(`Found lfortran binary at: ${lfortranBin}`);
+  core.addPath(environment.binDir);
+  core.exportVariable(
+    "LFORTRAN_OMP_LIB_DIR",
+    path.join(environment.envPrefix, "lib"),
+  );
 
-  core.addPath(lfortranBinDir);
-
-  core.exportVariable("LFORTRAN_OMP_LIB_DIR", path.join(condaPrefix, "lib"));
-
-  const resolvedVersion = await resolveInstalledVersion(lfortranBin);
+  const resolvedVersion = await resolveInstalledVersion(environment.lfortran);
   core.info(`LFortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,

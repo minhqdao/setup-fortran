@@ -16,6 +16,10 @@ interface FetchResult<T> {
   data: T | null;
 }
 
+const MAX_GITHUB_RATE_LIMIT_WAIT_MS = 30_000;
+
+class GitHubRateLimitError extends Error {}
+
 /**
  * A production-grade wrapper around native fetch that handles stream timeouts,
  * precise GitHub rate-limit reset windows, and exponential backoff.
@@ -45,12 +49,35 @@ async function fetchJsonWithRetry<T>(
         return { status: 404, data: null };
       }
 
-      // Handle Rate Limiting Intelligent Sleep
+      // A short reset window is worth waiting for, but an exhausted anonymous
+      // quota can otherwise suspend the action for close to an hour.
       if (response.status === 403 || response.status === 429) {
         const resetHeader = response.headers.get("x-ratelimit-reset");
         if (resetHeader) {
           const resetTimeMs = parseInt(resetHeader, 10) * 1000;
           const sleepTimeMs = Math.max(resetTimeMs - Date.now() + 1000, 2000);
+
+          if (!Number.isFinite(resetTimeMs)) {
+            throw new GitHubRateLimitError(
+              `GitHub API rate limit response contained an invalid x-ratelimit-reset value: ${resetHeader}.`,
+            );
+          }
+
+          if (sleepTimeMs > MAX_GITHUB_RATE_LIMIT_WAIT_MS) {
+            throw new GitHubRateLimitError(
+              `GitHub API rate limit for ${url} resets at ${new Date(resetTimeMs).toISOString()} ` +
+                `(${Math.ceil(sleepTimeMs / 1000).toString()} seconds away), which exceeds the ` +
+                `${(MAX_GITHUB_RATE_LIMIT_WAIT_MS / 1000).toString()}-second maximum wait. ` +
+                "Retry later or provide a GITHUB_TOKEN with available API quota.",
+            );
+          }
+
+          if (attempt === maxRetries) {
+            throw new GitHubRateLimitError(
+              `GitHub API rate limit remained active after ${maxRetries.toString()} attempts for ${url}. ` +
+                `Retry after ${new Date(resetTimeMs).toISOString()} or provide a GITHUB_TOKEN with available API quota.`,
+            );
+          }
 
           core.warning(
             `GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
@@ -61,6 +88,11 @@ async function fetchJsonWithRetry<T>(
           await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
           continue;
         }
+
+        throw new GitHubRateLimitError(
+          `GitHub API returned status ${response.status.toString()} for ${url} without a usable ` +
+            "x-ratelimit-reset header, so the action cannot retry safely. Check GITHUB_TOKEN permissions and quota, then retry.",
+        );
       }
 
       if (!response.ok) {
@@ -76,6 +108,9 @@ async function fetchJsonWithRetry<T>(
       clearTimeout(timeoutId);
 
       const error = e instanceof Error ? e : new Error(String(e));
+      if (error instanceof GitHubRateLimitError) {
+        throw error;
+      }
       const isAbort = error.name === "AbortError";
       const errorMessage = isAbort
         ? `Request or body streaming timed out after ${timeoutMs.toString()}ms`
@@ -250,7 +285,7 @@ export async function resolveLatestPatch(
 }
 
 interface GitHubTagMetadata {
-  assets: { name: string }[];
+  assets: { name: string; digest?: string | null }[];
 }
 
 export async function verifyAssetExists(
@@ -258,7 +293,7 @@ export async function verifyAssetExists(
   patch: string,
   filename: string,
   tagFromPatch: (patch: string) => string = (p) => `llvmorg-${p}`,
-): Promise<void> {
+): Promise<string | undefined> {
   const tag = tagFromPatch(patch);
   core.info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
 
@@ -282,12 +317,29 @@ export async function verifyAssetExists(
     );
   }
 
-  if (!release.assets.some((a) => a.name === filename)) {
+  const asset = release.assets.find((a) => a.name === filename);
+  if (!asset) {
     throw new Error(
       `Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
         `See https://github.com/${repo}/releases/tag/${tag} for available assets.`,
     );
   }
+
+  if (!asset.digest?.startsWith("sha256:")) {
+    core.warning(
+      `GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}; ` +
+        `download integrity cannot be verified automatically for this legacy asset.`,
+    );
+    return undefined;
+  }
+
+  const digest = asset.digest.slice("sha256:".length).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new Error(
+      `GitHub returned an invalid SHA-256 digest for ${repo} release asset ${filename}.`,
+    );
+  }
+  return digest;
 }
 
 function githubHeaders(): Record<string, string> {

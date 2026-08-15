@@ -4,6 +4,10 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -55,7 +59,7 @@ export async function installDebian(
   core.info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
 
   const ONEAPI_ROOT = "/opt/intel/oneapi";
-  const cacheKey = `oneapi-ifx-${version}`;
+  const cacheKey = `oneapi-ifx-validated-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -63,8 +67,24 @@ export async function installDebian(
   }
 
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `ifx ${version}`,
+        [setVarsScript],
+        "bash",
+        [
+          "-c",
+          `source "${setVarsScript}" --force && ifx --version && icx --version && icpx --version`,
+        ],
+      )
+    : false;
 
-  if (!cacheHit) {
+  if (!cacheValid) {
+    if (cacheHit) {
+      await exec.exec("sudo", ["rm", "-rf", ONEAPI_ROOT]);
+      await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+    }
     core.info("Adding Intel oneAPI apt repository...");
     await exec.exec("bash", [
       "-c",
@@ -102,12 +122,11 @@ export async function installDebian(
       cppPkg,
     ]);
 
-    await cache.saveCache(cachePaths, cacheKey);
+    await saveCompilerCache(cachePaths, cacheKey);
   } else {
     core.info(`Cache hit for ${cacheKey}, skipping installation...`);
   }
 
-  const setVarsScript = "/opt/intel/oneapi/setvars.sh";
   core.info(`Sourcing ${setVarsScript} and exporting environment...`);
 
   let envOutput = "";

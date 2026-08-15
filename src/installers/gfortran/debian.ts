@@ -1,6 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
@@ -12,10 +15,32 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 } as const satisfies Record<Arch, readonly string[]>;
 
-const CACHE_PATHS = ["/var/cache/apt/archives"];
+const CACHE_SCHEMA_VERSION = "v2";
 
-function aptCacheKey(version: string, osVersion: string): string {
-  return `apt-gfortran-${osVersion}-${version}`;
+function aptCacheKey(inputs: Inputs, version: string): string {
+  return [
+    "apt-gfortran",
+    CACHE_SCHEMA_VERSION,
+    inputs.osVersion,
+    inputs.arch,
+    version,
+  ].join("-");
+}
+
+function aptCacheDir(inputs: Inputs, version: string): string {
+  return path.join(
+    process.env.RUNNER_TEMP ?? os.tmpdir(),
+    "setup-fortran",
+    "apt",
+    "gfortran",
+    inputs.osVersion,
+    inputs.arch,
+    version,
+  );
+}
+
+function aptCacheOptions(cacheDir: string): string[] {
+  return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
 
 export async function installDebian(
@@ -24,27 +49,51 @@ export async function installDebian(
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   core.info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
 
-  const cacheKey = aptCacheKey(version, inputs.osVersion);
-  const cacheHit = await cache.restoreCache(CACHE_PATHS, cacheKey);
+  const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
+  const cacheDir = aptCacheDir(inputs, version);
+  const cachePaths = [cacheDir];
+  const cacheKey = aptCacheKey(inputs, version);
+
+  // APT expects this directory to exist beneath its archive directory.
+  fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
+  let cacheHit: string | undefined;
+  try {
+    cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  } catch (err) {
+    core.warning(
+      `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
+    );
+  }
+
+  if (needsPpa(version, inputs.osVersion)) {
+    core.info(`Adding PPA for GFortran ${version}...`);
+    await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+  }
+
+  await aptGetUpdateWithRetry();
 
   if (cacheHit) {
     core.info(`Cache hit for ${cacheKey}, installing from cache...`);
-    await exec.exec("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-download",
-      "--ignore-missing",
-      `gcc-${version}`,
-      `gfortran-${version}`,
-    ]);
-  } else {
-    if (needsPpa(version, inputs.osVersion)) {
-      core.info(`Adding PPA for GFortran ${version}...`);
-      await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+    try {
+      await aptGetInstallFromCache(packages, cacheDir);
+      await verifyInstalledToolchain(version);
+    } catch (err) {
+      core.warning(
+        `Cached GFortran packages were incomplete or invalid; ` +
+          `falling back to an online installation: ${String(err)}`,
+      );
+      await aptGetInstallWithRetry(packages, cacheDir);
+      await verifyInstalledToolchain(version);
     }
-    await aptGetInstallWithRetry([`gcc-${version}`, `gfortran-${version}`]);
-    await cache.saveCache(CACHE_PATHS, cacheKey);
+  } else {
+    await aptGetInstallWithRetry(packages, cacheDir);
+    await verifyInstalledToolchain(version);
+    try {
+      await prepareCacheForSave(cacheDir);
+      await cache.saveCache(cachePaths, cacheKey);
+    } catch (err) {
+      core.warning(`Could not save the GFortran package cache: ${String(err)}`);
+    }
   }
 
   await exec.exec("sudo", [
@@ -73,8 +122,46 @@ export async function installDebian(
 
 async function aptGetInstallWithRetry(
   packages: string[],
+  cacheDir: string,
   maxAttempts = 5,
 ): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "-o",
+        "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
+        ...aptCacheOptions(cacheDir),
+        ...packages,
+      ]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
+}
+
+async function prepareCacheForSave(cacheDir: string): Promise<void> {
+  // APT may leave root-owned lock and partial-download metadata behind. They
+  // are not reusable package data and can prevent the cache client from
+  // archiving the directory as the unprivileged runner user.
+  await exec.exec("sudo", ["chown", "-R", os.userInfo().username, cacheDir]);
+  fs.rmSync(path.join(cacheDir, "lock"), { force: true });
+  fs.rmSync(path.join(cacheDir, "partial"), {
+    recursive: true,
+    force: true,
+  });
+}
+
+async function aptGetUpdateWithRetry(maxAttempts = 5): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
@@ -86,24 +173,34 @@ async function aptGetInstallWithRetry(
         "-o",
         "Acquire::Retries=3",
       ]);
-      await exec.exec("sudo", [
-        "apt-get",
-        "install",
-        "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
-        ...packages,
-      ]);
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
       core.warning(
-        `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+        `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
+  }
+}
+
+async function aptGetInstallFromCache(
+  packages: string[],
+  cacheDir: string,
+): Promise<void> {
+  await exec.exec("sudo", [
+    "apt-get",
+    "install",
+    "-y",
+    "--no-download",
+    ...aptCacheOptions(cacheDir),
+    ...packages,
+  ]);
+}
+
+async function verifyInstalledToolchain(version: string): Promise<void> {
+  for (const tool of ["gcc", "g++", "gfortran"]) {
+    await exec.exec(`${tool}-${version}`, ["--version"], { silent: true });
   }
 }
 

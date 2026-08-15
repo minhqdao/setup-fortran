@@ -18,6 +18,7 @@ import {
 } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
 import { addMsvcBinFromPath } from "../../setup_msvc";
+import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -179,8 +180,6 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
   let patch: string;
 
   if (userPatch !== undefined) {
-    const filename = `LLVM-${userPatch}-${WINDOWS_INSTALLER_SUFFIX[inputs.arch]}.exe`;
-    await verifyAssetExists("llvm/llvm-project", userPatch, filename);
     patch = userPatch;
   } else {
     patch = await resolveLatestPatch("llvm/llvm-project", major);
@@ -188,17 +187,25 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
 
   const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
   const filename = `LLVM-${patch}-${suffix}.exe`;
+  const expectedSha256 = await verifyAssetExists(
+    "llvm/llvm-project",
+    patch,
+    filename,
+  );
   const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
 
   core.info(
     `Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`,
   );
 
-  let toolRoot = tc.find("flang", patch, inputs.arch);
+  let toolRoot = tc.find("flang-verified", patch, inputs.arch);
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
     const downloadPath = await tc.downloadTool(downloadUrl);
+    if (expectedSha256) {
+      await verifySha256(downloadPath, expectedSha256);
+    }
 
     const tempExtractDir = path.join(
       process.env.RUNNER_TEMP ?? "C:\\Temp",
@@ -209,7 +216,12 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     await extractExe(downloadPath, tempExtractDir);
 
     core.info("Caching...");
-    toolRoot = await tc.cacheDir(tempExtractDir, "flang", patch, inputs.arch);
+    toolRoot = await tc.cacheDir(
+      tempExtractDir,
+      "flang-verified",
+      patch,
+      inputs.arch,
+    );
   } else {
     core.info(
       `Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`,

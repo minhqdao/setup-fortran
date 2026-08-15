@@ -13,6 +13,11 @@ import * as fs from "fs";
 import * as os from "os";
 import path from "path";
 import { addMsvcBinFromPath } from "../../setup_msvc";
+import { verifyIntelAuthenticode } from "../../verify_download";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
@@ -83,7 +88,7 @@ export async function installWin32(
 
   core.info(`Installing ifort ${version} on Windows (${inputs.arch})...`);
 
-  const cacheKey = `ifort-win32-${inputs.arch}-${version}`;
+  const cacheKey = `ifort-win32-validated-v1-${inputs.arch}-${version}`;
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -91,14 +96,31 @@ export async function installWin32(
   }
 
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-  if (cacheHit) {
-    core.info(`Restored ifort installation from cache (${cacheHit}).`);
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `ifort ${version}`,
+        [SETVARS_BAT],
+        "cmd",
+        [
+          "/D",
+          "/S",
+          "/C",
+          `call "${SETVARS_BAT}" --force >nul && ifort /what >nul`,
+        ],
+      )
+    : false;
+  if (cacheValid) {
+    core.info(
+      `Restored ifort installation from cache (${cacheHit ?? cacheKey}).`,
+    );
   } else {
+    if (cacheHit) fs.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
     core.info(`Downloading ifort installer...`);
     const installerPath = await tc.downloadTool(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`),
     );
+    await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install (this may take several minutes)...");
     await exec.exec(`"${installerPath}"`, [
@@ -112,7 +134,7 @@ export async function installWin32(
     ]);
 
     core.info("Saving installation to cache...");
-    await cache.saveCache(cachePaths, cacheKey);
+    await saveCompilerCache(cachePaths, cacheKey);
   }
 
   // Create a temporary batch file to capture the environment variables

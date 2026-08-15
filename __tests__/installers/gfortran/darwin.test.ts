@@ -25,7 +25,7 @@ describe("installDarwin (gfortran)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (commandLine === "gfortran" && args?.[0] === "--version") {
+      if (commandLine.includes("gfortran-14") && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(
             Buffer.from("GNU Fortran (Homebrew GCC 14.1.0) 14.1.0"),
@@ -45,6 +45,11 @@ describe("installDarwin (gfortran)", () => {
           options.listeners.stdout(Buffer.from("/path/to/SDK"));
         }
       }
+      if (commandLine === "bash" && args?.[0] === "-c") {
+        options?.listeners?.stdout?.(
+          Buffer.from("/usr/local/Cellar/gcc@14/14.1.0/lib/gcc/14"),
+        );
+      }
       return 0;
     });
   });
@@ -57,11 +62,11 @@ describe("installDarwin (gfortran)", () => {
       "--skip-post-install",
       "gcc@14",
     ]);
-    expect(mockedExec).toHaveBeenCalledWith("ln", [
-      "-sf",
-      expect.stringContaining("gfortran-14"),
-      expect.stringContaining("gfortran"),
-    ]);
+    expect(mockedExec).not.toHaveBeenCalledWith("ln", expect.anything());
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "bash",
+      ["-c", expect.stringContaining("/usr/local/lib")],
+    );
   });
 
   it("skips install if already present", async () => {
@@ -77,6 +82,16 @@ describe("installDarwin (gfortran)", () => {
           options.listeners.stdout(Buffer.from("/usr/local"));
         }
       }
+      if (commandLine === "bash" && args?.[0] === "-c") {
+        options?.listeners?.stdout?.(
+          Buffer.from("/usr/local/Cellar/gcc@14/14.1.0/lib/gcc/14"),
+        );
+      }
+      if (commandLine.includes("gfortran-14") && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(
+          Buffer.from("GNU Fortran (Homebrew GCC 14.1.0) 14.1.0"),
+        );
+      }
       return 0;
     });
 
@@ -90,6 +105,14 @@ describe("installDarwin (gfortran)", () => {
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "SDKROOT",
       "/path/to/SDK",
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "DYLD_FALLBACK_LIBRARY_PATH",
+      expect.stringContaining("/lib/gcc/14"),
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "LIBRARY_PATH",
+      "/path/to/SDK/usr/lib",
     );
   });
 

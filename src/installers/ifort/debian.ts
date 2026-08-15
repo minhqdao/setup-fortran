@@ -4,6 +4,10 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import {
+  saveCompilerCache,
+  validateRestoredCompilerCache,
+} from "../../cache_validation";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -49,10 +53,23 @@ export async function installDebian(
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheKey = `oneapi-ifort-${bundle}`;
+  const cacheKey = `oneapi-ifort-validated-v1-${inputs.arch}-${bundle}`;
   const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
+  const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
+  const cacheValid = cacheHit
+    ? await validateRestoredCompilerCache(
+        `ifort ${version}`,
+        [setVarsScript],
+        "bash",
+        ["-c", `source "${setVarsScript}" --force && ifort --version`],
+      )
+    : false;
 
-  if (!cacheHit) {
+  if (!cacheValid) {
+    if (cacheHit) {
+      await exec.exec("sudo", ["rm", "-rf", ONEAPI_ROOT]);
+      await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
+    }
     core.info("Adding Intel oneAPI apt repository...");
     await exec.exec("bash", [
       "-c",
@@ -95,12 +112,11 @@ export async function installDebian(
       cppPkg,
     ]);
 
-    await cache.saveCache(ONEAPI_CACHE_PATHS, cacheKey);
+    await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
   } else {
     core.info(`Cache hit for ${cacheKey}, skipping installation...`);
   }
 
-  const setVarsScript = "/opt/intel/oneapi/setvars.sh";
   core.info(`Sourcing ${setVarsScript} and exporting environment...`);
 
   let envOutput = "";

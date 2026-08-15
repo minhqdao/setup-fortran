@@ -3,13 +3,7 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/ifx/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -31,7 +25,7 @@ describe("installDebian ifx", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -64,7 +58,7 @@ describe("installDebian ifx", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifx-2023.2.0",
+      "oneapi-ifx-validated-v1-x64-2023.2.0",
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
@@ -87,7 +81,7 @@ describe("installDebian ifx", () => {
     );
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifx-2023.2.0",
+      "oneapi-ifx-validated-v1-x64-2023.2.0",
     );
   });
 
@@ -108,10 +102,28 @@ describe("installDebian ifx", () => {
     // But still sources setvars.sh
     expect(mockedExec).toHaveBeenCalledWith(
       "bash",
-      [
-        "-c",
-        expect.stringContaining('source "/opt/intel/oneapi/setvars.sh"'),
-      ],
+      ["-c", expect.stringContaining('source "/opt/intel/oneapi/setvars.sh"')],
+      expect.anything(),
+    );
+  });
+
+  it("reinstalls when the restored cache is incomplete", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedFs.existsSync.mockReturnValue(false);
+
+    await installDebian({ ...baseInputs, version: "2023.2.0" });
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "rm",
+      "-rf",
+      "/opt/intel/oneapi",
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "apt-get",
+        "intel-oneapi-compiler-fortran-2023.2.0",
+      ]),
       expect.anything(),
     );
   });
@@ -194,6 +206,5 @@ describe("installDebian ifx", () => {
 
   it("exports environment variables including FPM flags", async () => {
     await installDebian(baseInputs);
-
   });
 });

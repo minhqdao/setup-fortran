@@ -6,11 +6,20 @@ import {
   Arch,
   LATEST,
   Msystem,
+  OS,
   type InstallationResult,
   type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
+import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
+import { verifySha256 } from "../../verify_download";
+import {
+  createInstallerTempDir,
+  isReusableLFortranEnvironment,
+  lfortranEnvironment,
+  resetLFortranEnvironment,
+} from "../../lfortran_environment";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -71,73 +80,62 @@ export async function installWin32(
 async function installConda(inputs: Inputs): Promise<InstallationResult> {
   const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
 
-  const gitLink = "C:\\Program Files\\Git\\usr\\bin\\link.exe";
-  if (fs.existsSync(gitLink)) {
-    core.info("Moving conflicting Git link.exe to link.exe.bak...");
-    try {
-      fs.renameSync(gitLink, `${gitLink}.bak`);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      core.warning(`Could not move Git link.exe: ${message}`);
-    }
-  }
-
   core.info(
     `Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`,
   );
 
-  const condaPrefix = "C:\\lfortran-conda";
-  const miniforgeInstaller = "C:\\miniforge-install.exe";
-
-  const arch = inputs.arch === Arch.ARM64 ? "arm64" : "x86_64";
-  const miniforgeUrl = `https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-${arch}.exe`;
-
-  core.info(`Downloading Miniforge from ${miniforgeUrl}...`);
-  await exec.exec("curl", [
-    "-fsSL",
-    "--retry",
-    "3",
-    "--retry-delay",
-    "15",
-    "-o",
-    miniforgeInstaller,
-    miniforgeUrl,
-  ]);
-
-  // The Miniforge Windows installer is NSIS-based. /S = silent, /D= sets the
-  // install prefix and must be the last argument with no quotes around the path.
-  core.info(`Installing Miniforge to ${condaPrefix}...`);
-  await exec.exec(miniforgeInstaller, ["/S", `/D=${condaPrefix}`]);
-
-  const condaExe = path.join(condaPrefix, "Scripts", "conda.exe");
-
-  core.info(`Installing lfortran==${version} from conda-forge...`);
-  await exec.exec(`"${condaExe}"`, [
-    "create",
-    "-y",
-    "-n",
-    "lfortran",
-    "-c",
-    "conda-forge",
-    "--solver=classic",
-    `lfortran==${version}`,
-    "lld",
-  ]);
-
-  const envPrefix = path.join(condaPrefix, "envs", "lfortran");
-  const libraryBin = path.join(envPrefix, "Library", "bin");
-  const lfortranExe = path.join(libraryBin, "lfortran.exe");
-
-  if (!fs.existsSync(lfortranExe)) {
-    throw new Error(`lfortran.exe not found at expected path: ${lfortranExe}`);
+  const environment = lfortranEnvironment(inputs, version);
+  const miniforge = resolveMiniforgeInstaller(OS.Windows, inputs.arch);
+  if (await isReusableLFortranEnvironment(environment, version)) {
+    core.info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
+  } else {
+    resetLFortranEnvironment(environment);
+    const tempDir = createInstallerTempDir();
+    const miniforgeInstaller = path.join(tempDir, "miniforge-install.exe");
+    try {
+      await exec.exec("curl", [
+        "-fsSL",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "15",
+        "-o",
+        miniforgeInstaller,
+        miniforge.url,
+      ]);
+      await verifySha256(miniforgeInstaller, miniforge.sha256);
+      await exec.exec(miniforgeInstaller, [
+        "/S",
+        `/D=${environment.miniforgePrefix}`,
+      ]);
+      await exec.exec(environment.conda, [
+        "create",
+        "-y",
+        "-p",
+        environment.envPrefix,
+        "-c",
+        "conda-forge",
+        "--solver=classic",
+        `lfortran==${version}`,
+        "lld",
+      ]);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 
-  core.addPath(envPrefix);
-  core.addPath(path.join(envPrefix, "Scripts"));
-  core.addPath(libraryBin);
+  if (!fs.existsSync(environment.lfortran)) {
+    throw new Error(
+      `lfortran.exe not found at expected path: ${environment.lfortran}`,
+    );
+  }
 
-  const lldLink = path.join(libraryBin, "lld-link.exe");
-  const proxyLink = path.join(libraryBin, "link.exe");
+  core.addPath(environment.envPrefix);
+  core.addPath(path.join(environment.envPrefix, "Scripts"));
+  core.addPath(environment.binDir);
+
+  const lldLink = path.join(environment.binDir, "lld-link.exe");
+  const proxyLink = path.join(environment.binDir, "link.exe");
 
   if (fs.existsSync(lldLink)) {
     if (!fs.existsSync(proxyLink)) {
@@ -161,18 +159,18 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join(envPrefix, "Library", "lib"),
+    path.join(environment.envPrefix, "Library", "lib"),
   );
 
-  const resolvedVersion = await resolveInstalledVersion(lfortranExe);
+  const resolvedVersion = await resolveInstalledVersion(environment.lfortran);
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (conda).`,
   );
   const result = {
     version: resolvedVersion,
-    fc: lfortranExe,
-    cc: path.join(libraryBin, "clang.exe"),
-    cxx: path.join(libraryBin, "clang++.exe"),
+    fc: environment.lfortran,
+    cc: path.join(environment.binDir, "clang.exe"),
+    cxx: path.join(environment.binDir, "clang++.exe"),
   };
   return result;
 }
@@ -184,10 +182,31 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     `Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
-  await setupMSYS2(inputs.msystem, ["lfortran"]);
-
   const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
   const lfortranExe = path.join(msysBin, "lfortran.exe");
+  let resolvedVersion: string | undefined;
+  if (fs.existsSync(lfortranExe)) {
+    try {
+      resolvedVersion = await resolveInstalledVersion(lfortranExe);
+      core.info(
+        `Reusing existing LFortran ${resolvedVersion} from ${lfortranExe}.`,
+      );
+    } catch (error) {
+      core.warning(
+        `Existing MSYS2 LFortran is unusable; reinstalling it: ${String(error)}`,
+      );
+    }
+  }
+
+  if (!resolvedVersion) {
+    await setupMSYS2(inputs.msystem, ["lfortran"]);
+    if (!fs.existsSync(lfortranExe)) {
+      throw new Error(
+        `lfortran.exe not found at expected path: ${lfortranExe}`,
+      );
+    }
+    resolvedVersion = await resolveInstalledVersion(lfortranExe);
+  }
 
   core.addPath(msysBin);
 
@@ -197,7 +216,6 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   );
   core.exportVariable("WINDOWS_ENV", inputs.msystem);
 
-  const resolvedVersion = await resolveInstalledVersion(lfortranExe);
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${inputs.msystem}).`,
   );

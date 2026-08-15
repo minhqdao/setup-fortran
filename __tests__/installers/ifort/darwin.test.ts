@@ -4,18 +4,13 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
 import { installDarwin } from "../../../src/installers/ifort/darwin";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
 jest.mock("@actions/cache");
 jest.mock("@actions/tool-cache");
+jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -37,7 +32,7 @@ describe("installDarwin (ifort)", () => {
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
 
@@ -96,11 +91,56 @@ describe("installDarwin (ifort)", () => {
       "install",
       "--eula",
       "accept",
-      "--continue-with-optional-error=yes",
       "--ignore-errors",
       "--components",
       "intel.oneapi.mac.ifort-compiler",
     ]);
+    expect(mockedCache.saveCache).toHaveBeenCalled();
+  });
+
+  it("retries a transient bootstrapper failure", async () => {
+    mockedCache.restoreCache.mockResolvedValue(undefined);
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback) => {
+        callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+    let installerAttempts = 0;
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (
+        commandLine === "sudo" &&
+        typeof args?.[0] === "string" &&
+        args[0].includes("bootstrapper")
+      ) {
+        installerAttempts++;
+        if (installerAttempts === 1) {
+          throw new Error("Cannot establish Internet connection");
+        }
+      }
+      if (commandLine === "ifort" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(
+          Buffer.from("ifort (IFORT) 2021.10.0 20230609"),
+        );
+      }
+      if (commandLine === "bash" && args?.[1]?.includes("setvars.sh")) {
+        options?.listeners?.stdout?.(
+          Buffer.from(
+            "PATH=/opt/intel/oneapi/compiler/latest/bin\nONEAPI_ROOT=/opt/intel/oneapi",
+          ),
+        );
+      }
+      return 0;
+    });
+
+    try {
+      await installDarwin(baseInputs);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+
+    expect(installerAttempts).toBe(2);
     expect(mockedCache.saveCache).toHaveBeenCalled();
   });
 

@@ -1,17 +1,14 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import {
   installDebian,
   needsPpa,
 } from "../../../src/installers/gfortran/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -27,13 +24,26 @@ describe("GFortran Debian Installer", () => {
     os: OS.Linux,
     osVersion: "20.04.6",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     msystem: Msystem.Native,
   };
+
+  const testRunnerTemp = path.join(os.tmpdir(), "setup-fortran-gfortran-tests");
+  const cacheDir = path.join(
+    testRunnerTemp,
+    "setup-fortran",
+    "apt",
+    "gfortran",
+    "20.04.6",
+    "x64",
+    "14",
+  );
+  const cacheKey = "apt-gfortran-v2-20.04.6-x64-14";
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    process.env.RUNNER_TEMP = testRunnerTemp;
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "gfortran" && args?.[0] === "--version") {
@@ -45,6 +55,10 @@ describe("GFortran Debian Installer", () => {
       }
       return 0;
     });
+  });
+
+  afterAll(() => {
+    fs.rmSync(testRunnerTemp, { recursive: true, force: true });
   });
 
   describe("needsPpa", () => {
@@ -102,8 +116,8 @@ describe("GFortran Debian Installer", () => {
       await installDebian(baseInputs);
 
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
-        ["/var/cache/apt/archives"],
-        expect.stringContaining("apt-gfortran-20.04.6-14"),
+        [cacheDir],
+        cacheKey,
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
@@ -122,12 +136,28 @@ describe("GFortran Debian Installer", () => {
         "Acquire::http::Timeout=60",
         "-o",
         "Acquire::Retries=3",
+        "-o",
+        `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
+        "g++-14",
         "gfortran-14",
       ]);
-      expect(mockedCache.saveCache).toHaveBeenCalledWith(
-        ["/var/cache/apt/archives"],
-        expect.stringContaining("apt-gfortran-20.04.6-14"),
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "chown",
+        "-R",
+        os.userInfo().username,
+        cacheDir,
+      ]);
+      expect(mockedCache.saveCache).toHaveBeenCalledWith([cacheDir], cacheKey);
+      expect(fs.existsSync(path.join(cacheDir, "partial"))).toBe(false);
+    });
+
+    it("separates x64 and ARM64 caches", async () => {
+      await installDebian({ ...baseInputs, arch: Arch.ARM64 });
+
+      expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+        [expect.stringContaining(path.join("arm64", "14"))],
+        "apt-gfortran-v2-20.04.6-arm64-14",
       );
     });
 
@@ -140,22 +170,107 @@ describe("GFortran Debian Installer", () => {
         "install",
         "-y",
         "--no-download",
-        "--ignore-missing",
+        "-o",
+        `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
+        "g++-14",
         "gfortran-14",
       ]);
-      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
         "update",
         "-y",
+        "-o",
+        "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
       ]);
       expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    });
+
+    it("falls back to an online install when cached packages are incomplete", async () => {
+      mockedCache.restoreCache.mockResolvedValue("hit");
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "sudo" && args?.includes("--no-download")) {
+          throw new Error("Cached package is missing");
+        }
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        return 0;
+      });
+
+      await installDebian(baseInputs);
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("falling back to an online installation"),
+      );
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "-o",
+        "Acquire::http::Timeout=60",
+        "-o",
+        "Acquire::Retries=3",
+        "-o",
+        `Dir::Cache::archives=${cacheDir}`,
+        "gcc-14",
+        "g++-14",
+        "gfortran-14",
+      ]);
+      expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    });
+
+    it("falls back when cached tools fail validation", async () => {
+      mockedCache.restoreCache.mockResolvedValue("hit");
+      let validationAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "gcc-14" && args?.[0] === "--version") {
+          validationAttempts++;
+          if (validationAttempts === 1) {
+            throw new Error("Invalid cached compiler");
+          }
+        }
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        return 0;
+      });
+
+      await installDebian(baseInputs);
+
+      expect(validationAttempts).toBe(2);
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("incomplete or invalid"),
+      );
+    });
+
+    it("continues when cache restore fails", async () => {
+      mockedCache.restoreCache.mockRejectedValue(
+        new Error("Cache unavailable"),
+      );
+
+      await installDebian(baseInputs);
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("proceeding without it"),
+      );
+      expect(mockedCache.saveCache).toHaveBeenCalled();
     });
 
     it("retries apt-get install on failure and eventually succeeds", async () => {
       let attempts = 0;
       mockedExec.mockImplementation(async (cmd, args) => {
-        if (cmd === "sudo" && args?.[0] === "apt-get" && args?.[1] === "install") {
+        if (
+          cmd === "sudo" &&
+          args?.[0] === "apt-get" &&
+          args?.[1] === "install"
+        ) {
           attempts++;
           if (attempts === 1) throw new Error("Apt failure");
         }
@@ -234,7 +349,6 @@ describe("GFortran Debian Installer", () => {
 
     it("exports environment variables", async () => {
       await installDebian(baseInputs);
-
     });
   });
 });

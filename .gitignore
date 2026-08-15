@@ -1,6 +1,7 @@
 node_modules/
 lib/
 dist-tests
+dist-verify
 test_build
 coverage/
 *.tsbuildinfo
