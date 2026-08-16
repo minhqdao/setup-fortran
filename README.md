@@ -28,10 +28,11 @@ LFortran on Linux, macOS, and Windows.
 | `cleanup-disk` | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`) | `false` |
 
 For compatibility with `fortran-lang/setup-fortran`, the legacy names `gcc`,
-`intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases
-for `gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. These mappings
-are platform-independent: in particular, `intel` always means `ifx` and fails
-on platforms where `ifx` is unsupported; it never falls back to `ifort`.
+`intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases for
+`gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. These mappings are
+platform-independent: in particular, `intel` always means `ifx` and fails on
+platforms where `ifx` is unsupported; it never falls back to `ifort`. The
+legacy names are deprecated in favor of the canonical names above.
 
 ## Compiler support
 

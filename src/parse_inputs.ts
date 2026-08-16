@@ -88,7 +88,14 @@ function parseCompiler(raw: string): Compiler {
   const canonicalCompilers = Object.values(Compiler);
   const val = raw.toLowerCase().trim();
   const compiler = COMPILER_ALIASES[val] ?? (val as Compiler);
-  if (canonicalCompilers.includes(compiler)) return compiler;
+  if (canonicalCompilers.includes(compiler)) {
+    if (val in COMPILER_ALIASES) {
+      core.warning(
+        `The compiler selector "${val}" is deprecated; please use "${compiler}" instead.`,
+      );
+    }
+    return compiler;
+  }
 
   const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
   throw new Error(

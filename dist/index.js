@@ -102692,8 +102692,12 @@ function parseCompiler(raw) {
     const canonicalCompilers = Object.values(Compiler);
     const val = raw.toLowerCase().trim();
     const compiler = COMPILER_ALIASES[val] ?? val;
-    if (canonicalCompilers.includes(compiler))
+    if (canonicalCompilers.includes(compiler)) {
+        if (val in COMPILER_ALIASES) {
+            warning(`The compiler selector "${val}" is deprecated; please use "${compiler}" instead.`);
+        }
         return compiler;
+    }
     const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
     throw new Error(`Unknown compiler "${raw}". Valid options: ${valid.join(", ")}`);
 }

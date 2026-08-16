@@ -143,6 +143,48 @@ describe("parseInputs", () => {
       expect(parseInputs().compiler).toBe(Compiler.IFort);
     });
 
+    it.each([
+      ["gcc", Compiler.GFortran],
+      ["intel", Compiler.IFX],
+      ["intel-classic", Compiler.IFort],
+      ["nvidia-hpc", Compiler.NVFortran],
+    ])("warns that the %s alias is deprecated in favor of %s", (alias, canonical) => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return alias;
+        return "";
+      });
+      parseInputs();
+      expect(core.warning).toHaveBeenCalledWith(
+        `The compiler selector "${alias}" is deprecated; please use "${canonical}" instead.`,
+      );
+    });
+
+    it("warns for aliases case-insensitively and with surrounding whitespace", () => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return "  InTeL-ClAsSiC  ";
+        return "";
+      });
+      parseInputs();
+      expect(core.warning).toHaveBeenCalledWith(
+        'The compiler selector "intel-classic" is deprecated; please use "ifort" instead.',
+      );
+    });
+
+    it("does not warn when a canonical compiler name is used", () => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return "ifx";
+        return "";
+      });
+      parseInputs();
+      expect(core.warning).not.toHaveBeenCalled();
+    });
+
+    it("does not warn when the default compiler is used", () => {
+      mockedGetInput.mockReturnValue("");
+      parseInputs();
+      expect(core.warning).not.toHaveBeenCalled();
+    });
+
     it("maps intel to ifx on macOS and retains ifx unsupported-platform behavior", async () => {
       setPlatform("darwin");
       mockedGetInput.mockImplementation((name) => {
