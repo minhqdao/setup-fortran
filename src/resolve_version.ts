@@ -212,7 +212,7 @@ export function resolveWindowsVersion(
   const versions = archVersions[msystem];
   if (!versions) {
     throw new Error(
-      `The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`,
+      `The environment "${msystem}" is not supported for Windows ${inputs.arch}.`,
     );
   }
 

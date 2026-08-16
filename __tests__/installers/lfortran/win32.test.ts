@@ -119,7 +119,7 @@ describe("installWin32 (LFortran)", () => {
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
       await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
@@ -128,7 +128,7 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("reuses a working MSYS2 installation on a second invocation", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
       await installWin32(inputs);
       await installWin32(inputs);
 

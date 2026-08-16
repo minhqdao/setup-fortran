@@ -102855,7 +102855,7 @@ function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = 
     const msystem = inputs.msystem;
     const versions = archVersions[msystem];
     if (!versions) {
-        throw new Error(`The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`);
+        throw new Error(`The environment "${msystem}" is not supported for Windows ${inputs.arch}.`);
     }
     return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
 }
@@ -106035,7 +106035,7 @@ async function installIFX(inputs) {
         case OS.Linux:
             return await debian_installDebian(inputs);
         case OS.MacOS:
-            throw new Error(`IFX is not supported on macOS`);
+            throw new Error(`ifx is not supported on macOS. Use ifort, or exclude {compiler: ifx, os: macos} from your build matrix.`);
         case OS.Windows:
             return await win32_installWin32(inputs);
     }
@@ -107020,7 +107020,7 @@ async function nvfortran_debian_resolveInstalledVersion() {
 
 async function installNVFortran(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`NVFortran is only supported on Linux (got: ${inputs.os})`);
+        throw new Error(`nvfortran is only supported on Linux. Got: ${inputs.os}`);
     }
     return await nvfortran_debian_installDebian(inputs);
 }
@@ -107169,7 +107169,7 @@ async function aocc_debian_resolveInstalledVersion(binDir) {
 
 async function installAOCC(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`AOCC is only supported on Linux (got: ${inputs.os})`);
+        throw new Error(`aocc is only supported on Linux. Got: ${inputs.os}`);
     }
     return await aocc_debian_installDebian(inputs);
 }
@@ -108295,7 +108295,8 @@ async function installConda(inputs) {
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
 async function lfortran_win32_installMSYS2(inputs) {
-    info(`Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
+    const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
+    info(`Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
     const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
     let resolvedVersion;
@@ -108668,7 +108669,7 @@ async function armflang_debian_installDebian(inputs) {
 
 async function installArmFlang(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`ArmFlang is only supported on Linux ARM64 (got: ${inputs.os} ${inputs.arch})`);
+        throw new Error(`armflang is only supported on Linux. Got: ${inputs.os}`);
     }
     return await armflang_debian_installDebian(inputs);
 }

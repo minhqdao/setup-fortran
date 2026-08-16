@@ -178,8 +178,9 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
   core.info(
-    `Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
+    `Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
   const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");

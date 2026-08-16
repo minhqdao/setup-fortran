@@ -7,7 +7,9 @@ export async function installIFX(inputs: Inputs): Promise<InstallationResult> {
     case OS.Linux:
       return await installDebian(inputs);
     case OS.MacOS:
-      throw new Error(`IFX is not supported on macOS`);
+      throw new Error(
+        `ifx is not supported on macOS. Use ifort, or exclude {compiler: ifx, os: macos} from your build matrix.`,
+      );
     case OS.Windows:
       return await installWin32(inputs);
   }
