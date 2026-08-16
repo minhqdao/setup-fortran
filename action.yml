@@ -7,7 +7,11 @@ branding:
 
 inputs:
   compiler:
-    description: Fortran compiler to install. Defaults to `gfortran`.
+    description: >-
+      Fortran compiler to install. Canonical names are `gfortran`, `ifx`,
+      `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, and `armflang`.
+      Compatibility aliases `gcc`, `intel`, `intel-classic`, and `nvidia-hpc`
+      are also accepted. Defaults to `gfortran`.
     required: false
     default: gfortran
   version:
