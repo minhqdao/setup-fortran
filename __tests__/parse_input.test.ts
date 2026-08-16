@@ -82,6 +82,9 @@ describe("parseInputs", () => {
     });
 
     it.each([
+      [Compiler.GFortran, "gfortran"],
+      [Compiler.IFX, "ifx"],
+      [Compiler.IFort, "ifort"],
       [Compiler.NVFortran, "nvfortran"],
       [Compiler.AOCC, "aocc"],
       [Compiler.Flang, "flang"],
@@ -95,13 +98,34 @@ describe("parseInputs", () => {
       expect(parseInputs().compiler).toBe(expected);
     });
 
+    it.each([
+      ["gcc", Compiler.GFortran],
+      ["intel", Compiler.IFX],
+      ["intel-classic", Compiler.IFort],
+      ["nvidia-hpc", Compiler.NVFortran],
+    ])("maps the %s alias to %s", (input, expected) => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return input;
+        return "";
+      });
+      expect(parseInputs().compiler).toBe(expected);
+    });
+
+    it("maps aliases case-insensitively and ignores surrounding whitespace", () => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return "  InTeL-ClAsSiC  ";
+        return "";
+      });
+      expect(parseInputs().compiler).toBe(Compiler.IFort);
+    });
+
     it("throws error for unknown compiler", () => {
       mockedGetInput.mockImplementation((name) => {
         if (name === "compiler") return "unknown-compiler";
         return "";
       });
       expect(() => parseInputs()).toThrow(
-        'Unknown compiler "unknown-compiler". Valid options: gfortran, ifx, ifort, nvfortran, aocc, flang, lfortran, armflang',
+        'Unknown compiler "unknown-compiler". Valid options: gfortran, ifx, ifort, nvfortran, aocc, flang, lfortran, armflang, gcc, intel, intel-classic, nvidia-hpc',
       );
     });
   });

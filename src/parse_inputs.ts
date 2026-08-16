@@ -9,6 +9,13 @@ const DEFAULTS = {
   cleanupDisk: false,
 } as const;
 
+const COMPILER_ALIASES: Readonly<Record<string, Compiler>> = {
+  gcc: Compiler.GFortran,
+  intel: Compiler.IFX,
+  "intel-classic": Compiler.IFort,
+  "nvidia-hpc": Compiler.NVFortran,
+};
+
 function detectOS(): OS {
   switch (process.platform) {
     case "linux":
@@ -78,9 +85,12 @@ function detectArch(): Arch {
 }
 
 function parseCompiler(raw: string): Compiler {
-  const valid = Object.values(Compiler);
-  const val = raw.toLowerCase().trim() as Compiler;
-  if (valid.includes(val)) return val;
+  const canonicalCompilers = Object.values(Compiler);
+  const val = raw.toLowerCase().trim();
+  const compiler = COMPILER_ALIASES[val] ?? (val as Compiler);
+  if (canonicalCompilers.includes(compiler)) return compiler;
+
+  const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
   throw new Error(
     `Unknown compiler "${raw}". Valid options: ${valid.join(", ")}`,
   );

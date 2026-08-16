@@ -102616,6 +102616,12 @@ const DEFAULTS = {
     msystem: Msystem.Native,
     cleanupDisk: false,
 };
+const COMPILER_ALIASES = {
+    gcc: Compiler.GFortran,
+    intel: Compiler.IFX,
+    "intel-classic": Compiler.IFort,
+    "nvidia-hpc": Compiler.NVFortran,
+};
 function detectOS() {
     switch (process.platform) {
         case "linux":
@@ -102683,10 +102689,12 @@ function detectArch() {
     }
 }
 function parseCompiler(raw) {
-    const valid = Object.values(Compiler);
+    const canonicalCompilers = Object.values(Compiler);
     const val = raw.toLowerCase().trim();
-    if (valid.includes(val))
-        return val;
+    const compiler = COMPILER_ALIASES[val] ?? val;
+    if (canonicalCompilers.includes(compiler))
+        return compiler;
+    const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
     throw new Error(`Unknown compiler "${raw}". Valid options: ${valid.join(", ")}`);
 }
 function parseMsystem(raw) {
