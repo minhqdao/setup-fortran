@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as os from "os";
 import { parseInputs } from "../src/parse_inputs";
+import { installIFX } from "../src/installers/ifx";
 import { Compiler, OS, Arch, Msystem, LATEST } from "../src/types";
 
 jest.mock("@actions/core");
@@ -111,12 +112,49 @@ describe("parseInputs", () => {
       expect(parseInputs().compiler).toBe(expected);
     });
 
+    it.each([
+      ["gcc", "gfortran"],
+      ["intel", "ifx"],
+      ["intel-classic", "ifort"],
+      ["nvidia-hpc", "nvfortran"],
+    ])(
+      "produces identical inputs for alias %s and canonical name %s",
+      (alias, canonical) => {
+        let compilerInput = alias;
+        mockedGetInput.mockImplementation((name) => {
+          if (name === "compiler") return compilerInput;
+          if (name === "version") return "2025.2";
+          return "";
+        });
+
+        const aliasInputs = parseInputs();
+        compilerInput = canonical;
+        const canonicalInputs = parseInputs();
+
+        expect(aliasInputs).toEqual(canonicalInputs);
+      },
+    );
+
     it("maps aliases case-insensitively and ignores surrounding whitespace", () => {
       mockedGetInput.mockImplementation((name) => {
         if (name === "compiler") return "  InTeL-ClAsSiC  ";
         return "";
       });
       expect(parseInputs().compiler).toBe(Compiler.IFort);
+    });
+
+    it("maps intel to ifx on macOS and retains ifx unsupported-platform behavior", async () => {
+      setPlatform("darwin");
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "compiler") return "intel";
+        return "";
+      });
+
+      const inputs = parseInputs();
+      expect(inputs.compiler).toBe(Compiler.IFX);
+      await expect(installIFX(inputs)).rejects.toThrow(
+        "IFX is not supported on macOS",
+      );
     });
 
     it("throws error for unknown compiler", () => {
