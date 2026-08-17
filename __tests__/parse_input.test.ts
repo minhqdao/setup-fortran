@@ -217,6 +217,71 @@ describe("parseInputs", () => {
         'Unknown compiler "unknown-compiler". Valid options: gfortran, ifx, ifort, nvfortran, aocc, flang, lfortran, armflang, gcc, intel, intel-classic, nvidia-hpc',
       );
     });
+
+    // Dedicated alias compatibility matrix: every alias must map to its
+    // canonical compiler deterministically on ALL OS families, regardless of
+    // whether the canonical compiler is ultimately installable on that platform.
+    // The canonical integration workflows alone cannot catch alias behavior
+    // because they exercise canonical names; this matrix ensures aliases are
+    // transparent substitutions at the input layer.
+    describe("alias compatibility matrix across all OS families", () => {
+      const ALIASES: [string, Compiler][] = [
+        ["gcc", Compiler.GFortran],
+        ["intel", Compiler.IFX],
+        ["intel-classic", Compiler.IFort],
+        ["nvidia-hpc", Compiler.NVFortran],
+      ];
+      const PLATFORMS: [string, OS][] = [
+        ["linux", OS.Linux],
+        ["darwin", OS.MacOS],
+        ["win32", OS.Windows],
+      ];
+
+      it.each(ALIASES)(
+        "alias '%s' maps to %s on all three OS families",
+        (alias, canonical) => {
+          for (const [platform, expectedOS] of PLATFORMS) {
+            setPlatform(platform);
+            mockedGetInput.mockImplementation((name) => {
+              if (name === "compiler") return alias;
+              return "";
+            });
+
+            const inputs = parseInputs();
+            expect(inputs.compiler).toBe(canonical);
+            expect(inputs.os).toBe(expectedOS);
+          }
+        },
+      );
+
+      it.each(ALIASES)(
+        "alias '%s' and canonical name '%s' produce identical parsed inputs on all OS families",
+        (alias, canonical) => {
+          for (const [platform, expectedOS] of PLATFORMS) {
+            setPlatform(platform);
+
+            // Parse with alias
+            mockedGetInput.mockImplementation((name) => {
+              if (name === "compiler") return alias;
+              if (name === "version") return "2025.2";
+              return "";
+            });
+            const aliasInputs = parseInputs();
+
+            // Parse with canonical
+            mockedGetInput.mockImplementation((name) => {
+              if (name === "compiler") return canonical;
+              if (name === "version") return "2025.2";
+              return "";
+            });
+            const canonicalInputs = parseInputs();
+
+            expect(aliasInputs).toEqual(canonicalInputs);
+            expect(aliasInputs.os).toBe(expectedOS);
+          }
+        },
+      );
+    });
   });
 
   describe("version input", () => {
@@ -255,6 +320,15 @@ describe("parseInputs", () => {
       const result = parseInputs();
       expect(result.version).toBe("14.1");
     });
+
+    it("accepts the literal string 'latest' and resolves to LATEST", () => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "version") return "latest";
+        return "";
+      });
+      const result = parseInputs();
+      expect(result.version).toBe(LATEST);
+    });
   });
 
   describe("mixed inputs", () => {
@@ -271,6 +345,51 @@ describe("parseInputs", () => {
         os: OS.Linux,
       });
     });
+  });
+
+  describe("defaults across all OS families", () => {
+    const PLATFORMS: [string, OS][] = [
+      ["linux", OS.Linux],
+      ["darwin", OS.MacOS],
+      ["win32", OS.Windows],
+    ];
+
+    it.each(PLATFORMS)(
+      "defaults compiler to gfortran, version to LATEST, and updateEnvironment to true on %s",
+      (platform, expectedOS) => {
+        setPlatform(platform);
+        const result = parseInputs();
+        expect(result).toMatchObject({
+          compiler: Compiler.GFortran,
+          version: LATEST,
+          os: expectedOS,
+          updateEnvironment: true,
+        });
+      },
+    );
+
+    it.each(PLATFORMS)(
+      "update-environment=false is parsed on %s",
+      (platform) => {
+        setPlatform(platform);
+        mockedGetBooleanInput.mockImplementation((name) => {
+          if (name === "update-environment") return false;
+          return false;
+        });
+        const result = parseInputs();
+        expect(result.updateEnvironment).toBe(false);
+      },
+    );
+
+    it.each(PLATFORMS)(
+      "omitted compiler defaults to gfortran and omitted version defaults to LATEST on %s",
+      (platform) => {
+        setPlatform(platform);
+        const result = parseInputs();
+        expect(result.compiler).toBe(Compiler.GFortran);
+        expect(result.version).toBe(LATEST);
+      },
+    );
   });
 
   describe("msystem input", () => {
