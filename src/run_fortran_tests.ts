@@ -164,6 +164,45 @@ async function run(): Promise<void> {
       core.endGroup();
     };
 
+    /**
+     * Compile a standalone C source to an object file, then link it with a
+     * Fortran source into a single executable. This verifies that the
+     * companion C compiler ($CC) is functional and that the Fortran compiler
+     * can interoperate with C at the link level.
+     */
+    const execMixedCTest = async (
+      name: string,
+      fortranSources: string[],
+      cSource: string,
+    ): Promise<void> => {
+      const fortranPath = path.join(testDir, fortranSources[0]);
+      const cPath = path.join(testDir, cSource);
+      const objPath = path.join(buildDir, `${name}.o`);
+      const outputPath = path.join(buildDir, isWindows ? `${name}.exe` : name);
+      const fflags = (process.env.FFLAGS ?? "").split(" ").filter(Boolean);
+
+      core.startGroup(`Test: ${name}`);
+
+      // Compile C source to object file using $CC
+      const cFlags = isWindows ? [] : ["-c"];
+      await exec.exec(cc, [...cFlags, "-o", objPath, cPath]);
+
+      // Link Fortran + C object into final executable
+      const linkFlags = [objPath];
+      await exec.exec(fc, [
+        ...baseFlags,
+        ...fflags,
+        fortranPath,
+        ...linkFlags,
+        ...linkerFlags,
+        "-o",
+        outputPath,
+      ]);
+
+      await exec.exec(outputPath);
+      core.endGroup();
+    };
+
     const skipTest = (name: string, reason: string): void => {
       core.info(`Skipping ${name}: ${reason}`);
     };
@@ -171,6 +210,7 @@ async function run(): Promise<void> {
     await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
+    await execMixedCTest("mixed_cc_test", ["mixed_cc_test.f90"], "cc_test.c");
 
     const skipPoly =
       isFlang &&
