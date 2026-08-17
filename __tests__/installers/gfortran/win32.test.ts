@@ -54,8 +54,11 @@ describe("installWin32 (gfortran)", () => {
       mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
       mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\gfortran");
 
-      await installWin32(baseInputs);
+      const result = await installWin32(baseInputs);
 
+      expect(result.fc).toBe("C:\\Cache\\gfortran/bin/gfortran.exe");
+      expect(result.cc).toBe("C:\\Cache\\gfortran/bin/gcc.exe");
+      expect(result.cxx).toBe("C:\\Cache\\gfortran/bin/g++.exe");
       expect(mockedTc.downloadTool).toHaveBeenCalled();
       expect(mockedTc.extractZip).toHaveBeenCalledWith("C:\\Temp\\gcc.zip");
       expect(mockedTc.cacheDir).toHaveBeenCalled();

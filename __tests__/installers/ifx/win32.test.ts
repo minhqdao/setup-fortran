@@ -64,7 +64,11 @@ describe("installWin32 (ifx)", () => {
   it("restores from cache if available", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
 
-    await installWin32(baseInputs);
+    const result = await installWin32(baseInputs);
+
+    expect(result.fc).toBe("ifx");
+    expect(result.cc).toBe("icx");
+    expect(result.cxx).toBe("icpx");
 
     expect(mockedRestoreCache).toHaveBeenCalled();
     expect(mockedDownloadTool).not.toHaveBeenCalled();

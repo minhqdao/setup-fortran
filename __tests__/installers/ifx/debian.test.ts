@@ -55,7 +55,11 @@ describe("installDebian ifx", () => {
 
   it("installs the correct versioned packages and saves to cache on miss", async () => {
     const inputs = { ...baseInputs, version: "2023.2.0" };
-    await installDebian(inputs);
+    const result = await installDebian(inputs);
+
+    expect(result.fc).toBe("ifx");
+    expect(result.cc).toBe("icx");
+    expect(result.cxx).toBe("icpx");
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],

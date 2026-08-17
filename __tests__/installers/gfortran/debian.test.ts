@@ -114,8 +114,11 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("always updates apt and installs gfortran on cache miss", async () => {
-      await installDebian(baseInputs);
+      const result = await installDebian(baseInputs);
 
+      expect(result.fc).toBe("gfortran-14");
+      expect(result.cc).toBe("gcc-14");
+      expect(result.cxx).toBe("g++-14");
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
         [cacheDir],
         cacheKey,

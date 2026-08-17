@@ -92,10 +92,14 @@ describe("installWin32 (Flang)", () => {
     it("downloads and extracts LLVM installer", async () => {
       mockedTc.find.mockReturnValue("");
       mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.exe");
+      mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
       mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang");
 
-      await installWin32(baseInputs);
+      const result = await installWin32(baseInputs);
 
+      expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+      expect(result.cc).toEqual(expect.stringContaining("clang.exe"));
+      expect(result.cxx).toEqual(expect.stringContaining("clang++.exe"));
       expect(mockedTc.downloadTool).toHaveBeenCalled();
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining("7z.exe"),
