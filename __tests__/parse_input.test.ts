@@ -53,10 +53,6 @@ describe("parseInputs", () => {
   }
 
   it("returns default values when no inputs are provided", () => {
-    mockedGetBooleanInput.mockImplementation((name) => {
-      if (name === "update-environment") return true;
-      return false;
-    });
     const result = parseInputs();
     expect(result).toEqual({
       compiler: Compiler.GFortran,
@@ -72,10 +68,6 @@ describe("parseInputs", () => {
 
   it("handles whitespace-only inputs by falling back to defaults where appropriate", () => {
     mockedGetInput.mockReturnValue("  ");
-    mockedGetBooleanInput.mockImplementation((name) => {
-      if (name === "update-environment") return true;
-      return false;
-    });
     const result = parseInputs();
     expect(result).toEqual({
       compiler: Compiler.GFortran,

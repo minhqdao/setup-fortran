@@ -129,6 +129,10 @@ describe("action invocation", () => {
     expect(setInstallationOutputs).toHaveBeenNthCalledWith(1, result);
     expect(setInstallationOutputs).toHaveBeenNthCalledWith(2, result);
     expect(exportInstallationVariables).toHaveBeenCalledTimes(2);
+    expect(core.exportVariable).toHaveBeenCalledWith(
+      "FORTRAN_COMPILER",
+      Compiler.GFortran,
+    );
   });
 
   it("always sets outputs even when update-environment is false", async () => {
@@ -165,6 +169,7 @@ describe("action invocation", () => {
     const { run } = await import("../src/index");
     await run();
 
+    expect(installGFortran).toHaveBeenCalledWith(inputs);
     expect(setInstallationOutputs).toHaveBeenCalledWith(result);
     expect(exportInstallationVariables).not.toHaveBeenCalled();
     expect(core.exportVariable).not.toHaveBeenCalled();
