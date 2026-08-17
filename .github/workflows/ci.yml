@@ -97,7 +97,7 @@ jobs:
           FIRST_CC: ${{ steps.first.outputs.cc }}
           FIRST_CXX: ${{ steps.first.outputs.cxx }}
         run: |
-          echo "First installation: version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX"
+          echo "First installation: version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX  F77=$F77  F90=$F90"
 
           # Env vars must be set and match the step outputs
           if [ "$FC" != "$FIRST_FC" ]; then
@@ -112,7 +112,16 @@ jobs:
             echo "::error::CXX env var (\$CXX='$CXX') does not match first output ('$FIRST_CXX')"
             exit 1
           fi
-          echo "First installation env vars: OK"
+          # F77 and F90 aliases should also match FC
+          if [ "$F77" != "$FIRST_FC" ]; then
+            echo "::error::F77 env var (\$F77) does not match first FC ('$FIRST_FC')"
+            exit 1
+          fi
+          if [ "$F90" != "$FIRST_FC" ]; then
+            echo "::error::F90 env var (\$F90) does not match first FC ('$FIRST_FC')"
+            exit 1
+          fi
+          echo "First installation env vars: OK (FC, CC, CXX, F77, F90)"
 
           # PATH ordering: first compiler's bin dir must be present
           first_bin=$(dirname "$(dirname "$FIRST_FC")")
@@ -154,15 +163,15 @@ jobs:
           FIRST_CXX: ${{ steps.first.outputs.cxx }}
           SECOND_CXX: ${{ steps.second.outputs.cxx }}
         run: |
-          echo "First installation:  version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX"
-          echo "Second installation: version=$SECOND_VERSION  FC=$SECOND_FC  CC=$SECOND_CC  CXX=$SECOND_CXX"
+          echo "First installation:  version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX  F77=$F77  F90=$F90"
+          echo "Second installation: version=$SECOND_VERSION  FC=$SECOND_FC  CC=$SECOND_CC  CXX=$SECOND_CXX  F77=$F77  F90=$F90"
 
           if [ "$FIRST_VERSION" = "$SECOND_VERSION" ]; then
             echo "::error::Two different versions resolved to the same version."
             exit 1
           fi
 
-          # 1. Env-var overwrite: $FC, $CC, $CXX must point to the SECOND installation
+          # 1. Env-var overwrite: $FC, $CC, $CXX, $F77, $F90 must point to the SECOND installation
           if [ "$FC" != "$SECOND_FC" ]; then
             echo "::error::FC env var (\$FC='$FC') does not match second output ('$SECOND_FC')"
             exit 1
@@ -175,12 +184,21 @@ jobs:
             echo "::error::CXX env var (\$CXX='$CXX') does not match second output ('$SECOND_CXX')"
             exit 1
           fi
+          # F77 and F90 aliases should also point to the second installation
+          if [ "$F77" != "$SECOND_FC" ]; then
+            echo "::error::F77 env var (\$F77) does not match second FC ('$SECOND_FC')"
+            exit 1
+          fi
+          if [ "$F90" != "$SECOND_FC" ]; then
+            echo "::error::F90 env var (\$F90) does not match second FC ('$SECOND_FC')"
+            exit 1
+          fi
           # Also verify they are NOT still pointing to the first installation
-          if [ "$FC" = "$FIRST_FC" ] || [ "$CC" = "$FIRST_CC" ] || [ "$CXX" = "$FIRST_CXX" ]; then
+          if [ "$FC" = "$FIRST_FC" ] || [ "$CC" = "$FIRST_CC" ] || [ "$CXX" = "$FIRST_CXX" ] || [ "$F77" = "$FIRST_FC" ] || [ "$F90" = "$FIRST_FC" ]; then
             echo "::error::One or more env vars still point to the FIRST installation"
             exit 1
           fi
-          echo "Env-var overwrite: OK (FC, CC, CXX all replaced)"
+          echo "Env-var overwrite: OK (FC, CC, CXX, F77, F90 all replaced)"
 
           # 2. PATH ordering: second compiler's bin dir must precede first's
           first_bin=$(dirname "$(dirname "$FIRST_FC")")

@@ -116,6 +116,23 @@ function verifyCompanionCompilers(): void {
     );
   }
 
+  // Verify F77 and F90 aliases match FC — downstream build systems
+  // (autotools, CMake FindFortran) may use F77/F90 instead of FC
+  const fc = process.env.FC;
+  if (!fc) {
+    throw new Error("FC is not set; cannot check F77/F90 sync.");
+  }
+  if (process.env.F77 !== fc) {
+    throw new Error(
+      `F77 env var (${(process.env.F77 ?? "unset")} does not match FC ($fc).`,
+    );
+  }
+  if (process.env.F90 !== fc) {
+    throw new Error(
+      `F90 env var (${process.env.F90 ?? "unset"}) does not match FC ($fc).`,
+    );
+  }
+
   const isWindows = process.platform === "win32";
   const checkTool = (tool: string, label: string): void => {
     try {
