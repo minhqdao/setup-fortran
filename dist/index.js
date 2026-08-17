@@ -102820,14 +102820,38 @@ async function fetchJsonWithRetry(url, options = {}) {
 // ==========================================
 // Exported Core Functions
 // ==========================================
-function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+/**
+ * Normalizes a version string by stripping a trailing `.0` patch segment.
+ * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
+ * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
+ * while the replacement tracks releases by minor version (`5.1`).
+ */
+function stripTrailingPatchZero(version) {
+    const match = /^(\d+\.\d+)\.0$/.exec(version);
+    return match ? match[1] : version;
+}
+function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, } = {}) {
     const versions = supportedVersions[inputs.arch];
     if (!versions) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
-    const version = inputs.version === LATEST ? versions[0] : inputs.version;
-    if (!version) {
+    const rawVersion = inputs.version === LATEST ? versions[0] : inputs.version;
+    if (!rawVersion) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
+    }
+    // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
+    // replacement's minor-version release entry. Only strips a trailing .0;
+    // X.Y.1 and other patch versions are left untouched so that genuinely
+    // unsupported versions still produce a clear error.
+    const version = stripPatchZero
+        ? stripTrailingPatchZero(rawVersion)
+        : rawVersion;
+    // Inform the user that AOCC releases are tracked by major.minor only, so
+    // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
+    if (stripPatchZero && version !== rawVersion) {
+        warning(`The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
+            `version "${rawVersion}" was normalized to "${version}". Consider ` +
+            `dropping the patch number.`);
     }
     const versionList = versions;
     if (!versionList.includes(version)) {
@@ -107080,7 +107104,9 @@ function getReleaseMetadata(version) {
     };
 }
 async function aocc_debian_installDebian(inputs) {
-    const version = resolveVersion(inputs, aocc_debian_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, aocc_debian_SUPPORTED_VERSIONS, {
+        stripPatchZero: true,
+    });
     const metadata = getReleaseMetadata(version);
     info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
     const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;

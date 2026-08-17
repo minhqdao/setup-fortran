@@ -3,6 +3,7 @@ import {
   resolveWindowsVersion,
   resolveLatestPatch,
   verifyAssetExists,
+  stripTrailingPatchZero,
 } from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, Msystem } from "../src/types";
 import type { Inputs } from "../src/types";
@@ -123,6 +124,90 @@ describe("resolveVersion", () => {
       expect(result).toBe("2025.2.1");
     });
   });
+
+  describe("stripPatchZero option", () => {
+    const supported = {
+      [Arch.X64]: ["5.2", "5.1", "5.0", "4.2", "4.1"],
+    };
+
+    const mockedWarning = core.warning as jest.MockedFunction<typeof core.warning>;
+
+    beforeEach(() => {
+      mockedWarning.mockClear();
+    });
+
+    it("normalizes X.Y.0 to X.Y when stripPatchZero is true", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.0" };
+      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      expect(result).toBe("5.1");
+      expect(mockedWarning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'normalized to "5.1". Consider dropping the patch number.',
+        ),
+      );
+    });
+
+    it("normalizes X.Y.0 for any AOCC-like version", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "4.2.0" };
+      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      expect(result).toBe("4.2");
+      expect(mockedWarning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'normalized to "4.2". Consider dropping the patch number.',
+        ),
+      );
+    });
+
+    it("leaves X.Y untouched when stripPatchZero is true", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1" };
+      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      expect(result).toBe("5.1");
+      expect(mockedWarning).not.toHaveBeenCalled();
+    });
+
+    it("does not normalize X.Y.1 (non-zero patch) and fails clearly", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.1" };
+      expect(() =>
+        resolveVersion(inputs, supported, { stripPatchZero: true }),
+      ).toThrow(
+        "aocc 5.1.1 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
+      );
+      expect(mockedWarning).not.toHaveBeenCalled();
+    });
+
+    it("does not normalize when stripPatchZero is false (default)", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.0" };
+      expect(() => resolveVersion(inputs, supported)).toThrow(
+        "aocc 5.1.0 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
+      );
+      expect(mockedWarning).not.toHaveBeenCalled();
+    });
+
+    it("still resolves latest when stripPatchZero is true", () => {
+      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: LATEST };
+      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      expect(result).toBe("5.2");
+      expect(mockedWarning).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("stripTrailingPatchZero", () => {
+  it.each([
+    ["5.1.0", "5.1"],
+    ["4.2.0", "4.2"],
+    ["5.0.0", "5.0"],
+    ["10.1.0", "10.1"],
+  ])("normalizes %s to %s", (input, expected) => {
+    expect(stripTrailingPatchZero(input)).toBe(expected);
+  });
+
+  it.each(["5.1", "5.1.1", "5.1.2", "latest", "5", "5.0.1"])(
+    "leaves %s unchanged",
+    (input) => {
+      expect(stripTrailingPatchZero(input)).toBe(input);
+    },
+  );
 });
 
 describe("resolveWindowsVersion", () => {

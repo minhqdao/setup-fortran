@@ -139,13 +139,29 @@ async function fetchJsonWithRetry<T>(
 // Exported Core Functions
 // ==========================================
 
+/**
+ * Normalizes a version string by stripping a trailing `.0` patch segment.
+ * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
+ * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
+ * while the replacement tracks releases by minor version (`5.1`).
+ */
+export function stripTrailingPatchZero(version: string): string {
+  const match = /^(\d+\.\d+)\.0$/.exec(version);
+  return match ? match[1] : version;
+}
+
 export function resolveVersion<T extends readonly string[]>(
   inputs: Inputs,
   supportedVersions: Record<string, T | undefined>,
   {
     matchMajorIfPatch = false,
     resolveMinorToLatestPatch = false,
-  }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
+    stripPatchZero = false,
+  }: {
+    matchMajorIfPatch?: boolean;
+    resolveMinorToLatestPatch?: boolean;
+    stripPatchZero?: boolean;
+  } = {},
 ): string {
   const versions = supportedVersions[inputs.arch];
 
@@ -155,11 +171,29 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
-  const version = inputs.version === LATEST ? versions[0] : inputs.version;
+  const rawVersion = inputs.version === LATEST ? versions[0] : inputs.version;
 
-  if (!version) {
+  if (!rawVersion) {
     throw new Error(
       `No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`,
+    );
+  }
+
+  // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
+  // replacement's minor-version release entry. Only strips a trailing .0;
+  // X.Y.1 and other patch versions are left untouched so that genuinely
+  // unsupported versions still produce a clear error.
+  const version = stripPatchZero
+    ? stripTrailingPatchZero(rawVersion)
+    : rawVersion;
+
+  // Inform the user that AOCC releases are tracked by major.minor only, so
+  // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
+  if (stripPatchZero && version !== rawVersion) {
+    core.warning(
+      `The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
+        `version "${rawVersion}" was normalized to "${version}". Consider ` +
+        `dropping the patch number.`,
     );
   }
 

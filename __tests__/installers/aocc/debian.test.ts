@@ -129,4 +129,28 @@ describe("installDebian (AOCC)", () => {
       cxx: "clang++",
     });
   });
+
+  it("normalizes 5.1.0 input to 5.1 release entry", async () => {
+    const inputs: Inputs = { ...baseInputs, version: "5.1.0" };
+    const result = await installDebian(inputs);
+    expect(result).toEqual({
+      version: "AOCC flang version 5.1.0",
+      fc: "flang",
+      cc: "clang",
+      cxx: "clang++",
+    });
+    expect(mockedDownloadTool).toHaveBeenCalledWith(
+      expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+      expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+      undefined,
+      { "User-Agent": "Mozilla/5.0" },
+    );
+  });
+
+  it("rejects non-zero patch versions like 5.1.1", async () => {
+    const inputs: Inputs = { ...baseInputs, version: "5.1.1" };
+    await expect(installDebian(inputs)).rejects.toThrow(
+      "aocc 5.1.1 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
+    );
+  });
 });

@@ -66,7 +66,9 @@ function getReleaseMetadata(version: string): AoccMetadata {
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+    stripPatchZero: true,
+  });
   const metadata = getReleaseMetadata(version);
 
   core.info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
