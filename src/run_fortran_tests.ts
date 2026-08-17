@@ -177,15 +177,21 @@ async function run(): Promise<void> {
     ): Promise<void> => {
       const fortranPath = path.join(testDir, fortranSources[0]);
       const cPath = path.join(testDir, cSource);
-      const objPath = path.join(buildDir, `${name}.o`);
+      // MSVC-style compilers (icl) use /Fo: and .obj; GCC/Clang use -o and .o
+      const isMsvc = isWindows && compiler === Compiler.IFort;
+      const objExt = isMsvc ? ".obj" : ".o";
+      const objPath = path.join(buildDir, `${name}${objExt}`);
       const outputPath = path.join(buildDir, isWindows ? `${name}.exe` : name);
       const fflags = (process.env.FFLAGS ?? "").split(" ").filter(Boolean);
 
       core.startGroup(`Test: ${name}`);
 
       // Compile C source to object file using $CC
-      const cFlags = isWindows ? [] : ["-c"];
-      await exec.exec(cc, [...cFlags, "-o", objPath, cPath]);
+      if (isMsvc) {
+        await exec.exec(cc, ["/c", `/Fo:${objPath}`, cPath]);
+      } else {
+        await exec.exec(cc, ["-c", "-o", objPath, cPath]);
+      }
 
       // Link Fortran + C object into final executable
       const linkFlags = [objPath];
