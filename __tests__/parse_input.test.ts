@@ -296,6 +296,8 @@ describe("parseInputs", () => {
 
   describe("update-environment input", () => {
     it("defaults to true when omitted", () => {
+      // getBooleanInput is mocked, so this simulates the action.yml default
+      // being applied; it does not exercise the real parsing path.
       mockedGetBooleanInput.mockImplementation((name) => {
         if (name === "update-environment") return true;
         return false;

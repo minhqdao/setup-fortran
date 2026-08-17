@@ -117,8 +117,7 @@ export function parseInputs(): Inputs {
   const rawCompiler = core.getInput("compiler").trim() || DEFAULTS.compiler;
   const rawVersion = core.getInput("version").trim() || DEFAULTS.version;
   const rawMsystem = core.getInput("msystem").trim();
-  const cleanupDisk =
-    core.getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+  const cleanupDisk = core.getBooleanInput("cleanup-disk");
   const updateEnvironment = core.getBooleanInput("update-environment");
 
   const compiler = parseCompiler(rawCompiler);

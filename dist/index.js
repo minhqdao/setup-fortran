@@ -102713,7 +102713,7 @@ function parseInputs() {
     const rawCompiler = getInput("compiler").trim() || DEFAULTS.compiler;
     const rawVersion = getInput("version").trim() || DEFAULTS.version;
     const rawMsystem = getInput("msystem").trim();
-    const cleanupDisk = getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+    const cleanupDisk = getBooleanInput("cleanup-disk");
     const updateEnvironment = getBooleanInput("update-environment");
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
