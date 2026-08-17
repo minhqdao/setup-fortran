@@ -25,6 +25,7 @@ describe("GFortran Debian Installer", () => {
     osVersion: "20.04.6",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

@@ -38,6 +38,7 @@ export interface Inputs {
   arch: Arch;
   msystem: Msystem;
   cleanupDisk: boolean;
+  updateEnvironment: boolean;
 }
 
 export const LATEST = "latest" as const;

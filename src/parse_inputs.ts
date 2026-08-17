@@ -7,6 +7,7 @@ const DEFAULTS = {
   version: LATEST,
   msystem: Msystem.Native,
   cleanupDisk: false,
+  updateEnvironment: true,
 } as const;
 
 const COMPILER_ALIASES: Readonly<Record<string, Compiler>> = {
@@ -118,6 +119,7 @@ export function parseInputs(): Inputs {
   const rawMsystem = core.getInput("msystem").trim();
   const cleanupDisk =
     core.getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+  const updateEnvironment = core.getBooleanInput("update-environment");
 
   const compiler = parseCompiler(rawCompiler);
   const detectedOS = detectOS();
@@ -130,6 +132,7 @@ export function parseInputs(): Inputs {
     arch: detectArch(),
     msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
     cleanupDisk,
+    updateEnvironment,
   };
 
   return inputs;

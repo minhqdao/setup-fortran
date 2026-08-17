@@ -15,6 +15,7 @@ function makeInputs(overrides: Partial<Inputs> = {}): Inputs {
     arch: Arch.X64,
     msystem: Msystem.Native,
     cleanupDisk: false,
+    updateEnvironment: true,
     ...overrides,
   };
 }

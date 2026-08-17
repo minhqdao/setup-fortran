@@ -29,6 +29,7 @@ describe("installDebian (ifort)", () => {
     osVersion: "22.04",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

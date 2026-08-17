@@ -69,6 +69,7 @@ describe("action invocation", () => {
         arch: Arch.X64,
         msystem: Msystem.Native,
         cleanupDisk: false,
+        updateEnvironment: true,
       };
       const result: InstallationResult = {
         version: "1.2.3",
@@ -108,6 +109,7 @@ describe("action invocation", () => {
       arch: Arch.X64,
       msystem: Msystem.Native,
       cleanupDisk: false,
+      updateEnvironment: true,
     };
     const result: InstallationResult = {
       version: "14.2.0",
@@ -127,5 +129,44 @@ describe("action invocation", () => {
     expect(setInstallationOutputs).toHaveBeenNthCalledWith(1, result);
     expect(setInstallationOutputs).toHaveBeenNthCalledWith(2, result);
     expect(exportInstallationVariables).toHaveBeenCalledTimes(2);
+  });
+
+  it("always sets outputs even when update-environment is false", async () => {
+    const { parseInputs } = jest.requireMock("../src/parse_inputs") as {
+      parseInputs: jest.Mock<Inputs>;
+    };
+    const { installGFortran } = jest.requireMock(
+      "../src/installers/gfortran",
+    ) as { installGFortran: jest.Mock<Promise<InstallationResult>> };
+    const { setInstallationOutputs, exportInstallationVariables } =
+      jest.requireMock("../src/installation_result") as {
+        setInstallationOutputs: jest.Mock;
+        exportInstallationVariables: jest.Mock;
+      };
+    const inputs: Inputs = {
+      compiler: Compiler.GFortran,
+      version: "14",
+      os: OS.Linux,
+      osVersion: "24.04",
+      arch: Arch.X64,
+      msystem: Msystem.Native,
+      cleanupDisk: false,
+      updateEnvironment: false,
+    };
+    const result: InstallationResult = {
+      version: "14.2.0",
+      fc: "gfortran-14",
+      cc: "gcc-14",
+      cxx: "g++-14",
+    };
+    parseInputs.mockReturnValue(inputs);
+    installGFortran.mockResolvedValue(result);
+
+    const { run } = await import("../src/index");
+    await run();
+
+    expect(setInstallationOutputs).toHaveBeenCalledWith(result);
+    expect(exportInstallationVariables).not.toHaveBeenCalled();
+    expect(core.exportVariable).not.toHaveBeenCalled();
   });
 });

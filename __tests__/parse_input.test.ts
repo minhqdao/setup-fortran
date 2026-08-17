@@ -11,6 +11,9 @@ describe("parseInputs", () => {
   const mockedGetInput = core.getInput as jest.MockedFunction<
     typeof core.getInput
   >;
+  const mockedGetBooleanInput = core.getBooleanInput as jest.MockedFunction<
+    typeof core.getBooleanInput
+  >;
   const mockedArch = os.arch as jest.MockedFunction<typeof os.arch>;
   const mockedRelease = os.release as jest.MockedFunction<typeof os.release>;
 
@@ -32,6 +35,10 @@ describe("parseInputs", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetInput.mockReturnValue("");
+    mockedGetBooleanInput.mockImplementation((name) => {
+      if (name === "update-environment") return true;
+      return false;
+    });
     mockedArch.mockReturnValue("x64");
     mockedRelease.mockReturnValue("5.15.0");
     delete process.env.ImageOS;
@@ -46,6 +53,10 @@ describe("parseInputs", () => {
   }
 
   it("returns default values when no inputs are provided", () => {
+    mockedGetBooleanInput.mockImplementation((name) => {
+      if (name === "update-environment") return true;
+      return false;
+    });
     const result = parseInputs();
     expect(result).toEqual({
       compiler: Compiler.GFortran,
@@ -55,11 +66,16 @@ describe("parseInputs", () => {
       arch: Arch.X64,
       msystem: Msystem.Native,
       cleanupDisk: false,
+      updateEnvironment: true,
     });
   });
 
   it("handles whitespace-only inputs by falling back to defaults where appropriate", () => {
     mockedGetInput.mockReturnValue("  ");
+    mockedGetBooleanInput.mockImplementation((name) => {
+      if (name === "update-environment") return true;
+      return false;
+    });
     const result = parseInputs();
     expect(result).toEqual({
       compiler: Compiler.GFortran,
@@ -69,6 +85,7 @@ describe("parseInputs", () => {
       arch: Arch.X64,
       msystem: Msystem.Native,
       cleanupDisk: false,
+      updateEnvironment: true,
     });
   });
 
@@ -281,6 +298,49 @@ describe("parseInputs", () => {
       });
       expect(() => parseInputs()).toThrow(
         'Unknown msystem "msys". Valid options: native, ucrt64',
+      );
+    });
+  });
+
+  describe("update-environment input", () => {
+    it("defaults to true when omitted", () => {
+      mockedGetBooleanInput.mockImplementation((name) => {
+        if (name === "update-environment") return true;
+        return false;
+      });
+      const result = parseInputs();
+      expect(result.updateEnvironment).toBe(true);
+    });
+
+    it("parses true", () => {
+      mockedGetBooleanInput.mockImplementation((name) => {
+        if (name === "update-environment") return true;
+        return false;
+      });
+      const result = parseInputs();
+      expect(result.updateEnvironment).toBe(true);
+    });
+
+    it("parses false", () => {
+      mockedGetBooleanInput.mockImplementation((name) => {
+        if (name === "update-environment") return false;
+        return false;
+      });
+      const result = parseInputs();
+      expect(result.updateEnvironment).toBe(false);
+    });
+
+    it("throws for invalid values", () => {
+      mockedGetBooleanInput.mockImplementation((name) => {
+        if (name === "update-environment") {
+          throw new Error(
+            'Input "update-environment" must be true or false; received "maybe".',
+          );
+        }
+        return false;
+      });
+      expect(() => parseInputs()).toThrow(
+        'Input "update-environment" must be true or false; received "maybe".',
       );
     });
   });

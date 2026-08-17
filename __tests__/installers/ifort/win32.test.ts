@@ -40,6 +40,7 @@ describe("installWin32 (ifort)", () => {
     osVersion: "2022",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

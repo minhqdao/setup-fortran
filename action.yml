@@ -26,6 +26,13 @@ inputs:
     description: 'Free up disk space by removing large pre-installed toolkits'
     required: false
     default: 'false'
+  update-environment:
+    description: >-
+      Whether to export toolchain environment variables (FC, CC, CXX, FPM_*,
+      F77, F90, FORTRAN_COMPILER) into the runner environment. Matches the
+      incumbent behavior. Parsed as a strict GitHub boolean. Defaults to `true`.
+    required: false
+    default: 'true'
 
 outputs:
   version:

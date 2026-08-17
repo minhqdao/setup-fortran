@@ -26,6 +26,7 @@ LFortran on Linux, macOS, and Windows.
 | `version` | Compiler version to install | `latest` |
 | `msystem` | MSYS2 subsystem (`native`, `ucrt64`, `clang64`) | `native` |
 | `cleanup-disk` | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`) | `false` |
+| `update-environment` | Whether to export toolchain environment variables (`FC`, `CC`, `CXX`, `FPM_*`, `F77`, `F90`, `FORTRAN_COMPILER`) into the runner environment (`true`, `false`) | `true` |
 
 For compatibility with `fortran-lang/setup-fortran`, the legacy names `gcc`,
 `intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases for

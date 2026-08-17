@@ -18,6 +18,7 @@ const baseInputs: Inputs = {
   arch: Arch.X64,
   msystem: Msystem.Native,
   cleanupDisk: false,
+  updateEnvironment: true,
 };
 
 const SUPPORTED: Record<string, readonly string[]> = {

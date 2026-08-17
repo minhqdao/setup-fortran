@@ -30,6 +30,7 @@ describe("installWin32 (gfortran)", () => {
     osVersion: "2022",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

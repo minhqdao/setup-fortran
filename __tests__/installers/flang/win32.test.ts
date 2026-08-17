@@ -65,6 +65,7 @@ describe("installWin32 (Flang)", () => {
     osVersion: "2022",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

@@ -39,6 +39,7 @@ describe("installWin32 (ifx)", () => {
     osVersion: "10.0.19045",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 

@@ -102615,6 +102615,7 @@ const DEFAULTS = {
     version: LATEST,
     msystem: Msystem.Native,
     cleanupDisk: false,
+    updateEnvironment: true,
 };
 const COMPILER_ALIASES = {
     gcc: Compiler.GFortran,
@@ -102713,6 +102714,7 @@ function parseInputs() {
     const rawVersion = getInput("version").trim() || DEFAULTS.version;
     const rawMsystem = getInput("msystem").trim();
     const cleanupDisk = getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+    const updateEnvironment = getBooleanInput("update-environment");
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
     const inputs = {
@@ -102723,6 +102725,7 @@ function parseInputs() {
         arch: detectArch(),
         msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
         cleanupDisk,
+        updateEnvironment,
     };
     return inputs;
 }
@@ -108763,8 +108766,12 @@ async function run() {
                 break;
         }
         setInstallationOutputs(installationResult);
-        exportInstallationVariables(installationResult);
-        exportVariable("FORTRAN_COMPILER", inputs.compiler);
+        // update-environment: false suppresses only the public env exports;
+        // outputs and the installation itself are unaffected.
+        if (inputs.updateEnvironment) {
+            exportInstallationVariables(installationResult);
+            exportVariable("FORTRAN_COMPILER", inputs.compiler);
+        }
     }
     catch (err) {
         setFailed(err instanceof Error ? err.message : String(err));

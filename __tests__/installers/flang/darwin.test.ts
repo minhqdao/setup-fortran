@@ -67,6 +67,7 @@ describe("installDarwin (Flang)", () => {
     osVersion: "13",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
