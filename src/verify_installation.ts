@@ -124,7 +124,7 @@ function verifyCompanionCompilers(): void {
   }
   if (process.env.F77 !== fc) {
     throw new Error(
-      `F77 env var (${(process.env.F77 ?? "unset")} does not match FC ($fc).`,
+      `F77 env var (${process.env.F77 ?? "unset"} does not match FC ($fc).`,
     );
   }
   if (process.env.F90 !== fc) {
