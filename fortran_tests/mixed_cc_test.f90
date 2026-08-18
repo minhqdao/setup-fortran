@@ -1,11 +1,11 @@
 program cc_test
   use, intrinsic :: iso_c_binding, only: c_int
-  implicit none(type, external)
+  implicit none
 
   interface
     function add_one(x) bind(C, name="add_one")
       use, intrinsic :: iso_c_binding, only: c_int
-      implicit none(type, external)
+      implicit none
 
       integer(c_int), value :: x
       integer(c_int) :: add_one
