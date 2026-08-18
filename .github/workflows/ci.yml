@@ -16,17 +16,17 @@ jobs:
   validation:
     uses: ./.github/workflows/validation.yml
 
-  aocc:
-    needs: [validation]
-    uses: ./.github/workflows/ci-aocc.yml
-
-  armflang:
-    needs: [validation]
-    uses: ./.github/workflows/ci-armflang.yml
-
-  # gfortran:
+  # aocc:
   #   needs: [validation]
-  #   uses: ./.github/workflows/ci-gfortran.yml
+  #   uses: ./.github/workflows/ci-aocc.yml
+
+  # armflang:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-armflang.yml
+
+  gfortran:
+    needs: [validation]
+    uses: ./.github/workflows/ci-gfortran.yml
 
   # flang:
   #   needs: [validation]
