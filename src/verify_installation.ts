@@ -124,7 +124,7 @@ function verifyCompanionCompilers(): void {
   }
   if (process.env.F77 !== fc) {
     throw new Error(
-      `F77 env var (${process.env.F77 ?? "unset"} does not match FC ($fc).`,
+      `F77 env var (${process.env.F77 ?? "unset"}) does not match FC (${fc}).`,
     );
   }
   if (process.env.F90 !== fc) {
@@ -161,7 +161,7 @@ function verifyCompanionCompilers(): void {
 
 /**
  * Verify that the Fortran compiler can be discovered by its unversioned
- * basename (e.g. `gfortran` rather than `gfortran-14`). Some downstream
+ * driver name (e.g. `gfortran` rather than `gfortran-14`). Some downstream
  * workflows invoke `command -v gfortran` directly.
  */
 function verifyUnversionedExecutable(): void {
@@ -170,10 +170,10 @@ function verifyUnversionedExecutable(): void {
     throw new Error("FC is not set; cannot check unversioned discovery.");
   }
 
-  // Use the canonical compiler name (e.g. `gfortran`) rather than the
-  // basename of $FC, which may be versioned (e.g. `gfortran-14`). This
-  // tests whether downstream workflows that call `command -v gfortran`
-  // will succeed, not just the exact driver that was installed.
+  // Use the unversioned driver name downstream workflows actually invoke,
+  // not the versioned $FC. `aocc` is a distribution selector, not an
+  // executable: the driver it installs is `flang`.
+  const DRIVER_NAMES: Record<string, string> = { aocc: "flang" };
   const compilerName = process.env.FORTRAN_COMPILER ?? "";
   if (!compilerName) {
     throw new Error(
@@ -181,12 +181,11 @@ function verifyUnversionedExecutable(): void {
     );
   }
 
+  const driverName = DRIVER_NAMES[compilerName] ?? compilerName;
   const isWindows = process.platform === "win32";
   // On Windows, `where.exe` locates executables with or without the `.exe`
   // suffix, so we strip it for a cleaner lookup.
-  const lookupName = isWindows
-    ? compilerName.replace(/\.exe$/i, "")
-    : compilerName;
+  const lookupName = isWindows ? driverName.replace(/\.exe$/i, "") : driverName;
 
   try {
     if (isWindows) {

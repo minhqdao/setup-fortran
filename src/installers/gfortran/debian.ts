@@ -109,7 +109,7 @@ export async function installDebian(
     `/usr/bin/gfortran-${version}`,
   ]);
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion(version);
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
@@ -229,9 +229,9 @@ async function addAptRepositoryWithRetry(
   }
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(version: string): Promise<string> {
   let output = "";
-  await exec.exec("gfortran", ["--version"], {
+  await exec.exec(`gfortran-${version}`, ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {
         output += data.toString();
