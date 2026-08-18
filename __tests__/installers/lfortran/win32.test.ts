@@ -106,7 +106,7 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("exports environment variables and sets linker", async () => {
-      await installWin32(baseInputs);
+      const result = await installWin32(baseInputs);
 
       expect(core.addPath).toHaveBeenCalledWith(
         expect.stringContaining("lfortran"),
@@ -115,6 +115,8 @@ describe("installWin32 (LFortran)", () => {
         "LFORTRAN_LINKER",
         expect.stringContaining("link.exe"),
       );
+      expect(result.cc).toBe("clang");
+      expect(result.cxx).toBe("clang++");
     });
   });
 

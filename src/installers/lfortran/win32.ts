@@ -166,11 +166,16 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (conda).`,
   );
+  // The companion C/C++ compiler is the system `clang`/`clang++` on PATH,
+  // matching the macOS/Linux lfortran installers. The `lfortran` conda-forge
+  // package does not ship clang, but GitHub Windows runners provide LLVM on
+  // PATH, so the companion-compiler check resolves it. This keeps the action
+  // consistent across platforms.
   const result = {
     version: resolvedVersion,
     fc: environment.lfortran,
-    cc: path.join(environment.binDir, "clang.exe"),
-    cxx: path.join(environment.binDir, "clang++.exe"),
+    cc: "clang",
+    cxx: "clang++",
   };
   return result;
 }
