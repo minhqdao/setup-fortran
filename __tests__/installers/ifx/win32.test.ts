@@ -67,8 +67,8 @@ describe("installWin32 (ifx)", () => {
     const result = await installWin32(baseInputs);
 
     expect(result.fc).toBe("ifx");
-    expect(result.cc).toBe("icx");
-    expect(result.cxx).toBe("icpx");
+    expect(result.cc).toBe("cl");
+    expect(result.cxx).toBe("cl");
 
     expect(mockedRestoreCache).toHaveBeenCalled();
     expect(mockedDownloadTool).not.toHaveBeenCalled();

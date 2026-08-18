@@ -105964,7 +105964,7 @@ async function win32_installWin32(inputs) {
             "/D",
             "/S",
             "/C",
-            `call "${SETVARS_BAT}" --force >nul && ifx /what >nul && icx --version >nul && icpx --version >nul`,
+            `call "${SETVARS_BAT}" --force >nul && ifx --version >nul`,
         ])
         : false;
     if (cacheValid) {
@@ -106027,11 +106027,17 @@ async function win32_installWin32(inputs) {
     }
     const resolvedVersion = await ifx_win32_resolveInstalledVersion();
     info(`ifx ${resolvedVersion} installed successfully.`);
+    // The LLVM C/C++ drivers (icx/icpx) are only shipped by the HPC Kit
+    // installers; the Fortran-only packages used below do not include them.
+    // Use MSVC's cl, which the vcvars64 environment (initialized by the
+    // install step) puts on PATH and which ifx interoperates with for mixed
+    // builds. This mirrors how the macOS installer uses the system clang/clang++
+    // and how installWin32 for ifort advertises cl on Windows.
     const result = {
         version: resolvedVersion,
         fc: "ifx",
-        cc: "icx",
-        cxx: "icpx",
+        cc: "cl",
+        cxx: "cl",
     };
     return result;
 }
@@ -106061,7 +106067,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     }
 }
 async function ifx_win32_resolveInstalledVersion() {
-    const versionCommand = process.platform === OS.Windows ? "/what" : "--version";
+    const versionCommand = "--version";
     let output = "";
     await exec_exec("ifx", [versionCommand], {
         ignoreReturnCode: true,
