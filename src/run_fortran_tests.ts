@@ -65,7 +65,8 @@ function getCppFlags(compiler: Compiler, isWindows: boolean): string[] {
 }
 
 async function run(): Promise<void> {
-  const buildDir = path.join(process.cwd(), "test_build");
+  const repoRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
+  const buildDir = path.join(repoRoot, "test_build");
 
   try {
     const fc = process.env.FC;
@@ -125,7 +126,7 @@ async function run(): Promise<void> {
     const isLFortran = compiler === Compiler.LFortran;
     const isFlang = compiler === Compiler.Flang;
 
-    const testDir = path.join(process.cwd(), "fortran_tests");
+    const testDir = path.join(repoRoot, "fortran_tests");
 
     if (!fs.existsSync(buildDir)) {
       fs.mkdirSync(buildDir);
