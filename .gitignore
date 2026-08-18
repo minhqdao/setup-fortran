@@ -13,4 +13,3 @@ coverage/
 .env.*
 .DS_Store
 Thumbs.db
-setup-fortran/

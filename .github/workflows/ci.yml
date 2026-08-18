@@ -24,13 +24,13 @@ jobs:
   #   needs: [validation]
   #   uses: ./.github/workflows/ci-armflang.yml
 
-  gfortran:
-    needs: [validation]
-    uses: ./.github/workflows/ci-gfortran.yml
-
-  # flang:
+  # gfortran:
   #   needs: [validation]
-  #   uses: ./.github/workflows/ci-flang.yml
+  #   uses: ./.github/workflows/ci-gfortran.yml
+
+  flang:
+    needs: [validation]
+    uses: ./.github/workflows/ci-flang.yml
 
   # ifort:
   #   needs: [validation]
