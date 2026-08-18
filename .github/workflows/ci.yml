@@ -28,13 +28,13 @@ jobs:
   #   needs: [validation]
   #   uses: ./.github/workflows/ci-gfortran.yml
 
-  flang:
-    needs: [validation]
-    uses: ./.github/workflows/ci-flang.yml
-
-  # ifort:
+  # flang:
   #   needs: [validation]
-  #   uses: ./.github/workflows/ci-ifort.yml
+  #   uses: ./.github/workflows/ci-flang.yml
+
+  ifort:
+    needs: [validation]
+    uses: ./.github/workflows/ci-ifort.yml
 
   # ifx:
   #   needs: [validation]
