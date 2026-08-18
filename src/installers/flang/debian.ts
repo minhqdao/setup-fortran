@@ -175,6 +175,12 @@ export async function installDebian(
     "install",
     "-y",
     ...APT_NETWORK_OPTIONS,
+    // The LLVM apt `flang-N` package does not declare `clang-N` as a
+    // dependency (unlike Ubuntu-archive flang-17/18 on noble, which pull it
+    // in transitively). flang links against clang as its host C/C++ compiler
+    // and the action advertises it as $CC/$CXX, so it must be installed
+    // explicitly — otherwise the companion-compiler verification fails.
+    `clang-${version}`,
     pkgName,
     `libomp-${version}-dev`,
     `libclang-rt-${version}-dev`,
@@ -217,8 +223,15 @@ export async function installDebian(
       `${flangBinaryName(major)}-${version}`,
     ),
     fc: `${flangBinaryName(major)}-${version}`,
-    cc: `clang-${version}`,
-    cxx: `clang++-${version}`,
+    // Reference the unversioned clang/clang++ shipped inside the LLVM install
+    // dir (always present once `clang-N` is installed) rather than the
+    // /usr/bin clang-N symlinks. Those symlinks compile to different versioned
+    // names across apt sources — Ubuntu archive uses `clang++-N` (dash) while
+    // apt.llvm.org uses `clang++N` (no dash) — so a single versioned cxx name
+    // cannot satisfy both. The absolute path is repo-agnostic and matches the
+    // darwin installer.
+    cc: `${llvmBinDir}/clang`,
+    cxx: `${llvmBinDir}/clang++`,
   };
   const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);

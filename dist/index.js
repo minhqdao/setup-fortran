@@ -107373,6 +107373,12 @@ async function flang_debian_installDebian(inputs) {
         "install",
         "-y",
         ...debian_APT_NETWORK_OPTIONS,
+        // The LLVM apt `flang-N` package does not declare `clang-N` as a
+        // dependency (unlike Ubuntu-archive flang-17/18 on noble, which pull it
+        // in transitively). flang links against clang as its host C/C++ compiler
+        // and the action advertises it as $CC/$CXX, so it must be installed
+        // explicitly — otherwise the companion-compiler verification fails.
+        `clang-${version}`,
         pkgName,
         `libomp-${version}-dev`,
         `libclang-rt-${version}-dev`,
@@ -107402,8 +107408,15 @@ async function flang_debian_installDebian(inputs) {
     const result = {
         version: await flang_debian_resolveInstalledVersion(`${flangBinaryName(major)}-${version}`),
         fc: `${flangBinaryName(major)}-${version}`,
-        cc: `clang-${version}`,
-        cxx: `clang++-${version}`,
+        // Reference the unversioned clang/clang++ shipped inside the LLVM install
+        // dir (always present once `clang-N` is installed) rather than the
+        // /usr/bin clang-N symlinks. Those symlinks compile to different versioned
+        // names across apt sources — Ubuntu archive uses `clang++-N` (dash) while
+        // apt.llvm.org uses `clang++N` (no dash) — so a single versioned cxx name
+        // cannot satisfy both. The absolute path is repo-agnostic and matches the
+        // darwin installer.
+        cc: `${llvmBinDir}/clang`,
+        cxx: `${llvmBinDir}/clang++`,
     };
     const resolvedVersion = result.version;
     info(`Flang ${resolvedVersion} installed successfully.`);
@@ -107551,6 +107564,14 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     addPath(binDir);
     const flangBin = resolveFlangBinary(binDir);
     info(`Using flang binary: ${flangBin}`);
+    // LLVM 17–19 release archives ship only the `flang-new` driver (`flang-new`
+    // became the primary `flang` driver in LLVM 20+). Ensure an unversioned
+    // `flang` driver exists so `command -v flang` and downstream workflows
+    // resolve regardless of the installed LLVM version.
+    const flangUnversioned = external_path_.join(binDir, "flang");
+    if (external_path_.basename(flangBin) !== "flang" && !external_fs_.existsSync(flangUnversioned)) {
+        external_fs_.symlinkSync(flangBin, flangUnversioned);
+    }
     const libDir = external_path_.join(toolRoot, "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
     exportVariable("LIBRARY_PATH", existingLibPath ? `${libDir}:${existingLibPath}` : libDir);

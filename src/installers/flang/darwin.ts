@@ -182,6 +182,15 @@ async function installFromGitHub(
   const flangBin = resolveFlangBinary(binDir);
   core.info(`Using flang binary: ${flangBin}`);
 
+  // LLVM 17–19 release archives ship only the `flang-new` driver (`flang-new`
+  // became the primary `flang` driver in LLVM 20+). Ensure an unversioned
+  // `flang` driver exists so `command -v flang` and downstream workflows
+  // resolve regardless of the installed LLVM version.
+  const flangUnversioned = path.join(binDir, "flang");
+  if (path.basename(flangBin) !== "flang" && !fs.existsSync(flangUnversioned)) {
+    fs.symlinkSync(flangBin, flangUnversioned);
+  }
+
   const libDir = path.join(toolRoot, "lib");
   const existingLibPath = process.env.LIBRARY_PATH ?? "";
   core.exportVariable(

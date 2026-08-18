@@ -92,6 +92,7 @@ describe("installDebian (Flang)", () => {
       "Acquire::http::Timeout=10",
       "-o",
       "Acquire::https::Timeout=10",
+      "clang-18",
       "flang-18",
       "libomp-18-dev",
       "libclang-rt-18-dev",
@@ -157,8 +158,8 @@ describe("installDebian (Flang)", () => {
     expect(result).toEqual({
       version: "flang version 18.1.0",
       fc: "flang-new-18",
-      cc: "clang-18",
-      cxx: "clang++-18",
+      cc: "/usr/lib/llvm-18/bin/clang",
+      cxx: "/usr/lib/llvm-18/bin/clang++",
     });
   });
 
