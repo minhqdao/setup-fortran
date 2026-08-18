@@ -36,13 +36,13 @@ jobs:
   #   needs: [validation]
   #   uses: ./.github/workflows/ci-ifort.yml
 
-  ifx:
-    needs: [validation]
-    uses: ./.github/workflows/ci-ifx.yml
-
-  # lfortran:
+  # ifx:
   #   needs: [validation]
-  #   uses: ./.github/workflows/ci-lfortran.yml
+  #   uses: ./.github/workflows/ci-ifx.yml
+
+  lfortran:
+    needs: [validation]
+    uses: ./.github/workflows/ci-lfortran.yml
 
   # nvfortran:
   #   needs: [validation]
