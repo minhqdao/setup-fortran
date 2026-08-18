@@ -43,6 +43,21 @@ function aptCacheOptions(cacheDir: string): string[] {
   return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
 
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — which let the azure apt mirror stall an entire job for 6h.
+// `ConnectTimeout` bounds the connect phase, and a low retry count keeps the
+// total time bounded. `aptGetUpdateWithRetry` separately tolerates update
+// failures on a warm cache.
+const APT_TIMEOUT_OPTS: string[] = [
+  "-o",
+  "Acquire::http::Timeout=30",
+  "-o",
+  "Acquire::http::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=1",
+];
+
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -70,7 +85,7 @@ export async function installDebian(
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
   }
 
-  await aptGetUpdateWithRetry();
+  await aptGetUpdateWithRetry(!!cacheHit);
 
   if (cacheHit) {
     core.info(`Cache hit for ${cacheKey}, installing from cache...`);
@@ -131,10 +146,7 @@ async function aptGetInstallWithRetry(
         "apt-get",
         "install",
         "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
+        ...APT_TIMEOUT_OPTS,
         ...aptCacheOptions(cacheDir),
         ...packages,
       ]);
@@ -161,20 +173,25 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
   });
 }
 
-async function aptGetUpdateWithRetry(maxAttempts = 5): Promise<void> {
+async function aptGetUpdateWithRetry(
+  cacheHit: boolean,
+  maxAttempts = 2,
+): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", [
-        "apt-get",
-        "update",
-        "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
-      ]);
+      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
       return;
     } catch (err) {
+      // A warm cache already holds the package archives; a transiently
+      // unreachable index mirror (e.g. the Azure mirror going stale) must
+      // not block an otherwise-cached installation — continue with the
+      // cached/stale package index instead of hanging or failing the job.
+      if (cacheHit) {
+        core.warning(
+          "apt-get update did not complete cleanly; continuing with cached/stale package index.",
+        );
+        return;
+      }
       if (attempt === maxAttempts) throw err;
       core.warning(
         `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,

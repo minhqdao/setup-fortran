@@ -102992,6 +102992,20 @@ function aptCacheDir(inputs, version) {
 function aptCacheOptions(cacheDir) {
     return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — which let the azure apt mirror stall an entire job for 6h.
+// `ConnectTimeout` bounds the connect phase, and a low retry count keeps the
+// total time bounded. `aptGetUpdateWithRetry` separately tolerates update
+// failures on a warm cache.
+const APT_TIMEOUT_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=30",
+    "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=1",
+];
 async function installDebian(inputs) {
     const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
     info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
@@ -103012,7 +103026,7 @@ async function installDebian(inputs) {
         info(`Adding PPA for GFortran ${version}...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
-    await aptGetUpdateWithRetry();
+    await aptGetUpdateWithRetry(!!cacheHit);
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
         try {
@@ -103066,10 +103080,7 @@ async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 5) {
                 "apt-get",
                 "install",
                 "-y",
-                "-o",
-                "Acquire::http::Timeout=60",
-                "-o",
-                "Acquire::Retries=3",
+                ...APT_TIMEOUT_OPTS,
                 ...aptCacheOptions(cacheDir),
                 ...packages,
             ]);
@@ -103094,21 +103105,21 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(maxAttempts = 5) {
+async function aptGetUpdateWithRetry(cacheHit, maxAttempts = 2) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", [
-                "apt-get",
-                "update",
-                "-y",
-                "-o",
-                "Acquire::http::Timeout=60",
-                "-o",
-                "Acquire::Retries=3",
-            ]);
+            await exec_exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
             return;
         }
         catch (err) {
+            // A warm cache already holds the package archives; a transiently
+            // unreachable index mirror (e.g. the Azure mirror going stale) must
+            // not block an otherwise-cached installation — continue with the
+            // cached/stale package index instead of hanging or failing the job.
+            if (cacheHit) {
+                warning("apt-get update did not complete cleanly; continuing with cached/stale package index.");
+                return;
+            }
             if (attempt === maxAttempts)
                 throw err;
             warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);

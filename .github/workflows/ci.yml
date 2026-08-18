@@ -89,6 +89,7 @@ jobs:
         with:
           compiler: gfortran
           version: "14"
+        timeout-minutes: 30
 
       - name: Verify first installation env vars (baseline)
         env:
@@ -151,6 +152,7 @@ jobs:
         with:
           compiler: gfortran
           version: "15"
+        timeout-minutes: 30
 
       - name: Verify second installation took precedence
         env:
