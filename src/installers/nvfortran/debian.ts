@@ -21,7 +21,11 @@ const APT_NETWORK_OPTIONS = [
   "-o",
   "Acquire::http::Timeout=60",
   "-o",
+  "Acquire::http::ConnectTimeout=20",
+  "-o",
   "Acquire::https::Timeout=60",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
 ];
 
 const SUPPORTED_VERSIONS = {

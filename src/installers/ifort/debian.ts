@@ -34,6 +34,20 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
+// for the full GitHub Actions 6h default. Retries are kept low because the
+// retry wrappers below drive them with backoff. Mirrors gfortran/debian.ts.
+const APT_TIMEOUT_OPTS: string[] = [
+  "-o",
+  "Acquire::http::Timeout=30",
+  "-o",
+  "Acquire::http::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=1",
+];
+
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -84,15 +98,7 @@ export async function installDebian(
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=60",
-      "-o",
-      "Acquire::Retries=3",
-    ]);
+    await aptGetUpdateWithRetry();
 
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
     // Because ifort only exists in <=2023, the C++ package is always the classic variant.
@@ -103,14 +109,7 @@ export async function installDebian(
     const cppPkg = `${cppPkgBase}-${bundle}`;
 
     core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-    await exec.exec("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      fortranPkg,
-      cppPkg,
-    ]);
+    await aptGetInstallWithRetry([fortranPkg, cppPkg]);
 
     await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
   } else {
@@ -178,4 +177,44 @@ async function resolveInstalledVersion(): Promise<string> {
   // ifort --version often prints a multi-line copyright header.
   // We grab just the first line which contains the actual version string.
   return output.trim().split("\n")[0];
+}
+
+async function aptGetUpdateWithRetry(maxAttempts = 2): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
+}
+
+async function aptGetInstallWithRetry(
+  packages: string[],
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+        "--no-install-recommends",
+        ...packages,
+      ]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
 }

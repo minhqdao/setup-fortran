@@ -106123,6 +106123,19 @@ const ifort_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
     [Arch.ARM64]: undefined,
 };
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
+// for the full GitHub Actions 6h default. Retries are kept low because the
+// retry wrappers below drive them with backoff. Mirrors gfortran/debian.ts.
+const debian_APT_TIMEOUT_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=30",
+    "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=1",
+];
 async function ifort_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, ifort_debian_SUPPORTED_VERSIONS);
     const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
@@ -106159,15 +106172,7 @@ async function ifort_debian_installDebian(inputs) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec_exec("sudo", [
-            "apt-get",
-            "update",
-            "-y",
-            "-o",
-            "Acquire::http::Timeout=60",
-            "-o",
-            "Acquire::Retries=3",
-        ]);
+        await debian_aptGetUpdateWithRetry();
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
         // Because ifort only exists in <=2023, the C++ package is always the classic variant.
         const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
@@ -106176,14 +106181,7 @@ async function ifort_debian_installDebian(inputs) {
             : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
         const cppPkg = `${cppPkgBase}-${bundle}`;
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-        await exec_exec("sudo", [
-            "apt-get",
-            "install",
-            "-y",
-            "--no-install-recommends",
-            fortranPkg,
-            cppPkg,
-        ]);
+        await debian_aptGetInstallWithRetry([fortranPkg, cppPkg]);
         await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
     }
     else {
@@ -106238,6 +106236,41 @@ async function ifort_debian_resolveInstalledVersion() {
     // ifort --version often prints a multi-line copyright header.
     // We grab just the first line which contains the actual version string.
     return output.trim().split("\n")[0];
+}
+async function debian_aptGetUpdateWithRetry(maxAttempts = 2) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_TIMEOUT_OPTS]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
+}
+async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "apt-get",
+                "install",
+                "-y",
+                ...debian_APT_TIMEOUT_OPTS,
+                "--no-install-recommends",
+                ...packages,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
@@ -106681,7 +106714,11 @@ const APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::http::Timeout=60",
     "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
     "Acquire::https::Timeout=60",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
 ];
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
