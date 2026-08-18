@@ -32,13 +32,13 @@ jobs:
   #   needs: [validation]
   #   uses: ./.github/workflows/ci-flang.yml
 
-  ifort:
-    needs: [validation]
-    uses: ./.github/workflows/ci-ifort.yml
-
-  # ifx:
+  # ifort:
   #   needs: [validation]
-  #   uses: ./.github/workflows/ci-ifx.yml
+  #   uses: ./.github/workflows/ci-ifort.yml
+
+  ifx:
+    needs: [validation]
+    uses: ./.github/workflows/ci-ifx.yml
 
   # lfortran:
   #   needs: [validation]
