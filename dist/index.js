@@ -106665,11 +106665,16 @@ async function ifort_win32_installWin32(inputs) {
     }
     const resolvedVersion = await ifort_win32_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // Intel's classic C++ driver (icl) was discontinued in oneAPI 2024+ and is
+    // not installed by the Fortran-only packages used below. Use MSVC's cl,
+    // which the vcvars64 environment (initialized by the install step) puts on
+    // PATH and which ifort is designed to interoperate with for mixed builds.
+    // This mirrors how the macOS installer uses the system clang/clang++.
     const result = {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icl",
-        cxx: "icl",
+        cc: "cl",
+        cxx: "cl",
     };
     return result;
 }

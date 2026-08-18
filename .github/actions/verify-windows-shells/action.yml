@@ -45,14 +45,18 @@ runs:
         }
 
         # Verify executables are callable under PowerShell.
-        # Try --version; fall back to /? for MSVC-style compilers (e.g. icl)
-        & "$fc" --version
+        # Try --version; fall back to /? for MSVC-style compilers (e.g. icl,
+        # ifort, cl), which reject --version on Windows.
+        & "$fc" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$fc" /? 2>$null }
         & "$cc" --version 2>$null
         if ($LASTEXITCODE -ne 0) { & "$cc" /? 2>$null }
         & "$cxx" --version 2>$null
         if ($LASTEXITCODE -ne 0) { & "$cxx" /? 2>$null }
-        & "$f77" --version
-        & "$f90" --version
+        & "$f77" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$f77" /? 2>$null }
+        & "$f90" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$f90" /? 2>$null }
 
     - name: Verify compiler invocation under cmd (Windows only)
       shell: cmd
@@ -74,11 +78,15 @@ runs:
           echo "::error::F90='%F90%' does not match FC='%OUTPUT_FC%'"
           exit /b 1
         )
-        REM Try --version; fall back to /? for MSVC-style compilers (e.g. icl)
-        "%OUTPUT_FC%" --version
+        REM Try --version; fall back to /? for MSVC-style compilers (e.g. icl,
+        REM ifort, cl), which reject --version on Windows.
+        "%OUTPUT_FC%" --version 2>nul
+        if errorlevel 1 "%OUTPUT_FC%" /? 2>nul
         "%OUTPUT_CC%" --version 2>nul
         if errorlevel 1 "%OUTPUT_CC%" /? 2>nul
         "%OUTPUT_CXX%" --version 2>nul
         if errorlevel 1 "%OUTPUT_CXX%" /? 2>nul
-        "%F77%" --version
-        "%F90%" --version
+        "%F77%" --version 2>nul
+        if errorlevel 1 "%F77%" /? 2>nul
+        "%F90%" --version 2>nul
+        if errorlevel 1 "%F90%" /? 2>nul

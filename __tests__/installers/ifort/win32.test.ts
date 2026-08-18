@@ -112,8 +112,8 @@ describe("installWin32 (ifort)", () => {
     const result = await installWin32(baseInputs);
     expect(result).toMatchObject({
       fc: "ifort",
-      cc: "icl",
-      cxx: "icl",
+      cc: "cl",
+      cxx: "cl",
     });
     expect(result.version).toContain(
       "Intel(R) Fortran Intel(R) 64 Compiler Classic",
