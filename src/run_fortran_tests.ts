@@ -178,8 +178,9 @@ async function run(): Promise<void> {
     ): Promise<void> => {
       const fortranPath = path.join(testDir, fortranSources[0]);
       const cPath = path.join(testDir, cSource);
-      // MSVC-style compilers (icl) use /Fo: and .obj; GCC/Clang use -o and .o
-      const isMsvc = isWindows && compiler === Compiler.IFort;
+      // MSVC-style compilers (icl/cl) use /Fo: and .obj; GCC/Clang use -o and .o
+      const isMsvc =
+        isWindows && (compiler === Compiler.IFort || compiler === Compiler.IFX);
       const objExt = isMsvc ? ".obj" : ".o";
       const objPath = path.join(buildDir, `${name}${objExt}`);
       const outputPath = path.join(buildDir, isWindows ? `${name}.exe` : name);
