@@ -41,14 +41,27 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-const APT_ACQUIRE_OPTS = [
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
+// for the full GitHub Actions 6h default. Retries are kept low because the
+// retry wrappers below drive them with backoff. Mirrors gfortran/ifort/debian.ts.
+const APT_TIMEOUT_OPTS = [
   "-o",
-  "Acquire::http::Timeout=120",
+  "Acquire::http::Timeout=30",
   "-o",
-  "Acquire::https::Timeout=120",
+  "Acquire::http::ConnectTimeout=20",
   "-o",
-  "Acquire::Retries=5",
+  "Acquire::https::Timeout=30",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=1",
 ];
+
+// wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
+// forever against a dead/unreachable host, stalling the job.
+const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 
 export async function installDebian(
   inputs: Inputs,
@@ -89,7 +102,7 @@ export async function installDebian(
     await exec.exec("bash", [
       "-c",
       [
-        `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+        `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
         `| gpg --dearmor`,
         `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
       ].join(" "),
@@ -99,7 +112,7 @@ export async function installDebian(
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
+    await aptGetUpdateWithRetry();
 
     const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
     const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
@@ -117,7 +130,7 @@ export async function installDebian(
       "-y",
       "--no-install-recommends",
       "--fix-missing",
-      ...APT_ACQUIRE_OPTS,
+      ...APT_TIMEOUT_OPTS,
       fortranPkg,
       cppPkg,
     ]);
@@ -185,6 +198,25 @@ async function aptInstallWithRetry(
       `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Retrying in 15 seconds...`,
     );
     await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
+}
+
+// `apt-get update` hits live mirrors and is the most common stall point; a
+// non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
+// a couple of bounded retries rather than stalling the whole job. Total worst
+// case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
+async function aptGetUpdateWithRetry(maxAttempts = 2): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
   }
 }
 

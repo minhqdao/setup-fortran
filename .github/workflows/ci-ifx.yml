@@ -12,6 +12,7 @@ jobs:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
     if: github.actor != 'dependabot[bot]'
+    timeout-minutes: 60
     runs-on: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -172,6 +173,7 @@ jobs:
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
         uses: ./
+        timeout-minutes: 30
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}

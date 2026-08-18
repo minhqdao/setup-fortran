@@ -105636,14 +105636,26 @@ const debian_SUPPORTED_VERSIONS = {
     ],
     [Arch.ARM64]: undefined,
 };
-const APT_ACQUIRE_OPTS = [
+// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
+// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
+// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
+// for the full GitHub Actions 6h default. Retries are kept low because the
+// retry wrappers below drive them with backoff. Mirrors gfortran/ifort/debian.ts.
+const debian_APT_TIMEOUT_OPTS = [
     "-o",
-    "Acquire::http::Timeout=120",
+    "Acquire::http::Timeout=30",
     "-o",
-    "Acquire::https::Timeout=120",
+    "Acquire::http::ConnectTimeout=20",
     "-o",
-    "Acquire::Retries=5",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=1",
 ];
+// wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
+// forever against a dead/unreachable host, stalling the job.
+const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 async function debian_installDebian(inputs) {
     const version = resolveVersion(inputs, debian_SUPPORTED_VERSIONS, {
         resolveMinorToLatestPatch: true,
@@ -105672,7 +105684,7 @@ async function debian_installDebian(inputs) {
         await exec_exec("bash", [
             "-c",
             [
-                `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+                `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
                 `| gpg --dearmor`,
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
@@ -105681,7 +105693,7 @@ async function debian_installDebian(inputs) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec_exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
+        await debian_aptGetUpdateWithRetry();
         const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
         const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
         const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) => version.startsWith(y))
@@ -105694,7 +105706,7 @@ async function debian_installDebian(inputs) {
             "-y",
             "--no-install-recommends",
             "--fix-missing",
-            ...APT_ACQUIRE_OPTS,
+            ...debian_APT_TIMEOUT_OPTS,
             fortranPkg,
             cppPkg,
         ]);
@@ -105744,6 +105756,24 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
         }
         warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Retrying in 15 seconds...`);
         await new Promise((resolve) => setTimeout(resolve, 15_000));
+    }
+}
+// `apt-get update` hits live mirrors and is the most common stall point; a
+// non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
+// a couple of bounded retries rather than stalling the whole job. Total worst
+// case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
+async function debian_aptGetUpdateWithRetry(maxAttempts = 2) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_TIMEOUT_OPTS]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
     }
 }
 async function debian_resolveInstalledVersion() {
@@ -106134,7 +106164,7 @@ const ifort_debian_SUPPORTED_VERSIONS = {
 // connect phase — without `ConnectTimeout` a stalled mirror can stall a job
 // for the full GitHub Actions 6h default. Retries are kept low because the
 // retry wrappers below drive them with backoff. Mirrors gfortran/debian.ts.
-const debian_APT_TIMEOUT_OPTS = [
+const ifort_debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::http::Timeout=30",
     "-o",
@@ -106178,7 +106208,7 @@ async function ifort_debian_installDebian(inputs) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await debian_aptGetUpdateWithRetry();
+        await ifort_debian_aptGetUpdateWithRetry();
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
         // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
         // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
@@ -106249,10 +106279,10 @@ async function ifort_debian_resolveInstalledVersion() {
     // We grab just the first line which contains the actual version string.
     return output.trim().split("\n")[0];
 }
-async function debian_aptGetUpdateWithRetry(maxAttempts = 2) {
+async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 2) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_TIMEOUT_OPTS]);
+            await exec_exec("sudo", ["apt-get", "update", "-y", ...ifort_debian_APT_TIMEOUT_OPTS]);
             return;
         }
         catch (err) {
@@ -106270,7 +106300,7 @@ async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
                 "apt-get",
                 "install",
                 "-y",
-                ...debian_APT_TIMEOUT_OPTS,
+                ...ifort_debian_APT_TIMEOUT_OPTS,
                 "--no-install-recommends",
                 ...packages,
             ]);
@@ -108522,7 +108552,7 @@ const debian_CURL_RETRY_ARGS = [
     "600",
     "-fsSL",
 ];
-const debian_APT_ACQUIRE_OPTS = [
+const APT_ACQUIRE_OPTS = [
     "-o",
     "Acquire::http::Timeout=120",
     "-o",
@@ -108616,7 +108646,7 @@ async function aptGetWithRetry(args, maxAttempts = 3) {
         },
     };
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await exec_exec("sudo", ["apt-get", ...debian_APT_ACQUIRE_OPTS, ...args], execOptions);
+        const exitCode = await exec_exec("sudo", ["apt-get", ...APT_ACQUIRE_OPTS, ...args], execOptions);
         if (exitCode === 0)
             return;
         if (attempt === maxAttempts) {
