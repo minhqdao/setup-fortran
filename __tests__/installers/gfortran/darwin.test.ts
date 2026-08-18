@@ -63,7 +63,23 @@ describe("installDarwin (gfortran)", () => {
       "--skip-post-install",
       "gcc@14",
     ]);
-    expect(mockedExec).not.toHaveBeenCalledWith("ln", expect.anything());
+    // Versioned Homebrew formulae don't create unversioned drivers; the
+    // action must symlink gfortran/gcc/g++ -> <version> for downstream use.
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/gfortran-14",
+      "/usr/local/bin/gfortran",
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/gcc-14",
+      "/usr/local/bin/gcc",
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/g++-14",
+      "/usr/local/bin/g++",
+    ]);
     expect(mockedExec).not.toHaveBeenCalledWith(
       "bash",
       ["-c", expect.stringContaining("/usr/local/lib")],

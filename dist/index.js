@@ -103250,6 +103250,19 @@ async function installDarwin(inputs) {
     }
     const gccBinary = external_path_.join(binDir, `gcc-${version}`);
     const gxxBinary = external_path_.join(binDir, `g++-${version}`);
+    // Homebrew's versioned `gcc@<version>` formulae only expose versioned
+    // driver names (e.g. `gfortran-14`, `gcc-14`, `g++-14`). Unlike the
+    // unversioned `gcc` formula, they do not create `gfortran`/`gcc`/`g++`
+    // symlinks in the Homebrew prefix, so the unversioned drivers are not
+    // discoverable on PATH. Several downstream workflows invoke the
+    // unversioned driver names directly (e.g. `command -v gfortran`), so we
+    // create unversioned symlinks pointing to the requested version. This
+    // mirrors the behavior of the shell-based action (install_gcc_brew).
+    for (const driver of ["gfortran", "gcc", "g++"]) {
+        const versionedBinary = external_path_.join(binDir, `${driver}-${version}`);
+        const unversionedBinary = external_path_.join(binDir, driver);
+        await exec_exec("ln", ["-sf", versionedBinary, unversionedBinary]);
+    }
     const resolvedVersion = await darwin_resolveInstalledVersion(gfortranBinary);
     info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     const result = {
