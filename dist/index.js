@@ -106174,7 +106174,9 @@ async function ifort_debian_installDebian(inputs) {
         ]);
         await debian_aptGetUpdateWithRetry();
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-        // Because ifort only exists in <=2023, the C++ package is always the classic variant.
+        // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
+        // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
+        // which also provides classic icc/icpc.
         const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
         const cppPkgBase = bundle.startsWith("2024")
             ? "intel-oneapi-compiler-dpcpp-cpp"
@@ -106216,11 +106218,15 @@ async function ifort_debian_installDebian(inputs) {
     }
     const resolvedVersion = await ifort_debian_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
+    // instead of the classic icc/icpc, which were discontinued. Earlier bundles
+    // (<=2023) still provide classic icc/icpc alongside icx.
+    const bundleIs2024 = bundle.startsWith("2024");
     const result = {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icc",
-        cxx: "icpc",
+        cc: bundleIs2024 ? "icx" : "icc",
+        cxx: bundleIs2024 ? "icpx" : "icpc",
     };
     return result;
 }
@@ -106480,11 +106486,16 @@ async function darwin_installDarwin(inputs) {
     }
     const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // The macOS HPC Kit DMG installs only the Fortran component
+    // (intel.oneapi.mac.ifort-compiler). Classic icc/icpc was never shipped on
+    // macOS, and the LLVM icx driver lives in the Intel oneAPI Base Kit (not
+    // installed here). The companion C/C++ compiler is therefore the system clang
+    // provided by the Xcode Command Line Tools.
     return {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icc",
-        cxx: "icpc",
+        cc: "clang",
+        cxx: "clang++",
     };
 }
 async function ifort_darwin_resolveInstalledVersion() {

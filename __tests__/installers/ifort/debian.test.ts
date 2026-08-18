@@ -161,4 +161,13 @@ describe("installDebian (ifort)", () => {
       cxx: "icpc",
     });
   });
+
+  it("advertises LLVM-based companion drivers for 2024+ bundles", async () => {
+    // 2021.13 ifort corresponds to the 2024.2 bundle. Intel oneAPI 2024+
+    // discontinued classic icc/icpc in favour of the LLVM icx/icpx drivers.
+    const result = await installDebian({ ...baseInputs, version: "2021.13" });
+    expect(result.fc).toBe("ifort");
+    expect(result.cc).toBe("icx");
+    expect(result.cxx).toBe("icpx");
+  });
 });

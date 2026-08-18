@@ -270,11 +270,16 @@ export async function installDarwin(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
+  // The macOS HPC Kit DMG installs only the Fortran component
+  // (intel.oneapi.mac.ifort-compiler). Classic icc/icpc was never shipped on
+  // macOS, and the LLVM icx driver lives in the Intel oneAPI Base Kit (not
+  // installed here). The companion C/C++ compiler is therefore the system clang
+  // provided by the Xcode Command Line Tools.
   return {
     version: resolvedVersion,
     fc: "ifort",
-    cc: "icc",
-    cxx: "icpc",
+    cc: "clang",
+    cxx: "clang++",
   };
 }
 

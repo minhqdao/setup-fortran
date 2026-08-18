@@ -101,7 +101,9 @@ export async function installDebian(
     await aptGetUpdateWithRetry();
 
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-    // Because ifort only exists in <=2023, the C++ package is always the classic variant.
+    // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
+    // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
+    // which also provides classic icc/icpc.
     const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
     const cppPkgBase = bundle.startsWith("2024")
       ? "intel-oneapi-compiler-dpcpp-cpp"
@@ -156,11 +158,15 @@ export async function installDebian(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
+  // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
+  // instead of the classic icc/icpc, which were discontinued. Earlier bundles
+  // (<=2023) still provide classic icc/icpc alongside icx.
+  const bundleIs2024 = bundle.startsWith("2024");
   const result = {
     version: resolvedVersion,
     fc: "ifort",
-    cc: "icc",
-    cxx: "icpc",
+    cc: bundleIs2024 ? "icx" : "icc",
+    cxx: bundleIs2024 ? "icpx" : "icpc",
   };
   return result;
 }

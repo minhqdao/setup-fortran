@@ -169,8 +169,8 @@ describe("installDarwin (ifort)", () => {
     expect(result).toEqual({
       version: "ifort (IFORT) 2021.10.0 20230609",
       fc: "ifort",
-      cc: "icc",
-      cxx: "icpc",
+      cc: "clang",
+      cxx: "clang++",
     });
   });
 });
