@@ -137,10 +137,20 @@ function verifyCompanionCompilers(): void {
   const checkTool = (tool: string, label: string): void => {
     try {
       if (isWindows) {
-        execFileSync("where.exe", [tool], {
-          encoding: "utf8",
-          stdio: "pipe",
-        });
+        // `where.exe` only accepts a *filename pattern* to search for on PATH;
+        // passing an absolute path (which the gfortran/flang/lfortran
+        // installers advertise as $CC/$CXX) always fails with exit code 1.
+        // Invoke the compiler directly instead, mirroring the pwsh/cmd
+        // shell checks that run in CI.
+        try {
+          execFileSync(tool, ["--version"], {
+            encoding: "utf8",
+            stdio: "pipe",
+          });
+        } catch {
+          // MSVC-style compilers (e.g. icl) reject `--version`.
+          execFileSync(tool, ["/?"], { encoding: "utf8", stdio: "pipe" });
+        }
       } else {
         execFileSync(tool, ["--version"], {
           encoding: "utf8",
@@ -150,7 +160,7 @@ function verifyCompanionCompilers(): void {
     } catch {
       throw new Error(
         `Companion compiler ${label}="${tool}" is not callable. ` +
-          `The action advertised this compiler but it was not found on PATH.`,
+          `The action advertised this compiler but it could not be executed.`,
       );
     }
   };
@@ -360,4 +370,6 @@ function run(): void {
   }
 }
 
-run();
+if (process.env.SETUP_FORTRAN_BUNDLE_SMOKE_TEST !== "1") {
+  run();
+}
