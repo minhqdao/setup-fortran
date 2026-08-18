@@ -105588,12 +105588,24 @@ async function validateRestoredCompilerCache(label, requiredPaths, command, args
     }
     return false;
 }
-async function saveCompilerCache(paths, key) {
+async function saveCompilerCache(paths, key, timeoutMs = 10 * 60_000) {
+    let timeout;
     try {
-        await cache.saveCache(paths, key);
+        await Promise.race([
+            cache.saveCache(paths, key),
+            new Promise((_, reject) => {
+                timeout = setTimeout(() => {
+                    reject(new Error(`Cache save timed out after ${Math.round(timeoutMs / 60_000).toString()} minutes`));
+                }, timeoutMs);
+            }),
+        ]);
     }
     catch (error) {
         warning(`Could not save compiler cache ${key}: ${String(error)}`);
+    }
+    finally {
+        if (timeout)
+            clearTimeout(timeout);
     }
 }
 
@@ -106004,7 +106016,8 @@ async function win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading installer...`);
-        const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        const installerPath = await downloadToolWithRetry(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
         await runInstallerWithRetry(installerPath);
@@ -106070,6 +106083,25 @@ async function win32_installWin32(inputs) {
         cxx: "cl",
     };
     return result;
+}
+async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            external_fs_.rmSync(destination, { force: true });
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            warning(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {

@@ -200,10 +200,12 @@ export async function installWin32(
   } else {
     if (cacheHit) fs.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
     core.info(`Downloading installer...`);
-    const installerPath = await tc.downloadTool(
+    const installerPath = await downloadToolWithRetry(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`),
     );
+
+    core.info("Verifying installer...");
     await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
@@ -285,6 +287,37 @@ export async function installWin32(
     cxx: "cl",
   };
   return result;
+}
+
+async function downloadToolWithRetry(
+  url: string,
+  destination: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination);
+    } catch (error) {
+      lastError = error;
+
+      fs.rmSync(destination, { force: true });
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.warning(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
 }
 
 async function runInstallerWithRetry(

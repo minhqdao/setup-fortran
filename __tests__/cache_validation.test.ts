@@ -71,4 +71,67 @@ describe("compiler cache validation", () => {
       expect.stringContaining("immutable cache already exists"),
     );
   });
+
+  describe("save timeout", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("times out a hanging cache save with a warning instead of blocking", async () => {
+      (
+        cache.saveCache as jest.MockedFunction<typeof cache.saveCache>
+      ).mockImplementation(() => new Promise(() => {}));
+
+      jest.useFakeTimers();
+      const savePromise = saveCompilerCache(["/compiler"], "key");
+
+      jest.advanceTimersByTime(10 * 60_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(savePromise).resolves.toBeUndefined();
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Cache save timed out after 10 minutes"),
+      );
+    });
+
+    it("clears the timeout once the save completes", async () => {
+      (
+        cache.saveCache as jest.MockedFunction<typeof cache.saveCache>
+      ).mockResolvedValue(1);
+
+      jest.useFakeTimers();
+      await saveCompilerCache(["/compiler"], "key");
+
+      // The timer must not fire after a successful save.
+      jest.advanceTimersByTime(10 * 60_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      expect(core.warning).not.toHaveBeenCalled();
+    });
+
+    it("honors a custom timeout", async () => {
+      (
+        cache.saveCache as jest.MockedFunction<typeof cache.saveCache>
+      ).mockImplementation(() => new Promise(() => {}));
+
+      jest.useFakeTimers();
+      const savePromise = saveCompilerCache(
+        ["/compiler"],
+        "key",
+        20 * 60_000,
+      );
+
+      jest.advanceTimersByTime(10 * 60_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(core.warning).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(10 * 60_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(savePromise).resolves.toBeUndefined();
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Cache save timed out after 20 minutes"),
+      );
+    });
+  });
 });
