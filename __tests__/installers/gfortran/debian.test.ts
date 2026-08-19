@@ -124,6 +124,10 @@ describe("GFortran Debian Installer", () => {
         cacheKey,
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
         "apt-get",
         "update",
         "-y",
@@ -132,9 +136,17 @@ describe("GFortran Debian Installer", () => {
         "-o",
         "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
       ]);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -143,7 +155,11 @@ describe("GFortran Debian Installer", () => {
         "-o",
         "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "-o",
         `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
@@ -185,6 +201,10 @@ describe("GFortran Debian Installer", () => {
         "gfortran-14",
       ]);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
         "apt-get",
         "update",
         "-y",
@@ -193,7 +213,11 @@ describe("GFortran Debian Installer", () => {
         "-o",
         "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
       ]);
       expect(mockedCache.saveCache).not.toHaveBeenCalled();
     });
@@ -218,6 +242,10 @@ describe("GFortran Debian Installer", () => {
         expect.stringContaining("falling back to an online installation"),
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -226,7 +254,11 @@ describe("GFortran Debian Installer", () => {
         "-o",
         "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "-o",
         `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
@@ -280,8 +312,9 @@ describe("GFortran Debian Installer", () => {
       mockedExec.mockImplementation(async (cmd, args) => {
         if (
           cmd === "sudo" &&
-          args?.[0] === "apt-get" &&
-          args?.[1] === "install"
+          args?.includes("apt-get") &&
+          args?.includes("install") &&
+          !args?.includes("--no-download")
         ) {
           attempts++;
           if (attempts === 1) throw new Error("Apt failure");
@@ -306,7 +339,7 @@ describe("GFortran Debian Installer", () => {
 
       expect(attempts).toBe(2);
       expect(core.warning).toHaveBeenCalledWith(
-        expect.stringContaining("apt-get install failed (attempt 1/5)"),
+        expect.stringContaining("apt-get install failed (attempt 1/3)"),
       );
     });
 

@@ -36,11 +36,6 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
-// for the full GitHub Actions 6h default. Retries are kept low because the
-// retry wrappers below drive them with backoff. Mirrors gfortran/debian.ts.
 const APT_TIMEOUT_OPTS: string[] = [
   "-o",
   "Acquire::http::Timeout=30",

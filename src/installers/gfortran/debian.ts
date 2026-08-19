@@ -43,19 +43,17 @@ function aptCacheOptions(cacheDir: string): string[] {
   return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
 
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — which let the azure apt mirror stall an entire job for 6h.
-// `ConnectTimeout` bounds the connect phase, and a low retry count keeps the
-// total time bounded. `aptGetUpdateWithRetry` separately tolerates update
-// failures on a warm cache.
 const APT_TIMEOUT_OPTS: string[] = [
   "-o",
   "Acquire::http::Timeout=30",
   "-o",
   "Acquire::http::ConnectTimeout=20",
   "-o",
-  "Acquire::Retries=1",
+  "Acquire::https::Timeout=30",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=0",
 ];
 
 export async function installDebian(
@@ -138,11 +136,15 @@ export async function installDebian(
 async function aptGetInstallWithRetry(
   packages: string[],
   cacheDir: string,
-  maxAttempts = 5,
+  maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -175,11 +177,20 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
 
 async function aptGetUpdateWithRetry(
   cacheHit: boolean,
-  maxAttempts = 2,
+  maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+      await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+      ]);
       return;
     } catch (err) {
       // A warm cache already holds the package archives; a transiently

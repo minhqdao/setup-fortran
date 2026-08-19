@@ -103023,19 +103023,17 @@ function aptCacheDir(inputs, version) {
 function aptCacheOptions(cacheDir) {
     return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — which let the azure apt mirror stall an entire job for 6h.
-// `ConnectTimeout` bounds the connect phase, and a low retry count keeps the
-// total time bounded. `aptGetUpdateWithRetry` separately tolerates update
-// failures on a warm cache.
 const APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::http::Timeout=30",
     "-o",
     "Acquire::http::ConnectTimeout=20",
     "-o",
-    "Acquire::Retries=1",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
 ];
 async function installDebian(inputs) {
     const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
@@ -103104,10 +103102,14 @@ async function installDebian(inputs) {
     };
     return result;
 }
-async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 5) {
+async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
                 "apt-get",
                 "install",
                 "-y",
@@ -103136,10 +103138,19 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(cacheHit, maxAttempts = 2) {
+async function aptGetUpdateWithRetry(cacheHit, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...APT_TIMEOUT_OPTS,
+            ]);
             return;
         }
         catch (err) {
@@ -105679,11 +105690,6 @@ const debian_SUPPORTED_VERSIONS = {
     ],
     [Arch.ARM64]: undefined,
 };
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
-// for the full GitHub Actions 6h default. Retries are kept low because the
-// retry wrappers below drive them with backoff. Mirrors gfortran/ifort/debian.ts.
 const debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::http::Timeout=30",
@@ -105696,8 +105702,6 @@ const debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::Retries=0",
 ];
-// wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
-// forever against a dead/unreachable host, stalling the job.
 const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 async function debian_installDebian(inputs) {
     const version = resolveVersion(inputs, debian_SUPPORTED_VERSIONS, {
@@ -106256,11 +106260,6 @@ const ifort_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
     [Arch.ARM64]: undefined,
 };
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
-// for the full GitHub Actions 6h default. Retries are kept low because the
-// retry wrappers below drive them with backoff. Mirrors gfortran/debian.ts.
 const ifort_debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::http::Timeout=30",

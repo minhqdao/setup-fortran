@@ -153,9 +153,7 @@ describe("installDebian ifx", () => {
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifx" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
-          options.listeners.stdout(
-            Buffer.from("ifx (IFX) 2023.2.4 20230101"),
-          );
+          options.listeners.stdout(Buffer.from("ifx (IFX) 2023.2.4 20230101"));
         }
       }
       if (commandLine === "bash" && args?.[1]?.includes("setvars.sh")) {

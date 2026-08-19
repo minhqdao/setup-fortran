@@ -41,11 +41,6 @@ const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-// Fail fast instead of hanging indefinitely on a dead/unreachable apt mirror.
-// `Acquire::http::Timeout` only bounds HTTP receive inactivity, not the TCP
-// connect phase — without `ConnectTimeout` a stalled mirror can stall a job
-// for the full GitHub Actions 6h default. Retries are kept low because the
-// retry wrappers below drive them with backoff. Mirrors gfortran/ifort/debian.ts.
 const APT_TIMEOUT_OPTS = [
   "-o",
   "Acquire::http::Timeout=30",
@@ -59,8 +54,6 @@ const APT_TIMEOUT_OPTS = [
   "Acquire::Retries=0",
 ];
 
-// wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
-// forever against a dead/unreachable host, stalling the job.
 const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 
 export async function installDebian(
