@@ -4,10 +4,9 @@
 
 # setup-fortran
 
-Build and test Fortran projects across compilers, versions, architectures, and
-operating systems with one GitHub Action. `minhqdao/setup-fortran` provides
-reproducible toolchains for GNU, Intel, LLVM, NVIDIA, AMD, Arm, and
-LFortran on Linux, macOS, and Windows.
+Set up Fortran compiler toolchains for GitHub Actions.
+Supports GNU, Intel, LLVM, NVIDIA, AMD, Arm, and LFortran compilers across
+Linux, macOS, and Windows.
 
 ## Usage
 
@@ -24,18 +23,17 @@ LFortran on Linux, macOS, and Windows.
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `compiler`           | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, `armflang`)                                                         | `gfortran` |
 | `version`            | Compiler version to install. Enclose the version string in quotation marks (e.g. `"2026.1.1"` or `"0.64.0"`)                                                   | `latest`   |
-| `msystem`            | MSYS2 subsystem (`native`, `ucrt64`, `clang64`)                                                                                                                | `native`   |
+| `msystem`            | Windows toolchain environment (`native`, `ucrt64`, `clang64`)                                                                                                  | `native`   |
 | `cleanup-disk`       | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`)                                                         | `false`    |
 | `update-environment` | Whether to export toolchain environment variables (`FC`, `CC`, `CXX`, `FPM_*`, `F77`, `F90`, `FORTRAN_COMPILER`) into the runner environment (`true`, `false`) | `true`     |
 
 For compatibility with `fortran-lang/setup-fortran`, the legacy names `gcc`,
 `intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases for
-`gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. These mappings are
-platform-independent: in particular, `intel` always means `ifx` and fails on
-platforms where `ifx` is unsupported; it never falls back to `ifort`. The
-legacy names are deprecated in favor of the canonical names above.
+`gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. Aliases do not
+change based on platform; for example, `intel` always resolves to `ifx`.
+Use of the canonical names is recommended.
 
-## Compiler support
+## Compiler Support
 
 ### `gfortran`
 
@@ -225,7 +223,9 @@ legacy names are deprecated in favor of the canonical names above.
 | 17      | ✓            | ✓            | ✓                | ✓                |          |                |          |                |          |              |              |                |                       |                       |                        |                        |
 | 16      |              | ✓            |                  |                  |          |                |          |                |          |              |              |                |                       |                       |                        |                        |
 
-> Specific patch versions (e.g. `21.1.6`) are also accepted on macOS and native Windows runners and are validated against available GitHub releases. If the requested patch does not exist, an error is thrown. Patches aren't specifically tested.
+> Specific patch versions (e.g. `21.1.6`) are supported on macOS and native
+> Windows runners and validated against available GitHub releases. Patch
+> versions are not individually tested.
 
 ---
 
@@ -242,7 +242,7 @@ legacy names are deprecated in favor of the canonical names above.
 
 ## Examples
 
-### Basic usage
+### Basic Usage
 
 ```yaml
 steps:
@@ -251,9 +251,10 @@ steps:
   - run: ${{ env.FC }} hello.f90
 ```
 
-This defaults to `gfortran` and the newest version available on that platform.
+If omitted, `compiler` defaults to `gfortran` and `version` to the latest
+supported version for the platform.
 
-### Specific version
+### Specific Version
 
 ```yaml
 - uses: minhqdao/setup-fortran@v1
@@ -262,7 +263,7 @@ This defaults to `gfortran` and the newest version available on that platform.
     version: "0.64.0"
 ```
 
-### Matrix build
+### Matrix Build
 
 ```yaml
 strategy:
@@ -308,7 +309,7 @@ jobs:
 | `cc`      | Command or path to the C compiler          |
 | `cxx`     | Command or path to the C++ compiler        |
 
-## Environment variables set
+## Environment Variables
 
 | Variable  | Description                                              |
 | --------- | -------------------------------------------------------- |
@@ -325,17 +326,21 @@ jobs:
 
 Migrating from `fortran-lang/setup-fortran` to `minhqdao/setup-fortran` requires only a few changes:
 
-- The compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases for `gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. Migrating to the canonical names is recommended.
+- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 - `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
-- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. This action consistently uses compiler version numbers, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
+- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
 
 ## Development
 
-Run `npm run all` to format, lint, run unit tests, bundle the code into the `dist` folder, and smoke-test the generated action in one go. Commit the contents of the `dist` folder, too, as GitHub Actions run the code straight from there.
+Run `npm run all` to format and lint the source, run unit tests, bundle the
+action into `dist`, and run the smoke tests.
 
-## Reporting
+Commit changes to `dist` together with the source changes, as GitHub Actions
+executes the bundled code from this directory.
 
-Please submit an [issue](https://github.com/minhqdao/setup-fortran/issues) if you find a problem or would like features to be added.
+## Reporting Issues
+
+Report bugs and feature requests in the [issue tracker](https://github.com/minhqdao/setup-fortran/issues).
 
 ## License
 
