@@ -11,38 +11,44 @@ inputs:
       Fortran compiler to install. Canonical names are `gfortran`, `ifx`,
       `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, and `armflang`.
       Compatibility aliases `gcc`, `intel`, `intel-classic`, and `nvidia-hpc`
-      are also accepted. Defaults to `gfortran`.
+      are also accepted, but canonical names are recommended. Defaults to
+      `gfortran`.
     required: false
     default: gfortran
   version:
-    description: Compiler version to install. Defaults to the latest version.
+    description: >-
+      Compiler version to install. Enclose the version string in quotation marks
+      (e.g. `"2026.1.1"` or `"0.64.0"`). Defaults to the latest version.
     required: false
   msystem:
-    description: Windows environment to use. Defaults to `native`. Ignored on
+    description: >-
+      Windows toolchain environment to use. Defaults to `native`. Ignored on
       non-Windows runners.
     required: false
     default: native
   cleanup-disk:
-    description: 'Free up disk space by removing large pre-installed toolkits'
+    description: >-
+      Free up disk space by removing large pre-installed toolkits. Currently
+      only supported for `nvfortran` installations. Defaults to `false`.
     required: false
-    default: 'false'
+    default: "false"
   update-environment:
     description: >-
       Whether to export toolchain environment variables (FC, CC, CXX, FPM_*,
-      F77, F90, FORTRAN_COMPILER) into the runner environment. Matches the
-      incumbent behavior. Parsed as a strict GitHub boolean. Defaults to `true`.
+      F77, F90, FORTRAN_COMPILER) to the runner environment. Accepts `true` or
+      `false`. Defaults to `true`.
     required: false
-    default: 'true'
+    default: "true"
 
 outputs:
   version:
-    description: The installed compiler version
+    description: The installed compiler version.
   fc:
-    description: The Fortran compiler command or path
+    description: The Fortran compiler command or path.
   cc:
-    description: The C compiler command or path
+    description: The C compiler command or path.
   cxx:
-    description: The C++ compiler command or path
+    description: The C++ compiler command or path.
 
 runs:
   using: node24

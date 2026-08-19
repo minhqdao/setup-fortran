@@ -237,7 +237,7 @@ jobs:
         run: npm run integration-test
 
   canary-report:
-    name: Report canary failures
+    name: Weekly Canary Report
     needs:
       [
         validation,
