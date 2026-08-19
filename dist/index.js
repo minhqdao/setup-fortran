@@ -107470,7 +107470,7 @@ const debian_APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
     "-o",
-    "Acquire::Retries=3",
+    "Acquire::Retries=0",
     "-o",
     "Acquire::http::Timeout=10",
     "-o",
@@ -107576,10 +107576,14 @@ async function flang_debian_installDebian(inputs) {
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     info(`Adding the verified LLVM ${version} apt repository...`);
     await configureLlvmAptRepository(version, inputs.osVersion);
-    await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_NETWORK_OPTIONS]);
+    await flang_debian_aptGetUpdateWithRetry();
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
     await exec_exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -107632,6 +107636,28 @@ async function flang_debian_installDebian(inputs) {
     const resolvedVersion = result.version;
     info(`Flang ${resolvedVersion} installed successfully.`);
     return result;
+}
+async function flang_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            "5m",
+            "apt-get",
+            "update",
+            "-y",
+            ...debian_APT_NETWORK_OPTIONS,
+        ], { ignoreReturnCode: true });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
+        }
+        const delaySeconds = attempt * 10;
+        warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
 }
 async function flang_debian_resolveInstalledVersion(fc) {
     let output = "";
