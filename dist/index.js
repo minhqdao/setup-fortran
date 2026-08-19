@@ -106267,8 +106267,13 @@ const ifort_debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::http::ConnectTimeout=20",
     "-o",
-    "Acquire::Retries=1",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
 ];
+const debian_WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 async function ifort_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, ifort_debian_SUPPORTED_VERSIONS);
     const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
@@ -106296,7 +106301,7 @@ async function ifort_debian_installDebian(inputs) {
         await exec_exec("bash", [
             "-c",
             [
-                `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+                `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
                 `| gpg --dearmor`,
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
@@ -106376,10 +106381,19 @@ async function ifort_debian_resolveInstalledVersion() {
     // We grab just the first line which contains the actual version string.
     return output.trim().split("\n")[0];
 }
-async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 2) {
+async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", ["apt-get", "update", "-y", ...ifort_debian_APT_TIMEOUT_OPTS]);
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...ifort_debian_APT_TIMEOUT_OPTS,
+            ]);
             return;
         }
         catch (err) {
@@ -106394,6 +106408,10 @@ async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
                 "apt-get",
                 "install",
                 "-y",

@@ -47,8 +47,14 @@ const APT_TIMEOUT_OPTS: string[] = [
   "-o",
   "Acquire::http::ConnectTimeout=20",
   "-o",
-  "Acquire::Retries=1",
+  "Acquire::https::Timeout=30",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=0",
 ];
+
+const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 
 export async function installDebian(
   inputs: Inputs,
@@ -90,7 +96,7 @@ export async function installDebian(
     await exec.exec("bash", [
       "-c",
       [
-        `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+        `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
         `| gpg --dearmor`,
         `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
       ].join(" "),
@@ -187,10 +193,19 @@ async function resolveInstalledVersion(): Promise<string> {
   return output.trim().split("\n")[0];
 }
 
-async function aptGetUpdateWithRetry(maxAttempts = 2): Promise<void> {
+async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+      await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+      ]);
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
@@ -209,6 +224,10 @@ async function aptGetInstallWithRetry(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
