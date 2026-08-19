@@ -106876,13 +106876,13 @@ const APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
     "-o",
-    "Acquire::Retries=10",
+    "Acquire::Retries=0",
     "-o",
-    "Acquire::http::Timeout=60",
+    "Acquire::http::Timeout=30",
     "-o",
     "Acquire::http::ConnectTimeout=20",
     "-o",
-    "Acquire::https::Timeout=60",
+    "Acquire::https::Timeout=30",
     "-o",
     "Acquire::https::ConnectTimeout=20",
 ];
@@ -107176,13 +107176,21 @@ async function nvfortran_debian_installDebian(inputs) {
                 ]);
                 info("Updating apt repositories with retry...");
                 await execWithRetry("sudo", [
+                    "timeout",
+                    "--signal=TERM",
+                    "--kill-after=10s",
+                    "5m",
                     "apt-get",
                     "update",
                     "-y",
                     ...APT_NETWORK_OPTIONS,
-                ]);
+                ], 3, 10_000);
                 info(`Installing apt package ${pkgName}...`);
                 await exec_exec("sudo", [
+                    "timeout",
+                    "--signal=TERM",
+                    "--kill-after=30s",
+                    "15m",
                     "apt-get",
                     "install",
                     "-y",
