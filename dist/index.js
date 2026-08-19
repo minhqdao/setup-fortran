@@ -105748,7 +105748,6 @@ async function debian_installDebian(inputs) {
             "install",
             "-y",
             "--no-install-recommends",
-            "--fix-missing",
             ...debian_APT_TIMEOUT_OPTS,
             fortranPkg,
             cppPkg,
@@ -105804,7 +105803,20 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
         if (attempt === maxAttempts) {
             throw new Error(`apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
-        warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Retrying in 15 seconds...`);
+        warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`);
+        await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "10m",
+            "apt-get",
+            "--fix-broken",
+            "install",
+            "-y",
+            ...debian_APT_TIMEOUT_OPTS,
+        ], {
+            ignoreReturnCode: true,
+        });
         await new Promise((resolve) => setTimeout(resolve, 15_000));
     }
 }
