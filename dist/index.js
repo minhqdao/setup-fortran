@@ -105949,10 +105949,6 @@ const IFX_RELEASES = [
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
     },
     {
-        version: "2023.0.0",
-        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/19085/w_HPCKit_p_2023.0.0.25931_offline.exe",
-    },
-    {
         version: "2022.3.0",
         url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
     },
