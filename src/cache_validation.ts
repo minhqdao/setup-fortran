@@ -37,26 +37,10 @@ export async function validateRestoredCompilerCache(
 export async function saveCompilerCache(
   paths: string[],
   key: string,
-  timeoutMs = 10 * 60_000,
 ): Promise<void> {
-  let timeout: NodeJS.Timeout | undefined;
-
   try {
-    await Promise.race([
-      cache.saveCache(paths, key),
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => {
-          reject(
-            new Error(
-              `Cache save timed out after ${Math.round(timeoutMs / 60_000).toString()} minutes`,
-            ),
-          );
-        }, timeoutMs);
-      }),
-    ]);
+    await cache.saveCache(paths, key);
   } catch (error) {
     core.warning(`Could not save compiler cache ${key}: ${String(error)}`);
-  } finally {
-    if (timeout) clearTimeout(timeout);
   }
 }

@@ -359,7 +359,7 @@ async function runInstallerWithRetry(
 }
 
 async function resolveInstalledVersion(): Promise<string> {
-  const versionCommand = "--version";
+  const versionCommand = "-V";
 
   let output = "";
   await exec.exec("ifx", [versionCommand], {

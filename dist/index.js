@@ -105630,24 +105630,12 @@ async function validateRestoredCompilerCache(label, requiredPaths, command, args
     }
     return false;
 }
-async function saveCompilerCache(paths, key, timeoutMs = 10 * 60_000) {
-    let timeout;
+async function saveCompilerCache(paths, key) {
     try {
-        await Promise.race([
-            cache.saveCache(paths, key),
-            new Promise((_, reject) => {
-                timeout = setTimeout(() => {
-                    reject(new Error(`Cache save timed out after ${Math.round(timeoutMs / 60_000).toString()} minutes`));
-                }, timeoutMs);
-            }),
-        ]);
+        await cache.saveCache(paths, key);
     }
     catch (error) {
         warning(`Could not save compiler cache ${key}: ${String(error)}`);
-    }
-    finally {
-        if (timeout)
-            clearTimeout(timeout);
     }
 }
 
@@ -106192,7 +106180,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     }
 }
 async function ifx_win32_resolveInstalledVersion() {
-    const versionCommand = "--version";
+    const versionCommand = "-V";
     let output = "";
     await exec_exec("ifx", [versionCommand], {
         ignoreReturnCode: true,
