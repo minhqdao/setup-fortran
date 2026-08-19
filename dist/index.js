@@ -105663,7 +105663,7 @@ const debian_APT_TIMEOUT_OPTS = [
     "-o",
     "Acquire::https::ConnectTimeout=20",
     "-o",
-    "Acquire::Retries=1",
+    "Acquire::Retries=0",
 ];
 // wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
 // forever against a dead/unreachable host, stalling the job.
@@ -105758,7 +105758,14 @@ async function debian_installDebian(inputs) {
 }
 async function aptInstallWithRetry(args, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await exec_exec("sudo", ["apt-get", ...args], {
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "15m",
+            "apt-get",
+            ...args,
+        ], {
             ignoreReturnCode: true,
         });
         if (exitCode === 0)
@@ -105774,10 +105781,19 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
 // non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
 // a couple of bounded retries rather than stalling the whole job. Total worst
 // case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
-async function debian_aptGetUpdateWithRetry(maxAttempts = 2) {
+async function debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_TIMEOUT_OPTS]);
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...debian_APT_TIMEOUT_OPTS,
+            ]);
             return;
         }
         catch (err) {

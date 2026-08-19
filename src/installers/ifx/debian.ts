@@ -56,7 +56,7 @@ const APT_TIMEOUT_OPTS = [
   "-o",
   "Acquire::https::ConnectTimeout=20",
   "-o",
-  "Acquire::Retries=1",
+  "Acquire::Retries=0",
 ];
 
 // wget is used to fetch the Intel apt GPG key. Without a timeout it would hang
@@ -182,9 +182,20 @@ async function aptInstallWithRetry(
   maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const exitCode = await exec.exec("sudo", ["apt-get", ...args], {
-      ignoreReturnCode: true,
-    });
+    const exitCode = await exec.exec(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
+        "apt-get",
+        ...args,
+      ],
+      {
+        ignoreReturnCode: true,
+      },
+    );
 
     if (exitCode === 0) return;
 
@@ -205,10 +216,19 @@ async function aptInstallWithRetry(
 // non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
 // a couple of bounded retries rather than stalling the whole job. Total worst
 // case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
-async function aptGetUpdateWithRetry(maxAttempts = 2): Promise<void> {
+async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_TIMEOUT_OPTS]);
+      await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+      ]);
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;

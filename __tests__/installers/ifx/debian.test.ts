@@ -68,6 +68,10 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -82,7 +86,7 @@ describe("installDebian ifx", () => {
         "-o",
         "Acquire::https::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2023.2.0",
         "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.0",
       ],
@@ -144,6 +148,10 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -158,7 +166,7 @@ describe("installDebian ifx", () => {
         "-o",
         "Acquire::https::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2025.2",
         "intel-oneapi-compiler-dpcpp-cpp-2025.2",
       ],
@@ -173,6 +181,10 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
@@ -187,7 +199,7 @@ describe("installDebian ifx", () => {
         "-o",
         "Acquire::https::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=1",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2023.2.4",
         "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.4",
       ],
@@ -199,6 +211,10 @@ describe("installDebian ifx", () => {
     await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=10s",
+      "5m",
       "apt-get",
       "update",
       "-y",
@@ -211,7 +227,7 @@ describe("installDebian ifx", () => {
       "-o",
       "Acquire::https::ConnectTimeout=20",
       "-o",
-      "Acquire::Retries=1",
+      "Acquire::Retries=0",
     ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
