@@ -56,6 +56,9 @@ jobs:
           - { compiler: nvfortran, version: "20.11" }
           - { compiler: nvfortran, version: "20.9" }
           - { compiler: nvfortran, version: "20.7" }
+        include:
+          - image: ubuntu-24.04-arm
+            toolchain: { compiler: nvidia-hpc } # test compatibility alias
 
     steps:
       - uses: actions/checkout@v7

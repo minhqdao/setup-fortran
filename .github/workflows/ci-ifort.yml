@@ -35,6 +35,8 @@ jobs:
           - { compiler: ifort, version: "2021.1" }
         include:
           - image: macos-26-intel
+            toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
+          - image: macos-26-intel
             toolchain: { compiler: ifort, version: "2021.10" }
           - image: macos-15-intel
             toolchain: { compiler: ifort, version: "2021.10" }

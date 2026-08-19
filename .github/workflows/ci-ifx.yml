@@ -46,6 +46,8 @@ jobs:
           - { compiler: ifx, version: "2021.1.2" }
           - { compiler: ifx, version: "2021.1.1" }
         include:
+          - image: windows-2022
+            toolchain: { compiler: intel } # test compatibility alias
           - image: ubuntu-24.04
             toolchain: { compiler: ifx, version: "2023.2" } # make sure that minor is resolved to latest patch
           - image: windows-2025
