@@ -20,12 +20,14 @@ const IFORT_BUNDLES = [
   { ifort: "2021.10", bundle: "2023.2.4" },
   { ifort: "2021.9", bundle: "2023.1.0" },
   { ifort: "2021.8", bundle: "2023.0.0" },
+  { ifort: "2021.7.1", bundle: "2022.2.1" },
   { ifort: "2021.7", bundle: "2022.2.0" },
   { ifort: "2021.6", bundle: "2022.1.0" },
   { ifort: "2021.5", bundle: "2022.0.2" },
   { ifort: "2021.4", bundle: "2021.4.0" },
   { ifort: "2021.3", bundle: "2021.3.0" },
   { ifort: "2021.2", bundle: "2021.2.0" },
+  { ifort: "2021.1.2", bundle: "2021.1.2" },
   { ifort: "2021.1", bundle: "2021.1.2" },
 ] as const;
 

@@ -243,4 +243,16 @@ describe("installWin32 (ifx)", () => {
     expect(core.exportVariable).toHaveBeenCalledWith("PATH", "C:\\bin");
     expect(core.exportVariable).toHaveBeenCalledWith("INTEL_VAR", "foo");
   });
+
+  it("resolves intel 2023.0 to the restored 2023.0.0 release", async () => {
+    mockedRestoreCache.mockResolvedValue("cache-hit");
+    const inputs = { ...baseInputs, version: "2023.0" };
+
+    await installWin32(inputs);
+
+    expect(mockedRestoreCache).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining("ifx-win32-validated-v1-x64-2023.0.0"),
+    );
+  });
 });

@@ -24,12 +24,14 @@ jobs:
           - { compiler: ifort, version: "2021.10" }
           - { compiler: ifort, version: "2021.9" }
           - { compiler: ifort, version: "2021.8" }
+          - { compiler: ifort, version: "2021.7.1" }
           - { compiler: ifort, version: "2021.7" }
           - { compiler: ifort, version: "2021.6" }
           - { compiler: ifort, version: "2021.5" }
           - { compiler: ifort, version: "2021.4" }
           - { compiler: ifort, version: "2021.3" }
           - { compiler: ifort, version: "2021.2" }
+          - { compiler: ifort, version: "2021.1.2" }
           - { compiler: ifort, version: "2021.1" }
         include:
           - image: macos-26-intel

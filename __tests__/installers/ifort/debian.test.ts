@@ -170,4 +170,52 @@ describe("installDebian (ifort)", () => {
     expect(result.cc).toBe("icx");
     expect(result.cxx).toBe("icpx");
   });
+
+  it("installs the 2021.1.2 legacy spelling as oneAPI 2021.1.2 packages", async () => {
+    const inputs = { ...baseInputs, version: "2021.1.2" };
+    await installDebian(inputs);
+
+    expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+      ["/opt/intel/oneapi"],
+      "oneapi-ifort-validated-v1-x64-2021.1.2",
+    );
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=30",
+      "-o",
+      "Acquire::http::ConnectTimeout=20",
+      "-o",
+      "Acquire::Retries=1",
+      "--no-install-recommends",
+      "intel-oneapi-compiler-fortran-2021.1.2",
+      "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2021.1.2",
+    ]);
+  });
+
+  it("installs the 2021.7.1 legacy spelling as oneAPI 2022.2.1 packages", async () => {
+    const inputs = { ...baseInputs, version: "2021.7.1" };
+    await installDebian(inputs);
+
+    expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+      ["/opt/intel/oneapi"],
+      "oneapi-ifort-validated-v1-x64-2022.2.1",
+    );
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "apt-get",
+      "install",
+      "-y",
+      "-o",
+      "Acquire::http::Timeout=30",
+      "-o",
+      "Acquire::http::ConnectTimeout=20",
+      "-o",
+      "Acquire::Retries=1",
+      "--no-install-recommends",
+      "intel-oneapi-compiler-fortran-2022.2.1",
+      "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.2.1",
+    ]);
+  });
 });

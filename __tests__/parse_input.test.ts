@@ -204,7 +204,7 @@ describe("parseInputs", () => {
       const inputs = parseInputs();
       expect(inputs.compiler).toBe(Compiler.IFX);
       await expect(installIFX(inputs)).rejects.toThrow(
-        "ifx is not supported on macOS. Use ifort, or exclude {compiler: ifx, os: macos} from your build matrix.",
+        "ifx is not supported on macOS.",
       );
     });
 

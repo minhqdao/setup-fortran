@@ -105949,6 +105949,10 @@ const IFX_RELEASES = [
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
     },
     {
+        version: "2023.0.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/19085/w_HPCKit_p_2023.0.0.25931_offline.exe",
+    },
+    {
         version: "2022.3.0",
         url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
     },
@@ -106154,7 +106158,11 @@ async function installIFX(inputs) {
         case OS.Linux:
             return await debian_installDebian(inputs);
         case OS.MacOS:
-            throw new Error(`ifx is not supported on macOS. Use ifort, or exclude {compiler: ifx, os: macos} from your build matrix.`);
+            throw new Error(`ifx is not supported on macOS. The previous fortran-lang/setup-fortran ` +
+                `action silently treated "compiler: intel" as intel-classic (ifort) on ` +
+                `macOS instead of installing ifx. Migrate those matrix entries to ` +
+                `"compiler: ifort", or exclude ` +
+                `{compiler: ifx, os: macos} from your build matrix.`);
         case OS.Windows:
             return await win32_installWin32(inputs);
     }
@@ -106179,12 +106187,14 @@ const IFORT_BUNDLES = [
     { ifort: "2021.10", bundle: "2023.2.4" },
     { ifort: "2021.9", bundle: "2023.1.0" },
     { ifort: "2021.8", bundle: "2023.0.0" },
+    { ifort: "2021.7.1", bundle: "2022.2.1" },
     { ifort: "2021.7", bundle: "2022.2.0" },
     { ifort: "2021.6", bundle: "2022.1.0" },
     { ifort: "2021.5", bundle: "2022.0.2" },
     { ifort: "2021.4", bundle: "2021.4.0" },
     { ifort: "2021.3", bundle: "2021.3.0" },
     { ifort: "2021.2", bundle: "2021.2.0" },
+    { ifort: "2021.1.2", bundle: "2021.1.2" },
     { ifort: "2021.1", bundle: "2021.1.2" },
 ];
 const ifort_debian_SUPPORTED_VERSIONS = {

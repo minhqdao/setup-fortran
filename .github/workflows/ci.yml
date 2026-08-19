@@ -32,9 +32,9 @@ jobs:
   #   needs: [validation]
   #   uses: ./.github/workflows/ci-flang.yml
 
-  # ifort:
-  #   needs: [validation]
-  #   uses: ./.github/workflows/ci-ifort.yml
+  ifort:
+    needs: [validation]
+    uses: ./.github/workflows/ci-ifort.yml
 
   ifx:
     needs: [validation]
