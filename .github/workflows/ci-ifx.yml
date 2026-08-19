@@ -204,3 +204,39 @@ jobs:
           cxx: ${{ steps.setup.outputs.cxx }}
       - name: Run Integration Tests
         run: npm run integration-test
+
+  negative-macos-fallback:
+    name: intel on macOS fails (no silent ifort fallback)
+    runs-on: macos-26-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install intel on macOS (must fail)
+        id: setup
+        uses: ./
+        with:
+          compiler: intel
+        continue-on-error: true
+        timeout-minutes: 20
+
+      - name: Assert expected failure and no substituted outputs
+        if: always()
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          FC_OUT: ${{ steps.setup.outputs.fc }}
+          CC_OUT: ${{ steps.setup.outputs.cc }}
+          CXX_OUT: ${{ steps.setup.outputs.cxx }}
+          VERSION_OUT: ${{ steps.setup.outputs.version }}
+        run: |
+          echo "Asserting: outcome=$OUTCOME  fc=$FC_OUT  cc=$CC_OUT  cxx=$CXX_OUT  version=$VERSION_OUT"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::Expected 'intel' on macOS to fail, but outcome=$OUTCOME"
+            exit 1
+          fi
+          for value in "$FC_OUT" "$CC_OUT" "$CXX_OUT" "$VERSION_OUT"; do
+            if [ -n "$value" ]; then
+              echo "::error::Expected empty output after failure, got: $value"
+              exit 1
+            fi
+          done
+          echo "intel on macOS failed as expected with no silently substituted compiler"
