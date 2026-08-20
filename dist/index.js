@@ -106082,7 +106082,10 @@ async function win32_installWin32(inputs) {
         info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
-        await runInstallerWithRetry(installerPath);
+        const extraArgs = isFullKitInstaller(release.url)
+            ? [`--components=${await resolveFortranComponentId(installerPath)}`]
+            : [];
+        await runInstallerWithRetry(installerPath, extraArgs);
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);
     }
@@ -106165,7 +106168,29 @@ async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
     }
     throw lastError;
 }
-async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
+function isFullKitInstaller(url) {
+    return /hpckit|hpc-toolkit/i.test(url);
+}
+async function resolveFortranComponentId(installerPath) {
+    let output = "";
+    await exec_exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
+    if (!line) {
+        throw new Error("Could not find the Fortran compiler component in --list-components output. This is a bug — please open an issue.");
+    }
+    const id = line.trim().split(/\s+/)[0];
+    if (!id) {
+        throw new Error(`Failed to parse component ID from line: "${line}"`);
+    }
+    return id;
+}
+async function runInstallerWithRetry(installerPath, extraArgs = [], maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const exitCode = await exec_exec(`"${installerPath}"`, [
             "-s",
@@ -106175,6 +106200,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
             "accept",
             "-p=NEED_VS2019_INTEGRATION=0",
             "-p=NEED_VS2022_INTEGRATION=0",
+            ...extraArgs,
         ], { ignoreReturnCode: true });
         // 0 = Success, 1001 = Already installed
         if (exitCode === 0 || exitCode === 1001) {
