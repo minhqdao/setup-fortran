@@ -107097,21 +107097,21 @@ async function installLegacyNcurses(inputs) {
     const packages = {
         arm64: {
             libtinfo5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
+                url: "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libtinfo5_6.3-2_arm64.deb",
                 sha256: "bff6bf29035a4bbd5aa3584bfbc86c2d414cb468a22dbd09fe601b0d39ce4e67",
             },
             libncursesw5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+                url: "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libncursesw5_6.3-2_arm64.deb",
                 sha256: "4abc034de6d0fe55032bdee039603b7a361ca1980c4f7faf781b64496ef0412a",
             },
         },
         amd64: {
             libtinfo5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
+                url: "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2_amd64.deb",
                 sha256: "d2597b5aec92a930cf549e1b429ad892595813e72ec7814685ea146a9fb715e5",
             },
             libncursesw5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+                url: "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncursesw5_6.3-2_amd64.deb",
                 sha256: "2cfb737d61b4243846ba3f8d70dac7307fab355aa43cbd2cb9d023bf8d606a5c",
             },
         },
