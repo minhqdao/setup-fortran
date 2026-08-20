@@ -133,6 +133,13 @@ const SUPPORTED_VERSIONS = {
   },
 } satisfies Record<Arch, Record<Msystem, readonly string[] | undefined>>;
 
+const LEGACY_KIT_VERSIONS = new Set([
+  "2022.2.0",
+  "2022.3.0",
+  "2023.1.0",
+  "2023.2.0",
+]);
+
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
@@ -209,9 +216,13 @@ export async function installWin32(
     await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
-    const extraArgs = isFullKitInstaller(release.url)
-      ? [`--components=${await resolveFortranComponentId(installerPath)}`]
-      : [];
+    const extraArgs: string[] = [];
+    if (supportsComponentFilter(version, release.url)) {
+      const componentId = await resolveFortranComponentId(installerPath);
+      if (componentId) {
+        extraArgs.push(`--components=${componentId}`);
+      }
+    }
     await runInstallerWithRetry(installerPath, extraArgs);
 
     core.info("Saving installation to cache...");
@@ -327,9 +338,13 @@ function isFullKitInstaller(url: string): boolean {
   return /hpckit|hpc-toolkit/i.test(url);
 }
 
+function supportsComponentFilter(version: string, url: string): boolean {
+  return isFullKitInstaller(url) && !LEGACY_KIT_VERSIONS.has(version);
+}
+
 async function resolveFortranComponentId(
   installerPath: string,
-): Promise<string> {
+): Promise<string | undefined> {
   let output = "";
   await exec.exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
     listeners: {
@@ -341,9 +356,11 @@ async function resolveFortranComponentId(
 
   const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
   if (!line) {
-    throw new Error(
-      "Could not find the Fortran compiler component in --list-components output. This is a bug — please open an issue.",
+    core.info(
+      "This installer doesn't expose the Fortran compiler as a separately " +
+        "installable component; installing the full kit instead.",
     );
+    return undefined;
   }
 
   const id = line.trim().split(/\s+/)[0];

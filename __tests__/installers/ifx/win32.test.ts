@@ -195,7 +195,7 @@ describe("installWin32 (ifx)", () => {
       );
     });
 
-    it("fails fast when the Fortran component cannot be found", async () => {
+    it("falls back to a full kit install when no component is listed", async () => {
       mockFullKitInstallerFlow(
         [
           "intel.oneapi.win.mkl.devel  2025.3.1  Intel oneAPI Math Kernel Library",
@@ -203,15 +203,38 @@ describe("installWin32 (ifx)", () => {
         ].join("\n"),
       );
 
-      await expect(installWin32(fullKitInputs)).rejects.toThrow(
-        "Could not find the Fortran compiler component",
-      );
+      await installWin32(fullKitInputs);
 
-      // The silent install must never be attempted if the component resolution
-      // fails, otherwise we'd silently fall back to a full HPC kit install.
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "This installer doesn't expose the Fortran compiler as a separately " +
+            "installable component; installing the full kit instead.",
+        ),
+      );
+      // Degrades gracefully: installs the full kit without any --components.
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        silentArgs,
+        { ignoreReturnCode: true },
+      );
+      expect(cache.saveCache).toHaveBeenCalled();
+    });
+
+    it("does not probe the component list for legacy HPC kits", async () => {
+      // 2023.1.0 is one of the older w_HPCKit bootstrappers that reportedly
+      // chokes on --components; legacy kits install in full.
+      mockFullKitInstallerFlow("");
+
+      await installWin32({ ...baseInputs, version: "2023.1.0" });
+
       expect(mockedExec).not.toHaveBeenCalledWith(
         '"C:\\Temp\\installer.exe"',
-        expect.arrayContaining(["--silent"]),
+        expect.arrayContaining(["--list-components"]),
+      );
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        silentArgs,
+        { ignoreReturnCode: true },
       );
     });
   });
