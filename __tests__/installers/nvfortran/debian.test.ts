@@ -32,6 +32,7 @@ describe("installDebian nvfortran", () => {
     osVersion: "22.04",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -176,7 +177,7 @@ describe("installDebian nvfortran", () => {
       }
       if (
         commandLine === "sudo" &&
-        args?.[0] === "apt-get" &&
+        args?.includes("apt-get") &&
         args.includes("nvhpc-26-3")
       ) {
         throw new Error("404 Not Found");
@@ -190,7 +191,7 @@ describe("installDebian nvfortran", () => {
       mockedExec.mock.calls.filter(
         ([command, args]) =>
           command === "sudo" &&
-          args?.[0] === "apt-get" &&
+          args?.includes("apt-get") &&
           args.includes("nvhpc-26-3"),
       ),
     ).toHaveLength(1);

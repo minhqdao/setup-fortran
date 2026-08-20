@@ -38,6 +38,7 @@ describe("installDebian (ArmFlang)", () => {
     arch: Arch.ARM64,
     msystem: Msystem.Native,
     cleanupDisk: false,
+    updateEnvironment: true,
   };
 
   beforeEach(() => {

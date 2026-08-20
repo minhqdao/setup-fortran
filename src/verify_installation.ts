@@ -100,6 +100,173 @@ function verifyNativeWindowsTools(): void {
   }
 }
 
+/**
+ * Verify that the advertised C and C++ companion compilers ($CC / $CXX) are
+ * actually installed and callable, not merely set as environment variables.
+ * This catches cases like ifort 2024+ bundles where `icc`/`icpc` may no
+ * longer be provided even though the action returns those names.
+ */
+function verifyCompanionCompilers(): void {
+  const cc = process.env.CC;
+  const cxx = process.env.CXX;
+
+  if (!cc || !cxx) {
+    throw new Error(
+      `Cannot verify companion compilers: CC=${cc ?? "unset"}, CXX=${cxx ?? "unset"}`,
+    );
+  }
+
+  // Verify F77 and F90 aliases match FC — downstream build systems
+  // (autotools, CMake FindFortran) may use F77/F90 instead of FC
+  const fc = process.env.FC;
+  if (!fc) {
+    throw new Error("FC is not set; cannot check F77/F90 sync.");
+  }
+  if (process.env.F77 !== fc) {
+    throw new Error(
+      `F77 env var (${process.env.F77 ?? "unset"}) does not match FC (${fc}).`,
+    );
+  }
+  if (process.env.F90 !== fc) {
+    throw new Error(
+      `F90 env var (${process.env.F90 ?? "unset"}) does not match FC ($fc).`,
+    );
+  }
+
+  const isWindows = process.platform === "win32";
+  const checkTool = (tool: string, label: string): void => {
+    try {
+      if (isWindows) {
+        // `where.exe` only accepts a *filename pattern* to search for on PATH;
+        // passing an absolute path (which the gfortran/flang/lfortran
+        // installers advertise as $CC/$CXX) always fails with exit code 1.
+        // Invoke the compiler directly instead, mirroring the pwsh/cmd
+        // shell checks that run in CI.
+        try {
+          execFileSync(tool, ["--version"], {
+            encoding: "utf8",
+            stdio: "pipe",
+          });
+        } catch {
+          // MSVC-style compilers (e.g. icl) reject `--version`.
+          execFileSync(tool, ["/?"], { encoding: "utf8", stdio: "pipe" });
+        }
+      } else {
+        execFileSync(tool, ["--version"], {
+          encoding: "utf8",
+          stdio: "pipe",
+        });
+      }
+    } catch {
+      throw new Error(
+        `Companion compiler ${label}="${tool}" is not callable. ` +
+          `The action advertised this compiler but it could not be executed.`,
+      );
+    }
+  };
+
+  checkTool(cc, "CC");
+  checkTool(cxx, "CXX");
+}
+
+/**
+ * Verify that the Fortran compiler can be discovered by its unversioned
+ * driver name (e.g. `gfortran` rather than `gfortran-14`). Some downstream
+ * workflows invoke `command -v gfortran` directly.
+ */
+function verifyUnversionedExecutable(): void {
+  const fc = process.env.FC;
+  if (!fc) {
+    throw new Error("FC is not set; cannot check unversioned discovery.");
+  }
+
+  // Use the unversioned driver name downstream workflows actually invoke,
+  // not the versioned $FC. `aocc` is a distribution selector, not an
+  // executable: the driver it installs is `flang`.
+  const DRIVER_NAMES: Record<string, string> = { aocc: "flang" };
+  const compilerName = process.env.FORTRAN_COMPILER ?? "";
+  if (!compilerName) {
+    throw new Error(
+      "FORTRAN_COMPILER is not set; cannot check unversioned discovery.",
+    );
+  }
+
+  const driverName = DRIVER_NAMES[compilerName] ?? compilerName;
+  const isWindows = process.platform === "win32";
+  // On Windows, `where.exe` locates executables with or without the `.exe`
+  // suffix, so we strip it for a cleaner lookup.
+  const lookupName = isWindows ? driverName.replace(/\.exe$/i, "") : driverName;
+
+  try {
+    if (isWindows) {
+      execFileSync("where.exe", [lookupName], {
+        encoding: "utf8",
+        stdio: "pipe",
+      });
+    } else {
+      execFileSync("command", ["-v", lookupName], {
+        encoding: "utf8",
+        stdio: "pipe",
+        shell: true,
+      });
+    }
+  } catch {
+    throw new Error(
+      `Unversioned Fortran compiler "${lookupName}" is not discoverable on PATH. ` +
+        `Downstream workflows that call \`command -v ${lookupName}\` will fail.`,
+    );
+  }
+}
+
+/**
+ * Verify that Intel oneAPI environment variables were propagated from
+ * `setvars.sh`/`setvars.bat`. The installers filter and export a subset
+ * including LIBRARY_PATH, CPATH, CMAKE_PREFIX_PATH, and oneAPI-specific vars.
+ */
+function verifyIntelEnv(): void {
+  const fortranCompiler = process.env.FORTRAN_COMPILER ?? "";
+  if (!["ifx", "ifort"].includes(fortranCompiler)) {
+    return;
+  }
+
+  const intelVars = Object.entries(process.env).filter(([key]) =>
+    /^.*(INTEL|ONEAPI|MKL|LIBRARY_PATH|CPATH|CMAKE_PREFIX_PATH|CMAKE_MODULE_PATH)$/i.test(
+      key,
+    ),
+  );
+
+  if (intelVars.length === 0) {
+    throw new Error(
+      `Intel compiler ${fortranCompiler} installed but no oneAPI environment ` +
+        "variables were propagated. Expected at least one of: LIBRARY_PATH, " +
+        "CPATH, CMAKE_PREFIX_PATH, and INTEL/ONEAPI/MKL vars.",
+    );
+  }
+
+  console.log(
+    `Intel environment verified: ${String(intelVars.length)} oneAPI vars propagated.`,
+  );
+}
+
+/**
+ * Verify that NVIDIA HPC environment variables are available. The installer
+ * exports LD_LIBRARY_PATH including the NVIDIA lib directory.
+ */
+function verifyNvidiaEnv(): void {
+  const fortranCompiler = process.env.FORTRAN_COMPILER ?? "";
+  if (fortranCompiler !== "nvfortran") {
+    return;
+  }
+
+  const ldLibraryPath = process.env.LD_LIBRARY_PATH ?? "";
+  if (!ldLibraryPath) {
+    throw new Error(
+      "NVIDIA HPC compiler installed but LD_LIBRARY_PATH is not set. " +
+        "The NVIDIA lib directory should be on LD_LIBRARY_PATH for runtime.",
+    );
+  }
+}
+
 function run(): void {
   try {
     const fc = process.env.FC;
@@ -187,6 +354,10 @@ function run(): void {
     }
 
     verifyNativeWindowsTools();
+    verifyCompanionCompilers();
+    verifyUnversionedExecutable();
+    verifyIntelEnv();
+    verifyNvidiaEnv();
 
     console.log("Installation verification successful!");
   } catch (error) {
@@ -199,4 +370,6 @@ function run(): void {
   }
 }
 
-run();
+if (process.env.SETUP_FORTRAN_BUNDLE_SMOKE_TEST !== "1") {
+  run();
+}

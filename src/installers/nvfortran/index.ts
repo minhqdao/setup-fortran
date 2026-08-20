@@ -5,7 +5,7 @@ export async function installNVFortran(
   inputs: Inputs,
 ): Promise<InstallationResult> {
   if (inputs.os !== OS.Linux) {
-    throw new Error(`NVFortran is only supported on Linux (got: ${inputs.os})`);
+    throw new Error(`nvfortran is only supported on Linux. Got: ${inputs.os}`);
   }
   return await installDebian(inputs);
 }

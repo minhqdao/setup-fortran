@@ -12,6 +12,7 @@ jobs:
     name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
       matrix.toolchain.msystem }}
     if: github.actor != 'dependabot[bot]'
+    timeout-minutes: 60
     runs-on: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -45,6 +46,8 @@ jobs:
           - { compiler: ifx, version: "2021.1.2" }
           - { compiler: ifx, version: "2021.1.1" }
         include:
+          - image: windows-2022
+            toolchain: { compiler: intel } # test compatibility alias
           - image: ubuntu-24.04
             toolchain: { compiler: ifx, version: "2023.2" } # make sure that minor is resolved to latest patch
           - image: windows-2025
@@ -172,6 +175,7 @@ jobs:
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
         uses: ./
+        timeout-minutes: 30
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
@@ -191,5 +195,48 @@ jobs:
           echo "  CC:      ${{ steps.setup.outputs.cc }}"
           echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
       - name: Run Integration Tests
         run: npm run integration-test
+
+  negative-macos-fallback:
+    name: intel on macOS fails (no silent ifort fallback)
+    runs-on: macos-26-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install intel on macOS (must fail)
+        id: setup
+        uses: ./
+        with:
+          compiler: intel
+        continue-on-error: true
+        timeout-minutes: 20
+
+      - name: Assert expected failure and no substituted outputs
+        if: always()
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          FC_OUT: ${{ steps.setup.outputs.fc }}
+          CC_OUT: ${{ steps.setup.outputs.cc }}
+          CXX_OUT: ${{ steps.setup.outputs.cxx }}
+          VERSION_OUT: ${{ steps.setup.outputs.version }}
+        run: |
+          echo "Asserting: outcome=$OUTCOME  fc=$FC_OUT  cc=$CC_OUT  cxx=$CXX_OUT  version=$VERSION_OUT"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::Expected 'intel' on macOS to fail, but outcome=$OUTCOME"
+            exit 1
+          fi
+          for value in "$FC_OUT" "$CC_OUT" "$CXX_OUT" "$VERSION_OUT"; do
+            if [ -n "$value" ]; then
+              echo "::error::Expected empty output after failure, got: $value"
+              exit 1
+            fi
+          done
+          echo "intel on macOS failed as expected with no silently substituted compiler"

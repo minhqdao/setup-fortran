@@ -24,14 +24,18 @@ jobs:
           - { compiler: ifort, version: "2021.10" }
           - { compiler: ifort, version: "2021.9" }
           - { compiler: ifort, version: "2021.8" }
+          - { compiler: ifort, version: "2021.7.1" }
           - { compiler: ifort, version: "2021.7" }
           - { compiler: ifort, version: "2021.6" }
           - { compiler: ifort, version: "2021.5" }
           - { compiler: ifort, version: "2021.4" }
           - { compiler: ifort, version: "2021.3" }
           - { compiler: ifort, version: "2021.2" }
+          - { compiler: ifort, version: "2021.1.2" }
           - { compiler: ifort, version: "2021.1" }
         include:
+          - image: macos-26-intel
+            toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
           - image: macos-26-intel
             toolchain: { compiler: ifort, version: "2021.10" }
           - image: macos-15-intel
@@ -122,6 +126,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+        timeout-minutes: 30
 
       - name: Verify installation
         shell: bash
@@ -138,5 +143,12 @@ jobs:
           echo "  CC:      ${{ steps.setup.outputs.cc }}"
           echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
       - name: Run Integration Tests
         run: npm run integration-test

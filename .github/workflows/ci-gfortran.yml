@@ -41,6 +41,8 @@ jobs:
           - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: ubuntu-24.04
+            toolchain: { compiler: gcc } # test compatibility alias
           - image: windows-2025
             toolchain: { compiler: gfortran, msystem: ucrt64 } # only latest version available from Pacman
           - image: windows-2022
@@ -76,6 +78,7 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
           msystem: ${{ matrix.toolchain.msystem }}
+        timeout-minutes: 30
 
       - name: Verify installation
         env:
@@ -91,5 +94,12 @@ jobs:
           echo "  CC:      ${{ steps.setup.outputs.cc }}"
           echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
 
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
       - name: Run Integration Tests
         run: npm run integration-test

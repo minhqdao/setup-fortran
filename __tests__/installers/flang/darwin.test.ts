@@ -25,6 +25,7 @@ jest.mock("@actions/tool-cache", () => ({
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  symlinkSync: jest.fn(),
 }));
 
 describe("installDarwin (Flang)", () => {
@@ -67,6 +68,7 @@ describe("installDarwin (Flang)", () => {
     osVersion: "13",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -113,6 +115,26 @@ describe("installDarwin (Flang)", () => {
     );
     expect(mockedTc.extractTar).toHaveBeenCalled();
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
+  });
+
+  it("creates an unversioned flang symlink when only flang-new is present (LLVM < 20)", async () => {
+    const inputs = { ...baseInputs, version: "19" };
+    mockedTc.find.mockReturnValue("");
+    mockedTc.downloadTool.mockResolvedValue("/tmp/llvm19.tar.xz");
+    mockedTc.extractTar.mockResolvedValue("/tmp/llvm19-extracted");
+    mockedTc.cacheDir.mockResolvedValue("/cache/llvm19");
+
+    // Simulate an LLVM 19 archive that ships only `flang-new` (no bare `flang`).
+    const binDir = "/cache/llvm19/bin";
+    mockedFs.existsSync.mockImplementation((p: fs.PathLike) => {
+      if (String(p) === `${binDir}/flang`) return false;
+      return true; // flang-new, clang, clang++ all present
+    });
+
+    await installDarwin(inputs);
+
+    const flangNew = `${binDir}/flang-new`;
+    expect(fs.symlinkSync).toHaveBeenCalledWith(flangNew, `${binDir}/flang`);
   });
 
   it("exports environment variables", async () => {

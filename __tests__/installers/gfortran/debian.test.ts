@@ -25,6 +25,7 @@ describe("GFortran Debian Installer", () => {
     osVersion: "20.04.6",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -113,29 +114,52 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("always updates apt and installs gfortran on cache miss", async () => {
-      await installDebian(baseInputs);
+      const result = await installDebian(baseInputs);
 
+      expect(result.fc).toBe("gfortran-14");
+      expect(result.cc).toBe("gcc-14");
+      expect(result.cxx).toBe("g++-14");
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
         [cacheDir],
         cacheKey,
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
         "apt-get",
         "update",
         "-y",
         "-o",
-        "Acquire::http::Timeout=60",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::Retries=3",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
       ]);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         "-o",
-        "Acquire::http::Timeout=60",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::Retries=3",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "-o",
         `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
@@ -177,13 +201,23 @@ describe("GFortran Debian Installer", () => {
         "gfortran-14",
       ]);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
         "apt-get",
         "update",
         "-y",
         "-o",
-        "Acquire::http::Timeout=60",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::Retries=3",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
       ]);
       expect(mockedCache.saveCache).not.toHaveBeenCalled();
     });
@@ -208,13 +242,23 @@ describe("GFortran Debian Installer", () => {
         expect.stringContaining("falling back to an online installation"),
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         "-o",
-        "Acquire::http::Timeout=60",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::Retries=3",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "-o",
         `Dir::Cache::archives=${cacheDir}`,
         "gcc-14",
@@ -268,8 +312,9 @@ describe("GFortran Debian Installer", () => {
       mockedExec.mockImplementation(async (cmd, args) => {
         if (
           cmd === "sudo" &&
-          args?.[0] === "apt-get" &&
-          args?.[1] === "install"
+          args?.includes("apt-get") &&
+          args?.includes("install") &&
+          !args?.includes("--no-download")
         ) {
           attempts++;
           if (attempts === 1) throw new Error("Apt failure");
@@ -294,7 +339,7 @@ describe("GFortran Debian Installer", () => {
 
       expect(attempts).toBe(2);
       expect(core.warning).toHaveBeenCalledWith(
-        expect.stringContaining("apt-get install failed (attempt 1/5)"),
+        expect.stringContaining("apt-get install failed (attempt 1/3)"),
       );
     });
 

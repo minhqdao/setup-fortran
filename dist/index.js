@@ -102615,6 +102615,13 @@ const DEFAULTS = {
     version: LATEST,
     msystem: Msystem.Native,
     cleanupDisk: false,
+    updateEnvironment: true,
+};
+const COMPILER_ALIASES = {
+    gcc: Compiler.GFortran,
+    intel: Compiler.IFX,
+    "intel-classic": Compiler.IFort,
+    "nvidia-hpc": Compiler.NVFortran,
 };
 function detectOS() {
     switch (process.platform) {
@@ -102683,10 +102690,16 @@ function detectArch() {
     }
 }
 function parseCompiler(raw) {
-    const valid = Object.values(Compiler);
+    const canonicalCompilers = Object.values(Compiler);
     const val = raw.toLowerCase().trim();
-    if (valid.includes(val))
-        return val;
+    const compiler = COMPILER_ALIASES[val] ?? val;
+    if (canonicalCompilers.includes(compiler)) {
+        if (val in COMPILER_ALIASES) {
+            warning(`The compiler selector "${val}" is deprecated; please use "${compiler}" instead.`);
+        }
+        return compiler;
+    }
+    const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
     throw new Error(`Unknown compiler "${raw}". Valid options: ${valid.join(", ")}`);
 }
 function parseMsystem(raw) {
@@ -102700,7 +102713,8 @@ function parseInputs() {
     const rawCompiler = getInput("compiler").trim() || DEFAULTS.compiler;
     const rawVersion = getInput("version").trim() || DEFAULTS.version;
     const rawMsystem = getInput("msystem").trim();
-    const cleanupDisk = getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+    const cleanupDisk = getBooleanInput("cleanup-disk");
+    const updateEnvironment = getBooleanInput("update-environment");
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
     const inputs = {
@@ -102711,6 +102725,7 @@ function parseInputs() {
         arch: detectArch(),
         msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
         cleanupDisk,
+        updateEnvironment,
     };
     return inputs;
 }
@@ -102805,14 +102820,48 @@ async function fetchJsonWithRetry(url, options = {}) {
 // ==========================================
 // Exported Core Functions
 // ==========================================
-function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+// Compilers whose supported-version tables use bare integer majors (e.g.
+// gfortran "14", flang "19"). For these a bare numeric input is a legitimate
+// table entry. Every other compiler (ifx/ifort year releases, nvfortran,
+// lfortran, aocc, armflang) only ships dotted/quoted releases, so a bare
+// numeric input is ambiguous — it is almost always a GitHub Actions-coerced
+// `YYYY.0` — and is rejected with an actionable error instead of guessed.
+const BARE_NUMERIC_ACCEPTED_COMPILERS = new Set([
+    Compiler.GFortran,
+    Compiler.Flang,
+]);
+/**
+ * Normalizes a version string by stripping a trailing `.0` patch segment.
+ * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
+ * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
+ * while the replacement tracks releases by minor version (`5.1`).
+ */
+function stripTrailingPatchZero(version) {
+    const match = /^(\d+\.\d+)\.0$/.exec(version);
+    return match ? match[1] : version;
+}
+function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, } = {}) {
     const versions = supportedVersions[inputs.arch];
     if (!versions) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
-    const version = inputs.version === LATEST ? versions[0] : inputs.version;
-    if (!version) {
+    const rawVersion = inputs.version === LATEST ? versions[0] : inputs.version;
+    if (!rawVersion) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
+    }
+    // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
+    // replacement's minor-version release entry. Only strips a trailing .0;
+    // X.Y.1 and other patch versions are left untouched so that genuinely
+    // unsupported versions still produce a clear error.
+    const version = stripPatchZero
+        ? stripTrailingPatchZero(rawVersion)
+        : rawVersion;
+    // Inform the user that AOCC releases are tracked by major.minor only, so
+    // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
+    if (stripPatchZero && version !== rawVersion) {
+        warning(`The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
+            `version "${rawVersion}" was normalized to "${version}". Consider ` +
+            `dropping the patch number.`);
     }
     const versionList = versions;
     if (!versionList.includes(version)) {
@@ -102830,6 +102879,27 @@ function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, 
                 return match;
             }
         }
+        // A bare numeric version is never a valid table entry for the year-based
+        // compilers (ifx/ifort/nvfortran/lfortran/aocc/armflang). GitHub Actions
+        // coerces an unquoted `version: 2026.0` YAML number to the bare string
+        // "2026", silently dropping the trailing `.0`. That input is ambiguous
+        // (it could mean that exact release or the latest release in the series),
+        // so we refuse to guess and point the user at exact, quoted table entries.
+        // gfortran/flang accept bare integer majors and are exempt. The
+        // unrecoverable trailing-zero collision (2021.10 -> "2021.1") is handled
+        // above by the patch-prefix fall through and is documented in the README
+        // as a quoting requirement.
+        if (!BARE_NUMERIC_ACCEPTED_COMPILERS.has(inputs.compiler) &&
+            /^\d+$/.test(version)) {
+            const examples = versions.slice(0, 2).map((v) => `"${v}"`);
+            throw new Error(`${inputs.compiler} version "${version}" is ambiguous and must be ` +
+                `quoted exactly as listed in the supported-version table. GitHub ` +
+                `Actions coerces unquoted YAML numbers into bare strings, silently ` +
+                `dropping segments like ".0", so the intended release is unclear; ` +
+                `specify the full release (e.g. ${examples.join(" or ")}) wrapped ` +
+                `in quotes. (gfortran and flang accept bare integer majors such as ` +
+                `"14" or "19".) Supported versions: ${versions.join(", ")}`);
+        }
         throw new Error(`${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
             `Supported versions: ${versions.join(", ")}`);
     }
@@ -102843,7 +102913,7 @@ function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = 
     const msystem = inputs.msystem;
     const versions = archVersions[msystem];
     if (!versions) {
-        throw new Error(`The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`);
+        throw new Error(`The environment "${msystem}" is not supported for Windows ${inputs.arch}.`);
     }
     return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
 }
@@ -102953,6 +103023,18 @@ function aptCacheDir(inputs, version) {
 function aptCacheOptions(cacheDir) {
     return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
+const APT_TIMEOUT_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=30",
+    "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
+];
 async function installDebian(inputs) {
     const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
     info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
@@ -102973,7 +103055,7 @@ async function installDebian(inputs) {
         info(`Adding PPA for GFortran ${version}...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
-    await aptGetUpdateWithRetry();
+    await aptGetUpdateWithRetry(!!cacheHit);
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
         try {
@@ -103010,7 +103092,7 @@ async function installDebian(inputs) {
         "gfortran",
         `/usr/bin/gfortran-${version}`,
     ]);
-    const resolvedVersion = await resolveInstalledVersion();
+    const resolvedVersion = await resolveInstalledVersion(version);
     info(`GFortran ${resolvedVersion} installed successfully.`);
     const result = {
         version: resolvedVersion,
@@ -103020,17 +103102,18 @@ async function installDebian(inputs) {
     };
     return result;
 }
-async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 5) {
+async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
                 "apt-get",
                 "install",
                 "-y",
-                "-o",
-                "Acquire::http::Timeout=60",
-                "-o",
-                "Acquire::Retries=3",
+                ...APT_TIMEOUT_OPTS,
                 ...aptCacheOptions(cacheDir),
                 ...packages,
             ]);
@@ -103055,21 +103138,30 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(maxAttempts = 5) {
+async function aptGetUpdateWithRetry(cacheHit, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
                 "apt-get",
                 "update",
                 "-y",
-                "-o",
-                "Acquire::http::Timeout=60",
-                "-o",
-                "Acquire::Retries=3",
+                ...APT_TIMEOUT_OPTS,
             ]);
             return;
         }
         catch (err) {
+            // A warm cache already holds the package archives; a transiently
+            // unreachable index mirror (e.g. the Azure mirror going stale) must
+            // not block an otherwise-cached installation — continue with the
+            // cached/stale package index instead of hanging or failing the job.
+            if (cacheHit) {
+                warning("apt-get update did not complete cleanly; continuing with cached/stale package index.");
+                return;
+            }
             if (attempt === maxAttempts)
                 throw err;
             warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
@@ -103114,9 +103206,9 @@ async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
         }
     }
 }
-async function resolveInstalledVersion() {
+async function resolveInstalledVersion(version) {
     let output = "";
-    await exec_exec("gfortran", ["--version"], {
+    await exec_exec(`gfortran-${version}`, ["--version"], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
@@ -103156,15 +103248,7 @@ async function installDarwin(inputs) {
         info(`${formula} is already installed, skipping brew install.`);
     }
     else {
-        const infoExitCode = await exec_exec("brew", ["info", formula], {
-            ignoreReturnCode: true,
-        });
-        if (infoExitCode !== 0) {
-            info(`${formula} not found in local index, running brew update...`);
-            await exec_exec("brew", ["update"]);
-        }
-        // Add --skip-post-install to ensure the hook failure doesn't crash the CI
-        await exec_exec("brew", ["install", "--skip-post-install", formula]);
+        await brewInstallWithRetry(formula);
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
@@ -103211,6 +103295,19 @@ async function installDarwin(inputs) {
     }
     const gccBinary = external_path_.join(binDir, `gcc-${version}`);
     const gxxBinary = external_path_.join(binDir, `g++-${version}`);
+    // Homebrew's versioned `gcc@<version>` formulae only expose versioned
+    // driver names (e.g. `gfortran-14`, `gcc-14`, `g++-14`). Unlike the
+    // unversioned `gcc` formula, they do not create `gfortran`/`gcc`/`g++`
+    // symlinks in the Homebrew prefix, so the unversioned drivers are not
+    // discoverable on PATH. Several downstream workflows invoke the
+    // unversioned driver names directly (e.g. `command -v gfortran`), so we
+    // create unversioned symlinks pointing to the requested version. This
+    // mirrors the behavior of the shell-based action (install_gcc_brew).
+    for (const driver of ["gfortran", "gcc", "g++"]) {
+        const versionedBinary = external_path_.join(binDir, `${driver}-${version}`);
+        const unversionedBinary = external_path_.join(binDir, driver);
+        await exec_exec("ln", ["-sf", versionedBinary, unversionedBinary]);
+    }
     const resolvedVersion = await darwin_resolveInstalledVersion(gfortranBinary);
     info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
     const result = {
@@ -103220,6 +103317,25 @@ async function installDarwin(inputs) {
         cxx: gxxBinary,
     };
     return result;
+}
+async function brewInstallWithRetry(formula, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("brew", ["install", "--skip-post-install", formula], {
+            ignoreReturnCode: true,
+            env: {
+                ...process.env,
+                HOMEBREW_NO_AUTO_UPDATE: "1",
+            },
+        });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`brew install ${formula} failed after ${maxAttempts.toString()} attempts.`);
+        }
+        const delaySeconds = attempt * 15;
+        warning(`brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
 }
 async function getBrewPrefix() {
     let output = "";
@@ -105573,14 +105689,19 @@ const debian_SUPPORTED_VERSIONS = {
     ],
     [Arch.ARM64]: undefined,
 };
-const APT_ACQUIRE_OPTS = [
+const debian_APT_TIMEOUT_OPTS = [
     "-o",
-    "Acquire::http::Timeout=120",
+    "Acquire::http::Timeout=30",
     "-o",
-    "Acquire::https::Timeout=120",
+    "Acquire::http::ConnectTimeout=20",
     "-o",
-    "Acquire::Retries=5",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
 ];
+const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 async function debian_installDebian(inputs) {
     const version = resolveVersion(inputs, debian_SUPPORTED_VERSIONS, {
         resolveMinorToLatestPatch: true,
@@ -105609,7 +105730,7 @@ async function debian_installDebian(inputs) {
         await exec_exec("bash", [
             "-c",
             [
-                `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+                `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
                 `| gpg --dearmor`,
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
@@ -105618,7 +105739,7 @@ async function debian_installDebian(inputs) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec_exec("sudo", ["apt-get", "update", "-y", ...APT_ACQUIRE_OPTS]);
+        await debian_aptGetUpdateWithRetry();
         const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
         const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
         const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) => version.startsWith(y))
@@ -105630,8 +105751,7 @@ async function debian_installDebian(inputs) {
             "install",
             "-y",
             "--no-install-recommends",
-            "--fix-missing",
-            ...APT_ACQUIRE_OPTS,
+            ...debian_APT_TIMEOUT_OPTS,
             fortranPkg,
             cppPkg,
         ]);
@@ -105671,7 +105791,14 @@ async function debian_installDebian(inputs) {
 }
 async function aptInstallWithRetry(args, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await exec_exec("sudo", ["apt-get", ...args], {
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "15m",
+            "apt-get",
+            ...args,
+        ], {
             ignoreReturnCode: true,
         });
         if (exitCode === 0)
@@ -105679,8 +105806,48 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
         if (attempt === maxAttempts) {
             throw new Error(`apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
-        warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Retrying in 15 seconds...`);
+        warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`);
+        await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "10m",
+            "apt-get",
+            "--fix-broken",
+            "install",
+            "-y",
+            ...debian_APT_TIMEOUT_OPTS,
+        ], {
+            ignoreReturnCode: true,
+        });
         await new Promise((resolve) => setTimeout(resolve, 15_000));
+    }
+}
+// `apt-get update` hits live mirrors and is the most common stall point; a
+// non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
+// a couple of bounded retries rather than stalling the whole job. Total worst
+// case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
+async function debian_aptGetUpdateWithRetry(maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...debian_APT_TIMEOUT_OPTS,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
     }
 }
 async function debian_resolveInstalledVersion() {
@@ -105901,7 +106068,7 @@ async function win32_installWin32(inputs) {
             "/D",
             "/S",
             "/C",
-            `call "${SETVARS_BAT}" --force >nul && ifx /what >nul && icx --version >nul && icpx --version >nul`,
+            `call "${SETVARS_BAT}" --force >nul && ifx --version >nul`,
         ])
         : false;
     if (cacheValid) {
@@ -105911,7 +106078,8 @@ async function win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading installer...`);
-        const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        const installerPath = await downloadToolWithRetry(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
         await runInstallerWithRetry(installerPath);
@@ -105964,13 +106132,38 @@ async function win32_installWin32(inputs) {
     }
     const resolvedVersion = await ifx_win32_resolveInstalledVersion();
     info(`ifx ${resolvedVersion} installed successfully.`);
+    // The LLVM C/C++ drivers (icx/icpx) are only shipped by the HPC Kit
+    // installers; the Fortran-only packages used below do not include them.
+    // Use MSVC's cl, which the vcvars64 environment (initialized by the
+    // install step) puts on PATH and which ifx interoperates with for mixed
+    // builds. This mirrors how the macOS installer uses the system clang/clang++
+    // and how installWin32 for ifort advertises cl on Windows.
     const result = {
         version: resolvedVersion,
         fc: "ifx",
-        cc: "icx",
-        cxx: "icpx",
+        cc: "cl",
+        cxx: "cl",
     };
     return result;
+}
+async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            external_fs_.rmSync(destination, { force: true });
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            warning(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -105998,7 +106191,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
     }
 }
 async function ifx_win32_resolveInstalledVersion() {
-    const versionCommand = process.platform === OS.Windows ? "/what" : "--version";
+    const versionCommand = "-V";
     let output = "";
     await exec_exec("ifx", [versionCommand], {
         ignoreReturnCode: true,
@@ -106023,7 +106216,11 @@ async function installIFX(inputs) {
         case OS.Linux:
             return await debian_installDebian(inputs);
         case OS.MacOS:
-            throw new Error(`IFX is not supported on macOS`);
+            throw new Error(`ifx is not supported on macOS. The previous fortran-lang/setup-fortran ` +
+                `action silently treated "compiler: intel" as intel-classic (ifort) on ` +
+                `macOS instead of installing ifx. Migrate those matrix entries to ` +
+                `"compiler: ifort", or exclude ` +
+                `{compiler: ifx, os: macos} from your build matrix.`);
         case OS.Windows:
             return await win32_installWin32(inputs);
     }
@@ -106048,18 +106245,33 @@ const IFORT_BUNDLES = [
     { ifort: "2021.10", bundle: "2023.2.4" },
     { ifort: "2021.9", bundle: "2023.1.0" },
     { ifort: "2021.8", bundle: "2023.0.0" },
+    { ifort: "2021.7.1", bundle: "2022.2.1" },
     { ifort: "2021.7", bundle: "2022.2.0" },
     { ifort: "2021.6", bundle: "2022.1.0" },
     { ifort: "2021.5", bundle: "2022.0.2" },
     { ifort: "2021.4", bundle: "2021.4.0" },
     { ifort: "2021.3", bundle: "2021.3.0" },
     { ifort: "2021.2", bundle: "2021.2.0" },
+    { ifort: "2021.1.2", bundle: "2021.1.2" },
     { ifort: "2021.1", bundle: "2021.1.2" },
 ];
 const ifort_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
     [Arch.ARM64]: undefined,
 };
+const ifort_debian_APT_TIMEOUT_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=30",
+    "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
+];
+const debian_WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 async function ifort_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, ifort_debian_SUPPORTED_VERSIONS);
     const entry = IFORT_BUNDLES.find((m) => m.ifort === version);
@@ -106087,7 +106299,7 @@ async function ifort_debian_installDebian(inputs) {
         await exec_exec("bash", [
             "-c",
             [
-                `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+                `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
                 `| gpg --dearmor`,
                 `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
             ].join(" "),
@@ -106096,31 +106308,18 @@ async function ifort_debian_installDebian(inputs) {
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
         ]);
-        await exec_exec("sudo", [
-            "apt-get",
-            "update",
-            "-y",
-            "-o",
-            "Acquire::http::Timeout=60",
-            "-o",
-            "Acquire::Retries=3",
-        ]);
+        await ifort_debian_aptGetUpdateWithRetry();
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-        // Because ifort only exists in <=2023, the C++ package is always the classic variant.
+        // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
+        // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
+        // which also provides classic icc/icpc.
         const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
         const cppPkgBase = bundle.startsWith("2024")
             ? "intel-oneapi-compiler-dpcpp-cpp"
             : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
         const cppPkg = `${cppPkgBase}-${bundle}`;
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-        await exec_exec("sudo", [
-            "apt-get",
-            "install",
-            "-y",
-            "--no-install-recommends",
-            fortranPkg,
-            cppPkg,
-        ]);
+        await debian_aptGetInstallWithRetry([fortranPkg, cppPkg]);
         await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
     }
     else {
@@ -106155,11 +106354,15 @@ async function ifort_debian_installDebian(inputs) {
     }
     const resolvedVersion = await ifort_debian_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
+    // instead of the classic icc/icpc, which were discontinued. Earlier bundles
+    // (<=2023) still provide classic icc/icpc alongside icx.
+    const bundleIs2024 = bundle.startsWith("2024");
     const result = {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icc",
-        cxx: "icpc",
+        cc: bundleIs2024 ? "icx" : "icc",
+        cxx: bundleIs2024 ? "icpx" : "icpc",
     };
     return result;
 }
@@ -106175,6 +106378,54 @@ async function ifort_debian_resolveInstalledVersion() {
     // ifort --version often prints a multi-line copyright header.
     // We grab just the first line which contains the actual version string.
     return output.trim().split("\n")[0];
+}
+async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...ifort_debian_APT_TIMEOUT_OPTS,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
+}
+async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
+                "apt-get",
+                "install",
+                "-y",
+                ...ifort_debian_APT_TIMEOUT_OPTS,
+                "--no-install-recommends",
+                ...packages,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
@@ -106384,11 +106635,16 @@ async function darwin_installDarwin(inputs) {
     }
     const resolvedVersion = await ifort_darwin_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // The macOS HPC Kit DMG installs only the Fortran component
+    // (intel.oneapi.mac.ifort-compiler). Classic icc/icpc was never shipped on
+    // macOS, and the LLVM icx driver lives in the Intel oneAPI Base Kit (not
+    // installed here). The companion C/C++ compiler is therefore the system clang
+    // provided by the Xcode Command Line Tools.
     return {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icc",
-        cxx: "icpc",
+        cc: "clang",
+        cxx: "clang++",
     };
 }
 async function ifort_darwin_resolveInstalledVersion() {
@@ -106558,11 +106814,16 @@ async function ifort_win32_installWin32(inputs) {
     }
     const resolvedVersion = await ifort_win32_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
+    // Intel's classic C++ driver (icl) was discontinued in oneAPI 2024+ and is
+    // not installed by the Fortran-only packages used below. Use MSVC's cl,
+    // which the vcvars64 environment (initialized by the install step) puts on
+    // PATH and which ifort is designed to interoperate with for mixed builds.
+    // This mirrors how the macOS installer uses the system clang/clang++.
     const result = {
         version: resolvedVersion,
         fc: "ifort",
-        cc: "icl",
-        cxx: "icl",
+        cc: "cl",
+        cxx: "cl",
     };
     return result;
 }
@@ -106614,11 +106875,15 @@ const APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
     "-o",
-    "Acquire::Retries=10",
+    "Acquire::Retries=0",
     "-o",
-    "Acquire::http::Timeout=60",
+    "Acquire::http::Timeout=30",
     "-o",
-    "Acquire::https::Timeout=60",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
 ];
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
@@ -106910,13 +107175,21 @@ async function nvfortran_debian_installDebian(inputs) {
                 ]);
                 info("Updating apt repositories with retry...");
                 await execWithRetry("sudo", [
+                    "timeout",
+                    "--signal=TERM",
+                    "--kill-after=10s",
+                    "5m",
                     "apt-get",
                     "update",
                     "-y",
                     ...APT_NETWORK_OPTIONS,
-                ]);
+                ], 3, 10_000);
                 info(`Installing apt package ${pkgName}...`);
                 await exec_exec("sudo", [
+                    "timeout",
+                    "--signal=TERM",
+                    "--kill-after=30s",
+                    "15m",
                     "apt-get",
                     "install",
                     "-y",
@@ -107008,7 +107281,7 @@ async function nvfortran_debian_resolveInstalledVersion() {
 
 async function installNVFortran(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`NVFortran is only supported on Linux (got: ${inputs.os})`);
+        throw new Error(`nvfortran is only supported on Linux. Got: ${inputs.os}`);
     }
     return await nvfortran_debian_installDebian(inputs);
 }
@@ -107065,7 +107338,9 @@ function getReleaseMetadata(version) {
     };
 }
 async function aocc_debian_installDebian(inputs) {
-    const version = resolveVersion(inputs, aocc_debian_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, aocc_debian_SUPPORTED_VERSIONS, {
+        stripPatchZero: true,
+    });
     const metadata = getReleaseMetadata(version);
     info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
     const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
@@ -107157,7 +107432,7 @@ async function aocc_debian_resolveInstalledVersion(binDir) {
 
 async function installAOCC(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`AOCC is only supported on Linux (got: ${inputs.os})`);
+        throw new Error(`aocc is only supported on Linux. Got: ${inputs.os}`);
     }
     return await aocc_debian_installDebian(inputs);
 }
@@ -107194,7 +107469,7 @@ const debian_APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
     "-o",
-    "Acquire::Retries=3",
+    "Acquire::Retries=0",
     "-o",
     "Acquire::http::Timeout=10",
     "-o",
@@ -107300,14 +107575,24 @@ async function flang_debian_installDebian(inputs) {
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     info(`Adding the verified LLVM ${version} apt repository...`);
     await configureLlvmAptRepository(version, inputs.osVersion);
-    await exec_exec("sudo", ["apt-get", "update", "-y", ...debian_APT_NETWORK_OPTIONS]);
+    await flang_debian_aptGetUpdateWithRetry();
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
     await exec_exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         ...debian_APT_NETWORK_OPTIONS,
+        // The LLVM apt `flang-N` package does not declare `clang-N` as a
+        // dependency (unlike Ubuntu-archive flang-17/18 on noble, which pull it
+        // in transitively). flang links against clang as its host C/C++ compiler
+        // and the action advertises it as $CC/$CXX, so it must be installed
+        // explicitly — otherwise the companion-compiler verification fails.
+        `clang-${version}`,
         pkgName,
         `libomp-${version}-dev`,
         `libclang-rt-${version}-dev`,
@@ -107337,12 +107622,41 @@ async function flang_debian_installDebian(inputs) {
     const result = {
         version: await flang_debian_resolveInstalledVersion(`${flangBinaryName(major)}-${version}`),
         fc: `${flangBinaryName(major)}-${version}`,
-        cc: `clang-${version}`,
-        cxx: `clang++-${version}`,
+        // Reference the unversioned clang/clang++ shipped inside the LLVM install
+        // dir (always present once `clang-N` is installed) rather than the
+        // /usr/bin clang-N symlinks. Those symlinks compile to different versioned
+        // names across apt sources — Ubuntu archive uses `clang++-N` (dash) while
+        // apt.llvm.org uses `clang++N` (no dash) — so a single versioned cxx name
+        // cannot satisfy both. The absolute path is repo-agnostic and matches the
+        // darwin installer.
+        cc: `${llvmBinDir}/clang`,
+        cxx: `${llvmBinDir}/clang++`,
     };
     const resolvedVersion = result.version;
     info(`Flang ${resolvedVersion} installed successfully.`);
     return result;
+}
+async function flang_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            "5m",
+            "apt-get",
+            "update",
+            "-y",
+            ...debian_APT_NETWORK_OPTIONS,
+        ], { ignoreReturnCode: true });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
+        }
+        const delaySeconds = attempt * 10;
+        warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
 }
 async function flang_debian_resolveInstalledVersion(fc) {
     let output = "";
@@ -107486,6 +107800,14 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     addPath(binDir);
     const flangBin = resolveFlangBinary(binDir);
     info(`Using flang binary: ${flangBin}`);
+    // LLVM 17–19 release archives ship only the `flang-new` driver (`flang-new`
+    // became the primary `flang` driver in LLVM 20+). Ensure an unversioned
+    // `flang` driver exists so `command -v flang` and downstream workflows
+    // resolve regardless of the installed LLVM version.
+    const flangUnversioned = external_path_.join(binDir, "flang");
+    if (external_path_.basename(flangBin) !== "flang" && !external_fs_.existsSync(flangUnversioned)) {
+        external_fs_.symlinkSync(flangBin, flangUnversioned);
+    }
     const libDir = external_path_.join(toolRoot, "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
     exportVariable("LIBRARY_PATH", existingLibPath ? `${libDir}:${existingLibPath}` : libDir);
@@ -108272,18 +108594,24 @@ async function installConda(inputs) {
     exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
+    // The companion C/C++ compiler is the system `clang`/`clang++` on PATH,
+    // matching the macOS/Linux lfortran installers. The `lfortran` conda-forge
+    // package does not ship clang, but GitHub Windows runners provide LLVM on
+    // PATH, so the companion-compiler check resolves it. This keeps the action
+    // consistent across platforms.
     const result = {
         version: resolvedVersion,
         fc: environment.lfortran,
-        cc: external_path_.join(environment.binDir, "clang.exe"),
-        cxx: external_path_.join(environment.binDir, "clang++.exe"),
+        cc: "clang",
+        cxx: "clang++",
     };
     return result;
 }
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
 async function lfortran_win32_installMSYS2(inputs) {
-    info(`Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
+    const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
+    info(`Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
     const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
     const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
     let resolvedVersion;
@@ -108376,7 +108704,7 @@ const debian_CURL_RETRY_ARGS = [
     "600",
     "-fsSL",
 ];
-const debian_APT_ACQUIRE_OPTS = [
+const APT_ACQUIRE_OPTS = [
     "-o",
     "Acquire::http::Timeout=120",
     "-o",
@@ -108470,7 +108798,7 @@ async function aptGetWithRetry(args, maxAttempts = 3) {
         },
     };
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await exec_exec("sudo", ["apt-get", ...debian_APT_ACQUIRE_OPTS, ...args], execOptions);
+        const exitCode = await exec_exec("sudo", ["apt-get", ...APT_ACQUIRE_OPTS, ...args], execOptions);
         if (exitCode === 0)
             return;
         if (attempt === maxAttempts) {
@@ -108656,7 +108984,7 @@ async function armflang_debian_installDebian(inputs) {
 
 async function installArmFlang(inputs) {
     if (inputs.os !== OS.Linux) {
-        throw new Error(`ArmFlang is only supported on Linux ARM64 (got: ${inputs.os} ${inputs.arch})`);
+        throw new Error(`armflang is only supported on Linux. Got: ${inputs.os}`);
     }
     return await armflang_debian_installDebian(inputs);
 }
@@ -108750,8 +109078,12 @@ async function run() {
                 break;
         }
         setInstallationOutputs(installationResult);
-        exportInstallationVariables(installationResult);
-        exportVariable("FORTRAN_COMPILER", inputs.compiler);
+        // update-environment: false suppresses only the public env exports;
+        // outputs and the installation itself are unaffected.
+        if (inputs.updateEnvironment) {
+            exportInstallationVariables(installationResult);
+            exportVariable("FORTRAN_COMPILER", inputs.compiler);
+        }
     }
     catch (err) {
         setFailed(err instanceof Error ? err.message : String(err));

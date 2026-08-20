@@ -32,6 +32,7 @@ describe("installWin32 (LFortran)", () => {
     osVersion: "2022",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -105,7 +106,7 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("exports environment variables and sets linker", async () => {
-      await installWin32(baseInputs);
+      const result = await installWin32(baseInputs);
 
       expect(core.addPath).toHaveBeenCalledWith(
         expect.stringContaining("lfortran"),
@@ -114,12 +115,14 @@ describe("installWin32 (LFortran)", () => {
         "LFORTRAN_LINKER",
         expect.stringContaining("link.exe"),
       );
+      expect(result.cc).toBe("clang");
+      expect(result.cxx).toBe("clang++");
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
       await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
@@ -128,7 +131,7 @@ describe("installWin32 (LFortran)", () => {
     });
 
     it("reuses a working MSYS2 installation on a second invocation", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64 };
+      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
       await installWin32(inputs);
       await installWin32(inputs);
 

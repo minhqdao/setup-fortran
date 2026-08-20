@@ -7,7 +7,15 @@ const DEFAULTS = {
   version: LATEST,
   msystem: Msystem.Native,
   cleanupDisk: false,
+  updateEnvironment: true,
 } as const;
+
+const COMPILER_ALIASES: Readonly<Record<string, Compiler>> = {
+  gcc: Compiler.GFortran,
+  intel: Compiler.IFX,
+  "intel-classic": Compiler.IFort,
+  "nvidia-hpc": Compiler.NVFortran,
+};
 
 function detectOS(): OS {
   switch (process.platform) {
@@ -78,9 +86,19 @@ function detectArch(): Arch {
 }
 
 function parseCompiler(raw: string): Compiler {
-  const valid = Object.values(Compiler);
-  const val = raw.toLowerCase().trim() as Compiler;
-  if (valid.includes(val)) return val;
+  const canonicalCompilers = Object.values(Compiler);
+  const val = raw.toLowerCase().trim();
+  const compiler = COMPILER_ALIASES[val] ?? (val as Compiler);
+  if (canonicalCompilers.includes(compiler)) {
+    if (val in COMPILER_ALIASES) {
+      core.warning(
+        `The compiler selector "${val}" is deprecated; please use "${compiler}" instead.`,
+      );
+    }
+    return compiler;
+  }
+
+  const valid = [...canonicalCompilers, ...Object.keys(COMPILER_ALIASES)];
   throw new Error(
     `Unknown compiler "${raw}". Valid options: ${valid.join(", ")}`,
   );
@@ -99,8 +117,8 @@ export function parseInputs(): Inputs {
   const rawCompiler = core.getInput("compiler").trim() || DEFAULTS.compiler;
   const rawVersion = core.getInput("version").trim() || DEFAULTS.version;
   const rawMsystem = core.getInput("msystem").trim();
-  const cleanupDisk =
-    core.getBooleanInput("cleanup-disk") || DEFAULTS.cleanupDisk;
+  const cleanupDisk = core.getBooleanInput("cleanup-disk");
+  const updateEnvironment = core.getBooleanInput("update-environment");
 
   const compiler = parseCompiler(rawCompiler);
   const detectedOS = detectOS();
@@ -113,6 +131,7 @@ export function parseInputs(): Inputs {
     arch: detectArch(),
     msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
     cleanupDisk,
+    updateEnvironment,
   };
 
   return inputs;

@@ -19,6 +19,7 @@ describe("installDarwin (gfortran)", () => {
     osVersion: "13",
     arch: Arch.X64,
   cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -57,12 +58,31 @@ describe("installDarwin (gfortran)", () => {
   it("installs gcc via Homebrew if missing", async () => {
     await installDarwin(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("brew", [
-      "install",
-      "--skip-post-install",
-      "gcc@14",
+    expect(mockedExec).toHaveBeenCalledWith(
+      "brew",
+      ["install", "--skip-post-install", "gcc@14"],
+      expect.objectContaining({
+        ignoreReturnCode: true,
+        env: expect.objectContaining({ HOMEBREW_NO_AUTO_UPDATE: "1" }),
+      }),
+    );
+    // Versioned Homebrew formulae don't create unversioned drivers; the
+    // action must symlink gfortran/gcc/g++ -> <version> for downstream use.
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/gfortran-14",
+      "/usr/local/bin/gfortran",
     ]);
-    expect(mockedExec).not.toHaveBeenCalledWith("ln", expect.anything());
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/gcc-14",
+      "/usr/local/bin/gcc",
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith("ln", [
+      "-sf",
+      "/usr/local/bin/g++-14",
+      "/usr/local/bin/g++",
+    ]);
     expect(mockedExec).not.toHaveBeenCalledWith(
       "bash",
       ["-c", expect.stringContaining("/usr/local/lib")],

@@ -4,7 +4,6 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import {
   Arch,
-  OS,
   Msystem,
   type InstallationResult,
   type Inputs,
@@ -189,7 +188,7 @@ export async function installWin32(
           "/D",
           "/S",
           "/C",
-          `call "${SETVARS_BAT}" --force >nul && ifx /what >nul && icx --version >nul && icpx --version >nul`,
+          `call "${SETVARS_BAT}" --force >nul && ifx --version >nul`,
         ],
       )
     : false;
@@ -201,10 +200,12 @@ export async function installWin32(
   } else {
     if (cacheHit) fs.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
     core.info(`Downloading installer...`);
-    const installerPath = await tc.downloadTool(
+    const installerPath = await downloadToolWithRetry(
       release.url,
       path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`),
     );
+
+    core.info("Verifying installer...");
     await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
@@ -273,13 +274,50 @@ export async function installWin32(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifx ${resolvedVersion} installed successfully.`);
+  // The LLVM C/C++ drivers (icx/icpx) are only shipped by the HPC Kit
+  // installers; the Fortran-only packages used below do not include them.
+  // Use MSVC's cl, which the vcvars64 environment (initialized by the
+  // install step) puts on PATH and which ifx interoperates with for mixed
+  // builds. This mirrors how the macOS installer uses the system clang/clang++
+  // and how installWin32 for ifort advertises cl on Windows.
   const result = {
     version: resolvedVersion,
     fc: "ifx",
-    cc: "icx",
-    cxx: "icpx",
+    cc: "cl",
+    cxx: "cl",
   };
   return result;
+}
+
+async function downloadToolWithRetry(
+  url: string,
+  destination: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination);
+    } catch (error) {
+      lastError = error;
+
+      fs.rmSync(destination, { force: true });
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.warning(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
 }
 
 async function runInstallerWithRetry(
@@ -321,8 +359,7 @@ async function runInstallerWithRetry(
 }
 
 async function resolveInstalledVersion(): Promise<string> {
-  const versionCommand =
-    process.platform === OS.Windows ? "/what" : "--version";
+  const versionCommand = "-V";
 
   let output = "";
   await exec.exec("ifx", [versionCommand], {

@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { LATEST, type Msystem, type Inputs } from "./types";
+import { Compiler, LATEST, type Msystem, type Inputs } from "./types";
 
 // ==========================================
 // Reusable Network Helper (Upgraded)
@@ -139,13 +139,40 @@ async function fetchJsonWithRetry<T>(
 // Exported Core Functions
 // ==========================================
 
+// Compilers whose supported-version tables use bare integer majors (e.g.
+// gfortran "14", flang "19"). For these a bare numeric input is a legitimate
+// table entry. Every other compiler (ifx/ifort year releases, nvfortran,
+// lfortran, aocc, armflang) only ships dotted/quoted releases, so a bare
+// numeric input is ambiguous — it is almost always a GitHub Actions-coerced
+// `YYYY.0` — and is rejected with an actionable error instead of guessed.
+const BARE_NUMERIC_ACCEPTED_COMPILERS = new Set<Compiler>([
+  Compiler.GFortran,
+  Compiler.Flang,
+]);
+
+/**
+ * Normalizes a version string by stripping a trailing `.0` patch segment.
+ * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
+ * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
+ * while the replacement tracks releases by minor version (`5.1`).
+ */
+export function stripTrailingPatchZero(version: string): string {
+  const match = /^(\d+\.\d+)\.0$/.exec(version);
+  return match ? match[1] : version;
+}
+
 export function resolveVersion<T extends readonly string[]>(
   inputs: Inputs,
   supportedVersions: Record<string, T | undefined>,
   {
     matchMajorIfPatch = false,
     resolveMinorToLatestPatch = false,
-  }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
+    stripPatchZero = false,
+  }: {
+    matchMajorIfPatch?: boolean;
+    resolveMinorToLatestPatch?: boolean;
+    stripPatchZero?: boolean;
+  } = {},
 ): string {
   const versions = supportedVersions[inputs.arch];
 
@@ -155,11 +182,29 @@ export function resolveVersion<T extends readonly string[]>(
     );
   }
 
-  const version = inputs.version === LATEST ? versions[0] : inputs.version;
+  const rawVersion = inputs.version === LATEST ? versions[0] : inputs.version;
 
-  if (!version) {
+  if (!rawVersion) {
     throw new Error(
       `No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`,
+    );
+  }
+
+  // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
+  // replacement's minor-version release entry. Only strips a trailing .0;
+  // X.Y.1 and other patch versions are left untouched so that genuinely
+  // unsupported versions still produce a clear error.
+  const version = stripPatchZero
+    ? stripTrailingPatchZero(rawVersion)
+    : rawVersion;
+
+  // Inform the user that AOCC releases are tracked by major.minor only, so
+  // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
+  if (stripPatchZero && version !== rawVersion) {
+    core.warning(
+      `The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
+        `version "${rawVersion}" was normalized to "${version}". Consider ` +
+        `dropping the patch number.`,
     );
   }
 
@@ -179,6 +224,32 @@ export function resolveVersion<T extends readonly string[]>(
       if (match) {
         return match;
       }
+    }
+
+    // A bare numeric version is never a valid table entry for the year-based
+    // compilers (ifx/ifort/nvfortran/lfortran/aocc/armflang). GitHub Actions
+    // coerces an unquoted `version: 2026.0` YAML number to the bare string
+    // "2026", silently dropping the trailing `.0`. That input is ambiguous
+    // (it could mean that exact release or the latest release in the series),
+    // so we refuse to guess and point the user at exact, quoted table entries.
+    // gfortran/flang accept bare integer majors and are exempt. The
+    // unrecoverable trailing-zero collision (2021.10 -> "2021.1") is handled
+    // above by the patch-prefix fall through and is documented in the README
+    // as a quoting requirement.
+    if (
+      !BARE_NUMERIC_ACCEPTED_COMPILERS.has(inputs.compiler) &&
+      /^\d+$/.test(version)
+    ) {
+      const examples = versions.slice(0, 2).map((v) => `"${v}"`);
+      throw new Error(
+        `${inputs.compiler} version "${version}" is ambiguous and must be ` +
+          `quoted exactly as listed in the supported-version table. GitHub ` +
+          `Actions coerces unquoted YAML numbers into bare strings, silently ` +
+          `dropping segments like ".0", so the intended release is unclear; ` +
+          `specify the full release (e.g. ${examples.join(" or ")}) wrapped ` +
+          `in quotes. (gfortran and flang accept bare integer majors such as ` +
+          `"14" or "19".) Supported versions: ${versions.join(", ")}`,
+      );
     }
 
     throw new Error(
@@ -212,7 +283,7 @@ export function resolveWindowsVersion(
   const versions = archVersions[msystem];
   if (!versions) {
     throw new Error(
-      `The environment "${msystem}" is not supported or implemented for Windows ${inputs.arch}.`,
+      `The environment "${msystem}" is not supported for Windows ${inputs.arch}.`,
     );
   }
 

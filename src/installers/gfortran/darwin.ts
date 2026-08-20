@@ -36,17 +36,7 @@ export async function installDarwin(
   if (alreadyInstalled) {
     core.info(`${formula} is already installed, skipping brew install.`);
   } else {
-    const infoExitCode = await exec.exec("brew", ["info", formula], {
-      ignoreReturnCode: true,
-    });
-
-    if (infoExitCode !== 0) {
-      core.info(`${formula} not found in local index, running brew update...`);
-      await exec.exec("brew", ["update"]);
-    }
-
-    // Add --skip-post-install to ensure the hook failure doesn't crash the CI
-    await exec.exec("brew", ["install", "--skip-post-install", formula]);
+    await brewInstallWithRetry(formula);
   }
 
   const brewPrefix = await getBrewPrefix();
@@ -110,6 +100,20 @@ export async function installDarwin(
   const gccBinary = path.join(binDir, `gcc-${version}`);
   const gxxBinary = path.join(binDir, `g++-${version}`);
 
+  // Homebrew's versioned `gcc@<version>` formulae only expose versioned
+  // driver names (e.g. `gfortran-14`, `gcc-14`, `g++-14`). Unlike the
+  // unversioned `gcc` formula, they do not create `gfortran`/`gcc`/`g++`
+  // symlinks in the Homebrew prefix, so the unversioned drivers are not
+  // discoverable on PATH. Several downstream workflows invoke the
+  // unversioned driver names directly (e.g. `command -v gfortran`), so we
+  // create unversioned symlinks pointing to the requested version. This
+  // mirrors the behavior of the shell-based action (install_gcc_brew).
+  for (const driver of ["gfortran", "gcc", "g++"] as const) {
+    const versionedBinary = path.join(binDir, `${driver}-${version}`);
+    const unversionedBinary = path.join(binDir, driver);
+    await exec.exec("ln", ["-sf", versionedBinary, unversionedBinary]);
+  }
+
   const resolvedVersion = await resolveInstalledVersion(gfortranBinary);
   core.info(`GFortran ${resolvedVersion} installed successfully on Darwin.`);
   const result = {
@@ -119,6 +123,40 @@ export async function installDarwin(
     cxx: gxxBinary,
   };
   return result;
+}
+
+async function brewInstallWithRetry(
+  formula: string,
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec(
+      "brew",
+      ["install", "--skip-post-install", formula],
+      {
+        ignoreReturnCode: true,
+        env: {
+          ...process.env,
+          HOMEBREW_NO_AUTO_UPDATE: "1",
+        },
+      },
+    );
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `brew install ${formula} failed after ${maxAttempts.toString()} attempts.`,
+      );
+    }
+
+    const delaySeconds = attempt * 15;
+    core.warning(
+      `brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+  }
 }
 
 async function getBrewPrefix(): Promise<string> {

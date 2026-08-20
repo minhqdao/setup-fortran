@@ -18,6 +18,7 @@ jest.mock("fs", () => ({
   writeFileSync: jest.fn(),
   existsSync: jest.fn(),
   mkdirSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 jest.mock("os");
 
@@ -39,6 +40,7 @@ describe("installWin32 (ifx)", () => {
     osVersion: "10.0.19045",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -63,7 +65,11 @@ describe("installWin32 (ifx)", () => {
   it("restores from cache if available", async () => {
     mockedRestoreCache.mockResolvedValue("cache-hit");
 
-    await installWin32(baseInputs);
+    const result = await installWin32(baseInputs);
+
+    expect(result.fc).toBe("ifx");
+    expect(result.cc).toBe("cl");
+    expect(result.cxx).toBe("cl");
 
     expect(mockedRestoreCache).toHaveBeenCalled();
     expect(mockedDownloadTool).not.toHaveBeenCalled();
@@ -120,6 +126,69 @@ describe("installWin32 (ifx)", () => {
         "Installer crashed with exit code 1 (attempt 1/3)",
       ),
     );
+  });
+
+  describe("download retry", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("retries a failed download, removes the partial file, and succeeds", async () => {
+      mockedRestoreCache.mockResolvedValue(undefined);
+      mockedDownloadTool
+        .mockRejectedValueOnce(new Error("connection reset"))
+        .mockResolvedValue("C:\\Temp\\installer.exe");
+
+      jest.useFakeTimers();
+      const installPromise = installWin32(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(1);
+
+      // Advance past the 20s backoff after the first failure.
+      jest.advanceTimersByTime(20_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(2);
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      // The partial download must not be treated as a complete installer.
+      expect(mockedFs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining("ifx-2026.0.0.exe"),
+        { force: true },
+      );
+      expect(core.info).toHaveBeenCalledWith("Verifying installer...");
+      expect(cache.saveCache).toHaveBeenCalled();
+    });
+
+    it("gives up after three attempts and propagates the last error", async () => {
+      mockedRestoreCache.mockResolvedValue(undefined);
+      mockedDownloadTool.mockRejectedValue(new Error("network down"));
+
+      jest.useFakeTimers();
+      const installPromise = installWin32(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(20_000); // backoff after attempt 1
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(40_000); // backoff after attempt 2
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(installPromise).rejects.toThrow("network down");
+
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(3);
+      expect(mockedFs.rmSync).toHaveBeenCalledTimes(3);
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 2/3)"),
+      );
+      expect(core.info).not.toHaveBeenCalledWith("Verifying installer...");
+    });
   });
 
   it("skips installation if exit code is 1001 (already installed)", async () => {

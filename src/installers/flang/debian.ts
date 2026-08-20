@@ -33,7 +33,7 @@ const APT_NETWORK_OPTIONS = [
   "-o",
   "Acquire::ForceIPv4=true",
   "-o",
-  "Acquire::Retries=3",
+  "Acquire::Retries=0",
   "-o",
   "Acquire::http::Timeout=10",
   "-o",
@@ -163,7 +163,7 @@ export async function installDebian(
 
   core.info(`Adding the verified LLVM ${version} apt repository...`);
   await configureLlvmAptRepository(version, inputs.osVersion);
-  await exec.exec("sudo", ["apt-get", "update", "-y", ...APT_NETWORK_OPTIONS]);
+  await aptGetUpdateWithRetry();
 
   const pkgName = `flang-${version}`;
 
@@ -171,10 +171,20 @@ export async function installDebian(
     `Installing apt package ${pkgName} with LLVM runtime dependencies...`,
   );
   await exec.exec("sudo", [
+    "timeout",
+    "--signal=TERM",
+    "--kill-after=30s",
+    "15m",
     "apt-get",
     "install",
     "-y",
     ...APT_NETWORK_OPTIONS,
+    // The LLVM apt `flang-N` package does not declare `clang-N` as a
+    // dependency (unlike Ubuntu-archive flang-17/18 on noble, which pull it
+    // in transitively). flang links against clang as its host C/C++ compiler
+    // and the action advertises it as $CC/$CXX, so it must be installed
+    // explicitly — otherwise the companion-compiler verification fails.
+    `clang-${version}`,
     pkgName,
     `libomp-${version}-dev`,
     `libclang-rt-${version}-dev`,
@@ -217,12 +227,54 @@ export async function installDebian(
       `${flangBinaryName(major)}-${version}`,
     ),
     fc: `${flangBinaryName(major)}-${version}`,
-    cc: `clang-${version}`,
-    cxx: `clang++-${version}`,
+    // Reference the unversioned clang/clang++ shipped inside the LLVM install
+    // dir (always present once `clang-N` is installed) rather than the
+    // /usr/bin clang-N symlinks. Those symlinks compile to different versioned
+    // names across apt sources — Ubuntu archive uses `clang++-N` (dash) while
+    // apt.llvm.org uses `clang++N` (no dash) — so a single versioned cxx name
+    // cannot satisfy both. The absolute path is repo-agnostic and matches the
+    // darwin installer.
+    cc: `${llvmBinDir}/clang`,
+    cxx: `${llvmBinDir}/clang++`,
   };
   const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);
   return result;
+}
+
+async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        ...APT_NETWORK_OPTIONS,
+      ],
+      { ignoreReturnCode: true },
+    );
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
+      );
+    }
+
+    const delaySeconds = attempt * 10;
+
+    core.warning(
+      `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+  }
 }
 
 async function resolveInstalledVersion(fc: string): Promise<string> {

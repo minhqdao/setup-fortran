@@ -26,6 +26,7 @@ describe("installDebian ifx", () => {
     osVersion: "22.04",
     arch: Arch.X64,
     cleanupDisk: false,
+    updateEnvironment: true,
     msystem: Msystem.Native,
   };
 
@@ -54,7 +55,11 @@ describe("installDebian ifx", () => {
 
   it("installs the correct versioned packages and saves to cache on miss", async () => {
     const inputs = { ...baseInputs, version: "2023.2.0" };
-    await installDebian(inputs);
+    const result = await installDebian(inputs);
+
+    expect(result.fc).toBe("ifx");
+    expect(result.cc).toBe("icx");
+    expect(result.cxx).toBe("icpx");
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
@@ -63,17 +68,24 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         "--no-install-recommends",
-        "--fix-missing",
         "-o",
-        "Acquire::http::Timeout=120",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::https::Timeout=120",
+        "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=5",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2023.2.0",
         "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.0",
       ],
@@ -128,6 +140,79 @@ describe("installDebian ifx", () => {
     );
   });
 
+  it("repairs dependencies with apt-get --fix-broken install after a failed install attempt", async () => {
+    // Avoid the real 15s retry backoff inside aptInstallWithRetry.
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback) => {
+        if (typeof callback === "function") callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+
+    let installAttempts = 0;
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "ifx" && args?.[0] === "--version") {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(Buffer.from("ifx (IFX) 2023.2.4 20230101"));
+        }
+      }
+      if (commandLine === "bash" && args?.[1]?.includes("setvars.sh")) {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=/opt/intel/oneapi/compiler/latest/bin\nONEAPI_ROOT=/opt/intel/oneapi",
+            ),
+          );
+        }
+      }
+      // The real `apt-get install` attempt (not the --fix-broken repair).
+      if (
+        commandLine === "sudo" &&
+        args?.includes("apt-get") &&
+        args?.includes("install") &&
+        !args?.includes("--fix-broken")
+      ) {
+        installAttempts++;
+        if (installAttempts === 1) return 1; // fail the first install attempt
+      }
+      return 0;
+    });
+
+    try {
+      const result = await installDebian(baseInputs);
+      expect(result.fc).toBe("ifx");
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+
+    // Install was retried once: failed first, succeeded on the second attempt.
+    expect(installAttempts).toBe(2);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "10m",
+        "apt-get",
+        "--fix-broken",
+        "install",
+        "-y",
+        "-o",
+        "Acquire::http::Timeout=30",
+        "-o",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
+      ],
+      { ignoreReturnCode: true },
+    );
+  });
+
   it("maps 2-digit version 2025.2 to 2025.2", async () => {
     const inputs = { ...baseInputs, version: "2025.2" };
     await installDebian(inputs);
@@ -135,17 +220,24 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         "--no-install-recommends",
-        "--fix-missing",
         "-o",
-        "Acquire::http::Timeout=120",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::https::Timeout=120",
+        "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=5",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2025.2",
         "intel-oneapi-compiler-dpcpp-cpp-2025.2",
       ],
@@ -160,17 +252,24 @@ describe("installDebian ifx", () => {
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
       [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
         "--no-install-recommends",
-        "--fix-missing",
         "-o",
-        "Acquire::http::Timeout=120",
+        "Acquire::http::Timeout=30",
         "-o",
-        "Acquire::https::Timeout=120",
+        "Acquire::http::ConnectTimeout=20",
         "-o",
-        "Acquire::Retries=5",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
         "intel-oneapi-compiler-fortran-2023.2.4",
         "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.2.4",
       ],
@@ -182,15 +281,23 @@ describe("installDebian ifx", () => {
     await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=10s",
+      "5m",
       "apt-get",
       "update",
       "-y",
       "-o",
-      "Acquire::http::Timeout=120",
+      "Acquire::http::Timeout=30",
       "-o",
-      "Acquire::https::Timeout=120",
+      "Acquire::http::ConnectTimeout=20",
       "-o",
-      "Acquire::Retries=5",
+      "Acquire::https::Timeout=30",
+      "-o",
+      "Acquire::https::ConnectTimeout=20",
+      "-o",
+      "Acquire::Retries=0",
     ]);
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",

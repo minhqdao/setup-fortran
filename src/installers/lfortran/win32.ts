@@ -166,11 +166,16 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   core.info(
     `LFortran ${resolvedVersion} installed successfully on Windows (conda).`,
   );
+  // The companion C/C++ compiler is the system `clang`/`clang++` on PATH,
+  // matching the macOS/Linux lfortran installers. The `lfortran` conda-forge
+  // package does not ship clang, but GitHub Windows runners provide LLVM on
+  // PATH, so the companion-compiler check resolves it. This keeps the action
+  // consistent across platforms.
   const result = {
     version: resolvedVersion,
     fc: environment.lfortran,
-    cc: path.join(environment.binDir, "clang.exe"),
-    cxx: path.join(environment.binDir, "clang++.exe"),
+    cc: "clang",
+    cxx: "clang++",
   };
   return result;
 }
@@ -178,8 +183,9 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
 // Installs lfortran via MSYS2 (rolling release).
 // The binary lives in C:\msys64\<msystem>\bin\lfortran.exe.
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
   core.info(
-    `Installing LFortran on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
+    `Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
   const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");

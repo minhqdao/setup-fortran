@@ -20,12 +20,14 @@ const IFORT_BUNDLES = [
   { ifort: "2021.10", bundle: "2023.2.4" },
   { ifort: "2021.9", bundle: "2023.1.0" },
   { ifort: "2021.8", bundle: "2023.0.0" },
+  { ifort: "2021.7.1", bundle: "2022.2.1" },
   { ifort: "2021.7", bundle: "2022.2.0" },
   { ifort: "2021.6", bundle: "2022.1.0" },
   { ifort: "2021.5", bundle: "2022.0.2" },
   { ifort: "2021.4", bundle: "2021.4.0" },
   { ifort: "2021.3", bundle: "2021.3.0" },
   { ifort: "2021.2", bundle: "2021.2.0" },
+  { ifort: "2021.1.2", bundle: "2021.1.2" },
   { ifort: "2021.1", bundle: "2021.1.2" },
 ] as const;
 
@@ -33,6 +35,21 @@ const SUPPORTED_VERSIONS = {
   [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;
+
+const APT_TIMEOUT_OPTS: string[] = [
+  "-o",
+  "Acquire::http::Timeout=30",
+  "-o",
+  "Acquire::http::ConnectTimeout=20",
+  "-o",
+  "Acquire::https::Timeout=30",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=0",
+];
+
+const WGET_TIMEOUT_ARGS = ["--timeout=30", "--connect-timeout=20", "--tries=3"];
 
 export async function installDebian(
   inputs: Inputs,
@@ -74,7 +91,7 @@ export async function installDebian(
     await exec.exec("bash", [
       "-c",
       [
-        `wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+        `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
         `| gpg --dearmor`,
         `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
       ].join(" "),
@@ -84,18 +101,12 @@ export async function installDebian(
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
     ]);
 
-    await exec.exec("sudo", [
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=60",
-      "-o",
-      "Acquire::Retries=3",
-    ]);
+    await aptGetUpdateWithRetry();
 
     // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-    // Because ifort only exists in <=2023, the C++ package is always the classic variant.
+    // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
+    // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
+    // which also provides classic icc/icpc.
     const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
     const cppPkgBase = bundle.startsWith("2024")
       ? "intel-oneapi-compiler-dpcpp-cpp"
@@ -103,14 +114,7 @@ export async function installDebian(
     const cppPkg = `${cppPkgBase}-${bundle}`;
 
     core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
-    await exec.exec("sudo", [
-      "apt-get",
-      "install",
-      "-y",
-      "--no-install-recommends",
-      fortranPkg,
-      cppPkg,
-    ]);
+    await aptGetInstallWithRetry([fortranPkg, cppPkg]);
 
     await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
   } else {
@@ -157,11 +161,15 @@ export async function installDebian(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
+  // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
+  // instead of the classic icc/icpc, which were discontinued. Earlier bundles
+  // (<=2023) still provide classic icc/icpc alongside icx.
+  const bundleIs2024 = bundle.startsWith("2024");
   const result = {
     version: resolvedVersion,
     fc: "ifort",
-    cc: "icc",
-    cxx: "icpc",
+    cc: bundleIs2024 ? "icx" : "icc",
+    cxx: bundleIs2024 ? "icpx" : "icpc",
   };
   return result;
 }
@@ -178,4 +186,57 @@ async function resolveInstalledVersion(): Promise<string> {
   // ifort --version often prints a multi-line copyright header.
   // We grab just the first line which contains the actual version string.
   return output.trim().split("\n")[0];
+}
+
+async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+      ]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
+}
+
+async function aptGetInstallWithRetry(
+  packages: string[],
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
+        "apt-get",
+        "install",
+        "-y",
+        ...APT_TIMEOUT_OPTS,
+        "--no-install-recommends",
+        ...packages,
+      ]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
 }

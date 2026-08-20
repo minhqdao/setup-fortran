@@ -43,6 +43,19 @@ function aptCacheOptions(cacheDir: string): string[] {
   return ["-o", `Dir::Cache::archives=${cacheDir}`];
 }
 
+const APT_TIMEOUT_OPTS: string[] = [
+  "-o",
+  "Acquire::http::Timeout=30",
+  "-o",
+  "Acquire::http::ConnectTimeout=20",
+  "-o",
+  "Acquire::https::Timeout=30",
+  "-o",
+  "Acquire::https::ConnectTimeout=20",
+  "-o",
+  "Acquire::Retries=0",
+];
+
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
@@ -70,7 +83,7 @@ export async function installDebian(
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
   }
 
-  await aptGetUpdateWithRetry();
+  await aptGetUpdateWithRetry(!!cacheHit);
 
   if (cacheHit) {
     core.info(`Cache hit for ${cacheKey}, installing from cache...`);
@@ -109,7 +122,7 @@ export async function installDebian(
     `/usr/bin/gfortran-${version}`,
   ]);
 
-  const resolvedVersion = await resolveInstalledVersion();
+  const resolvedVersion = await resolveInstalledVersion(version);
   core.info(`GFortran ${resolvedVersion} installed successfully.`);
   const result = {
     version: resolvedVersion,
@@ -123,18 +136,19 @@ export async function installDebian(
 async function aptGetInstallWithRetry(
   packages: string[],
   cacheDir: string,
-  maxAttempts = 5,
+  maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
         "apt-get",
         "install",
         "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
+        ...APT_TIMEOUT_OPTS,
         ...aptCacheOptions(cacheDir),
         ...packages,
       ]);
@@ -161,20 +175,34 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
   });
 }
 
-async function aptGetUpdateWithRetry(maxAttempts = 5): Promise<void> {
+async function aptGetUpdateWithRetry(
+  cacheHit: boolean,
+  maxAttempts = 3,
+): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
         "apt-get",
         "update",
         "-y",
-        "-o",
-        "Acquire::http::Timeout=60",
-        "-o",
-        "Acquire::Retries=3",
+        ...APT_TIMEOUT_OPTS,
       ]);
       return;
     } catch (err) {
+      // A warm cache already holds the package archives; a transiently
+      // unreachable index mirror (e.g. the Azure mirror going stale) must
+      // not block an otherwise-cached installation — continue with the
+      // cached/stale package index instead of hanging or failing the job.
+      if (cacheHit) {
+        core.warning(
+          "apt-get update did not complete cleanly; continuing with cached/stale package index.",
+        );
+        return;
+      }
       if (attempt === maxAttempts) throw err;
       core.warning(
         `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
@@ -229,9 +257,9 @@ async function addAptRepositoryWithRetry(
   }
 }
 
-async function resolveInstalledVersion(): Promise<string> {
+async function resolveInstalledVersion(version: string): Promise<string> {
   let output = "";
-  await exec.exec("gfortran", ["--version"], {
+  await exec.exec(`gfortran-${version}`, ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {
         output += data.toString();

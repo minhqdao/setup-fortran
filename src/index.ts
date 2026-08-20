@@ -58,9 +58,13 @@ export async function run(): Promise<void> {
     }
 
     setInstallationOutputs(installationResult);
-    exportInstallationVariables(installationResult);
 
-    core.exportVariable("FORTRAN_COMPILER", inputs.compiler);
+    // update-environment: false suppresses only the public env exports;
+    // outputs and the installation itself are unaffected.
+    if (inputs.updateEnvironment) {
+      exportInstallationVariables(installationResult);
+      core.exportVariable("FORTRAN_COMPILER", inputs.compiler);
+    }
   } catch (err) {
     core.setFailed(err instanceof Error ? err.message : String(err));
   }
