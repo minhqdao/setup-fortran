@@ -58,11 +58,14 @@ describe("installDarwin (gfortran)", () => {
   it("installs gcc via Homebrew if missing", async () => {
     await installDarwin(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("brew", [
-      "install",
-      "--skip-post-install",
-      "gcc@14",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "brew",
+      ["install", "--skip-post-install", "gcc@14"],
+      expect.objectContaining({
+        ignoreReturnCode: true,
+        env: expect.objectContaining({ HOMEBREW_NO_AUTO_UPDATE: "1" }),
+      }),
+    );
     // Versioned Homebrew formulae don't create unversioned drivers; the
     // action must symlink gfortran/gcc/g++ -> <version> for downstream use.
     expect(mockedExec).toHaveBeenCalledWith("ln", [

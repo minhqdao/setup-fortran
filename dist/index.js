@@ -103248,15 +103248,7 @@ async function installDarwin(inputs) {
         info(`${formula} is already installed, skipping brew install.`);
     }
     else {
-        const infoExitCode = await exec_exec("brew", ["info", formula], {
-            ignoreReturnCode: true,
-        });
-        if (infoExitCode !== 0) {
-            info(`${formula} not found in local index, running brew update...`);
-            await exec_exec("brew", ["update"]);
-        }
-        // Add --skip-post-install to ensure the hook failure doesn't crash the CI
-        await exec_exec("brew", ["install", "--skip-post-install", formula]);
+        await brewInstallWithRetry(formula);
     }
     const brewPrefix = await getBrewPrefix();
     let cellarPrefix = "";
@@ -103325,6 +103317,25 @@ async function installDarwin(inputs) {
         cxx: gxxBinary,
     };
     return result;
+}
+async function brewInstallWithRetry(formula, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("brew", ["install", "--skip-post-install", formula], {
+            ignoreReturnCode: true,
+            env: {
+                ...process.env,
+                HOMEBREW_NO_AUTO_UPDATE: "1",
+            },
+        });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`brew install ${formula} failed after ${maxAttempts.toString()} attempts.`);
+        }
+        const delaySeconds = attempt * 15;
+        warning(`brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
 }
 async function getBrewPrefix() {
     let output = "";
