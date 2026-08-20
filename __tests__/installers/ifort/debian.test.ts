@@ -61,25 +61,29 @@ describe("installDebian (ifort)", () => {
   it("adds the Intel repository on cache miss", async () => {
     await installDebian(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "timeout",
-      "--signal=TERM",
-      "--kill-after=10s",
-      "5m",
-      "apt-get",
-      "update",
-      "-y",
-      "-o",
-      "Acquire::http::Timeout=30",
-      "-o",
-      "Acquire::http::ConnectTimeout=20",
-      "-o",
-      "Acquire::https::Timeout=30",
-      "-o",
-      "Acquire::https::ConnectTimeout=20",
-      "-o",
-      "Acquire::Retries=0",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "5m",
+        "apt-get",
+        "update",
+        "-y",
+        "-o",
+        "Acquire::http::Timeout=30",
+        "-o",
+        "Acquire::http::ConnectTimeout=20",
+        "-o",
+        "Acquire::https::Timeout=30",
+        "-o",
+        "Acquire::https::ConnectTimeout=20",
+        "-o",
+        "Acquire::Retries=0",
+      ],
+      expect.objectContaining({ listeners: expect.any(Object) }),
+    );
     expect(mockedExec).toHaveBeenCalledWith("bash", [
       "-c",
       expect.stringContaining(

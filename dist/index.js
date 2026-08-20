@@ -106296,14 +106296,7 @@ async function ifort_debian_installDebian(inputs) {
             await exec_exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
         }
         info("Adding Intel oneAPI apt repository...");
-        await exec_exec("bash", [
-            "-c",
-            [
-                `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
-                `| gpg --dearmor`,
-                `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
-            ].join(" "),
-        ]);
+        await addOneApiAptRepo();
         await exec_exec("bash", [
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
@@ -106366,6 +106359,26 @@ async function ifort_debian_installDebian(inputs) {
     };
     return result;
 }
+async function addOneApiAptRepo(maxAttempts = 3) {
+    const cmd = [
+        "set -o pipefail;",
+        `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+        "| gpg --dearmor",
+        "| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null",
+    ].join(" ");
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("bash", ["-c", cmd]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
+}
 async function ifort_debian_resolveInstalledVersion() {
     let output = "";
     await exec_exec("ifort", ["--version"], {
@@ -106381,25 +106394,35 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            await exec_exec("sudo", [
-                "timeout",
-                "--signal=TERM",
-                "--kill-after=10s",
-                "5m",
-                "apt-get",
-                "update",
-                "-y",
-                ...ifort_debian_APT_TIMEOUT_OPTS,
-            ]);
+        let output = "";
+        await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            "5m",
+            "apt-get",
+            "update",
+            "-y",
+            ...ifort_debian_APT_TIMEOUT_OPTS,
+        ], {
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+                stderr: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+        const intelFetchFailed = output.includes("Failed to fetch") &&
+            output.includes("apt.repos.intel.com");
+        if (!intelFetchFailed)
             return;
+        if (attempt === maxAttempts) {
+            throw new Error("Failed to fetch the Intel oneAPI apt repository index.");
         }
-        catch (err) {
-            if (attempt === maxAttempts)
-                throw err;
-            warning(`apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
-            await new Promise((res) => setTimeout(res, attempt * 10_000));
-        }
+        warning(`Intel oneAPI apt repository unreachable (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+        await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
 }
 async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
