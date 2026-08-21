@@ -105412,10 +105412,7 @@ async function setupMSYS2(msystem, packages) {
         return;
     const pkgList = packages.map((pkg) => msys2PkgName(msystem, pkg)).join(" ");
     info(`Installing MSYS2 packages (${msystem}): ${pkgList}`);
-    await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", [
-        "-lc",
-        `pacman -S --noconfirm --needed ${pkgList}`,
-    ]);
+    await pacmanInstallWithRetry(pkgList);
     const msysRoot = external_path_.join(MSYS2_ROOT, msystem);
     const msysBin = external_path_.join(msysRoot, "bin");
     const msysLib = external_path_.join(msysRoot, "lib");
@@ -105423,6 +105420,27 @@ async function setupMSYS2(msystem, packages) {
     exportVariable("MSYSTEM", msystem.toUpperCase());
     exportVariable("MSYS2_PATH_TYPE", "inherit");
     exportVariable("PKG_CONFIG_PATH", external_path_.join(msysLib, "pkgconfig"));
+}
+// pacman's default mirror list occasionally hands out a slow/dead mirror
+// (e.g. ftp2.osuosl.org stalling mid-download), which aborts the whole
+// transaction. --needed makes retries safe: already-downloaded packages
+// are skipped, so a retry only has to fetch what actually failed.
+async function pacmanInstallWithRetry(pkgList, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", [
+                "-lc",
+                `pacman -S --noconfirm --needed ${pkgList}`,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`pacman install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${String(attempt * 15)}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 15_000));
+        }
+    }
 }
 function msys2PkgName(msystem, pkg) {
     const prefix = PKG_PREFIX[msystem];
