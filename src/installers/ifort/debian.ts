@@ -88,14 +88,7 @@ export async function installDebian(
       await exec.exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
     }
     core.info("Adding Intel oneAPI apt repository...");
-    await exec.exec("bash", [
-      "-c",
-      [
-        `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
-        `| gpg --dearmor`,
-        `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
-      ].join(" "),
-    ]);
+    await addOneApiAptRepo();
     await exec.exec("bash", [
       "-c",
       `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
@@ -174,6 +167,28 @@ export async function installDebian(
   return result;
 }
 
+async function addOneApiAptRepo(maxAttempts = 3): Promise<void> {
+  const cmd = [
+    "set -o pipefail;",
+    `wget ${WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+    "| gpg --dearmor",
+    "| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null",
+  ].join(" ");
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await exec.exec("bash", ["-c", cmd]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
+    }
+  }
+}
+
 async function resolveInstalledVersion(): Promise<string> {
   let output = "";
   await exec.exec("ifort", ["--version"], {
@@ -190,8 +205,10 @@ async function resolveInstalledVersion(): Promise<string> {
 
 async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await exec.exec("sudo", [
+    let output = "";
+    await exec.exec(
+      "sudo",
+      [
         "timeout",
         "--signal=TERM",
         "--kill-after=10s",
@@ -200,15 +217,31 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
         "update",
         "-y",
         ...APT_TIMEOUT_OPTS,
-      ]);
-      return;
-    } catch (err) {
-      if (attempt === maxAttempts) throw err;
-      core.warning(
-        `apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
-      );
-      await new Promise((res) => setTimeout(res, attempt * 10_000));
+      ],
+      {
+        listeners: {
+          stdout: (data: Buffer) => {
+            output += data.toString();
+          },
+          stderr: (data: Buffer) => {
+            output += data.toString();
+          },
+        },
+      },
+    );
+
+    const intelFetchFailed =
+      output.includes("Failed to fetch") &&
+      output.includes("apt.repos.intel.com");
+    if (!intelFetchFailed) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error("Failed to fetch the Intel oneAPI apt repository index.");
     }
+    core.warning(
+      `Intel oneAPI apt repository unreachable (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+    );
+    await new Promise((res) => setTimeout(res, attempt * 10_000));
   }
 }
 

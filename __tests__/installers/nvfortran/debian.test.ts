@@ -54,7 +54,7 @@ describe("installDebian nvfortran", () => {
   it("installs legacy ncurses via direct download when needed", async () => {
     // Version <= 24.3 triggers ncurses check
     const inputs = { ...baseInputs, version: "24.3" };
-    
+
     // Simulate ncurses not installed
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
       stdout: "",
@@ -70,17 +70,17 @@ describe("installDebian nvfortran", () => {
 
     await installDebian(inputs);
 
-    // Should download each pinned .deb
+    // Should download each pinned .deb from the Ubuntu archive pool
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining([
-        expect.stringContaining("libtinfo5_6.3-2_amd64.deb"),
+        "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2_amd64.deb",
       ]),
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "curl",
       expect.arrayContaining([
-        expect.stringContaining("libncursesw5_6.3-2_amd64.deb"),
+        "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncursesw5_6.3-2_amd64.deb",
       ]),
     );
     // Should install each .deb via dpkg
@@ -94,9 +94,38 @@ describe("installDebian nvfortran", () => {
     );
   });
 
+  it("downloads the arm64 ncurses debs from ports.ubuntu.com", async () => {
+    const inputs = {
+      ...baseInputs,
+      version: "24.3",
+      arch: Arch.ARM64,
+    };
+
+    // Simulate ncurses not installed
+    (exec.getExecOutput as jest.Mock).mockResolvedValue({
+      stdout: "",
+      exitCode: 0,
+    });
+
+    await installDebian(inputs);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libtinfo5_6.3-2_arm64.deb",
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libncursesw5_6.3-2_arm64.deb",
+      ]),
+    );
+  });
+
   it("skips ncurses install if already present", async () => {
     const inputs = { ...baseInputs, version: "24.3" };
-    
+
     // Already installed
     (exec.getExecOutput as jest.Mock).mockResolvedValue({
       stdout: "install ok installed install ok installed",
@@ -105,13 +134,10 @@ describe("installDebian nvfortran", () => {
 
     await installDebian(inputs);
 
-    // Should not fetch directory listing or download any .deb
+    // Should not download any .deb
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining([
-        expect.stringContaining("archive.ubuntu.com"),
-        expect.stringContaining("ncurses"),
-      ]),
+      expect.arrayContaining(["-o"]),
       expect.anything(),
     );
   });
@@ -119,16 +145,13 @@ describe("installDebian nvfortran", () => {
   it("skips ncurses install for newer nvhpc versions", async () => {
     // Version > 24.3
     const inputs = { ...baseInputs, version: "25.1" };
-    
+
     await installDebian(inputs);
 
-    // Should not fetch directory listing or download any .deb
+    // Should not download any .deb
     expect(mockedExec).not.toHaveBeenCalledWith(
       "curl",
-      expect.arrayContaining([
-        expect.stringContaining("archive.ubuntu.com"),
-        expect.stringContaining("ncurses"),
-      ]),
+      expect.arrayContaining(["-o"]),
       expect.anything(),
     );
   });

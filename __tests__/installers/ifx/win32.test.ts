@@ -82,12 +82,161 @@ describe("installWin32 (ifx)", () => {
     await installWin32(baseInputs);
 
     expect(mockedDownloadTool).toHaveBeenCalled();
+    // Standalone (non-HPC-kit) installers run the silent install without any
+    // --components selection...
     expect(mockedExec).toHaveBeenCalledWith(
       '"C:\\Temp\\installer.exe"',
-      expect.arrayContaining(["-s", "-a", "--silent", "--eula", "accept"]),
+      [
+        "-s",
+        "-a",
+        "--silent",
+        "--eula",
+        "accept",
+        "-p=NEED_VS2019_INTEGRATION=0",
+        "-p=NEED_VS2022_INTEGRATION=0",
+      ],
       { ignoreReturnCode: true },
     );
+    // ...and must not probe the component list.
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      '"C:\\Temp\\installer.exe"',
+      expect.arrayContaining(["--list-components"]),
+    );
     expect(cache.saveCache).toHaveBeenCalled();
+  });
+
+  describe("full HPC kit installers", () => {
+    const silentArgs = [
+      "-s",
+      "-a",
+      "--silent",
+      "--eula",
+      "accept",
+      "-p=NEED_VS2019_INTEGRATION=0",
+      "-p=NEED_VS2022_INTEGRATION=0",
+    ];
+
+    const fullKitInputs = {
+      ...baseInputs,
+      version: "2025.3.1", // intel-oneapi-hpc-toolkit offline installer
+    };
+
+    const mockFullKitInstallerFlow = (listOutput: string) => {
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (
+          commandLine === '"C:\\Temp\\installer.exe"' &&
+          args?.includes("--list-components")
+        ) {
+          if (options?.listeners?.stdout) {
+            options.listeners.stdout(Buffer.from(listOutput));
+          }
+          return 0;
+        }
+        if (commandLine === '"C:\\Temp\\installer.exe"') return 0;
+        if (commandLine === "ifx") {
+          if (options?.listeners?.stdout) {
+            options.listeners.stdout(Buffer.from("ifx version 2025.3.1"));
+          }
+          return 0;
+        }
+        if (commandLine === "cmd" && args?.[0] === "/C") {
+          if (options?.listeners?.stdout) {
+            options.listeners.stdout(
+              Buffer.from("PATH=C:\\bin\nINTEL_VAR=foo"),
+            );
+          }
+          return 0;
+        }
+        return 0;
+      });
+    };
+
+    beforeEach(() => {
+      mockedRestoreCache.mockResolvedValue(undefined);
+      mockedDownloadTool.mockResolvedValue("C:\\Temp\\installer.exe");
+    });
+
+    it("lists components and installs only the Fortran compiler component", async () => {
+      mockFullKitInstallerFlow(
+        [
+          "intel.oneapi.win.mkl.devel  2025.3.1  Intel oneAPI Math Kernel Library",
+          "intel.oneapi.win.ifort-compiler  2025.3.1  Intel(R) Fortran Compiler",
+          "intel.oneapi.win.tbb.devel  2025.3.1  Intel oneAPI Threading Building Blocks",
+        ].join("\n"),
+      );
+
+      await installWin32(fullKitInputs);
+
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        ["-s", "-a", "--list-components"],
+        expect.objectContaining({ listeners: expect.any(Object) }),
+      );
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        [...silentArgs, "--components=intel.oneapi.win.ifort-compiler"],
+        { ignoreReturnCode: true },
+      );
+    });
+
+    it("detects the w_HPCKit-prefixed installers as full kits", async () => {
+      mockFullKitInstallerFlow(
+        "intel.oneapi.win.ifort-compiler  2024.1.0  Intel(R) Fortran Compiler",
+      );
+
+      await installWin32({ ...baseInputs, version: "2024.1.0" });
+
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        expect.arrayContaining([
+          "--components=intel.oneapi.win.ifort-compiler",
+        ]),
+        { ignoreReturnCode: true },
+      );
+    });
+
+    it("falls back to a full kit install when no component is listed", async () => {
+      mockFullKitInstallerFlow(
+        [
+          "intel.oneapi.win.mkl.devel  2025.3.1  Intel oneAPI Math Kernel Library",
+          "intel.oneapi.win.tbb.devel  2025.3.1  Intel oneAPI Threading Building Blocks",
+        ].join("\n"),
+      );
+
+      await installWin32(fullKitInputs);
+
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "This installer doesn't expose the Fortran compiler as a separately " +
+            "installable component; installing the full kit instead.",
+        ),
+      );
+      // Degrades gracefully: installs the full kit without any --components.
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        silentArgs,
+        { ignoreReturnCode: true },
+      );
+      expect(cache.saveCache).toHaveBeenCalled();
+    });
+
+    it("does not probe the component list for legacy HPC kits", async () => {
+      // 2023.1.0 is one of the older w_HPCKit bootstrappers that reportedly
+      // chokes on --components; legacy kits install in full.
+      mockFullKitInstallerFlow("");
+
+      await installWin32({ ...baseInputs, version: "2023.1.0" });
+
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        expect.arrayContaining(["--list-components"]),
+      );
+      expect(mockedExec).toHaveBeenCalledWith(
+        '"C:\\Temp\\installer.exe"',
+        silentArgs,
+        { ignoreReturnCode: true },
+      );
+    });
   });
 
   it("retries installation on crash and eventually succeeds", async () => {

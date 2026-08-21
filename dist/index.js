@@ -105412,10 +105412,7 @@ async function setupMSYS2(msystem, packages) {
         return;
     const pkgList = packages.map((pkg) => msys2PkgName(msystem, pkg)).join(" ");
     info(`Installing MSYS2 packages (${msystem}): ${pkgList}`);
-    await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", [
-        "-lc",
-        `pacman -S --noconfirm --needed ${pkgList}`,
-    ]);
+    await pacmanInstallWithRetry(pkgList);
     const msysRoot = external_path_.join(MSYS2_ROOT, msystem);
     const msysBin = external_path_.join(msysRoot, "bin");
     const msysLib = external_path_.join(msysRoot, "lib");
@@ -105423,6 +105420,27 @@ async function setupMSYS2(msystem, packages) {
     exportVariable("MSYSTEM", msystem.toUpperCase());
     exportVariable("MSYS2_PATH_TYPE", "inherit");
     exportVariable("PKG_CONFIG_PATH", external_path_.join(msysLib, "pkgconfig"));
+}
+// pacman's default mirror list occasionally hands out a slow/dead mirror
+// (e.g. ftp2.osuosl.org stalling mid-download), which aborts the whole
+// transaction. --needed makes retries safe: already-downloaded packages
+// are skipped, so a retry only has to fetch what actually failed.
+async function pacmanInstallWithRetry(pkgList, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", [
+                "-lc",
+                `pacman -S --noconfirm --needed ${pkgList}`,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`pacman install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${String(attempt * 15)}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 15_000));
+        }
+    }
 }
 function msys2PkgName(msystem, pkg) {
     const prefix = PKG_PREFIX[msystem];
@@ -106031,6 +106049,12 @@ const ifx_win32_SUPPORTED_VERSIONS = {
         [Msystem.Clang64]: undefined,
     },
 };
+const LEGACY_KIT_VERSIONS = new Set([
+    "2022.2.0",
+    "2022.3.0",
+    "2023.1.0",
+    "2023.2.0",
+]);
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 async function win32_installWin32(inputs) {
@@ -106082,7 +106106,14 @@ async function win32_installWin32(inputs) {
         info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
-        await runInstallerWithRetry(installerPath);
+        const extraArgs = [];
+        if (supportsComponentFilter(version, release.url)) {
+            const componentId = await resolveFortranComponentId(installerPath);
+            if (componentId) {
+                extraArgs.push(`--components=${componentId}`);
+            }
+        }
+        await runInstallerWithRetry(installerPath, extraArgs);
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);
     }
@@ -106165,7 +106196,34 @@ async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
     }
     throw lastError;
 }
-async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
+function isFullKitInstaller(url) {
+    return /hpckit|hpc-toolkit/i.test(url);
+}
+function supportsComponentFilter(version, url) {
+    return isFullKitInstaller(url) && !LEGACY_KIT_VERSIONS.has(version);
+}
+async function resolveFortranComponentId(installerPath) {
+    let output = "";
+    await exec_exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
+    if (!line) {
+        info("This installer doesn't expose the Fortran compiler as a separately " +
+            "installable component; installing the full kit instead.");
+        return undefined;
+    }
+    const id = line.trim().split(/\s+/)[0];
+    if (!id) {
+        throw new Error(`Failed to parse component ID from line: "${line}"`);
+    }
+    return id;
+}
+async function runInstallerWithRetry(installerPath, extraArgs = [], maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const exitCode = await exec_exec(`"${installerPath}"`, [
             "-s",
@@ -106175,6 +106233,7 @@ async function runInstallerWithRetry(installerPath, maxAttempts = 3) {
             "accept",
             "-p=NEED_VS2019_INTEGRATION=0",
             "-p=NEED_VS2022_INTEGRATION=0",
+            ...extraArgs,
         ], { ignoreReturnCode: true });
         // 0 = Success, 1001 = Already installed
         if (exitCode === 0 || exitCode === 1001) {
@@ -106296,14 +106355,7 @@ async function ifort_debian_installDebian(inputs) {
             await exec_exec("sudo", ["mkdir", "-p", ONEAPI_ROOT]);
         }
         info("Adding Intel oneAPI apt repository...");
-        await exec_exec("bash", [
-            "-c",
-            [
-                `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
-                `| gpg --dearmor`,
-                `| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null`,
-            ].join(" "),
-        ]);
+        await addOneApiAptRepo();
         await exec_exec("bash", [
             "-c",
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
@@ -106366,6 +106418,26 @@ async function ifort_debian_installDebian(inputs) {
     };
     return result;
 }
+async function addOneApiAptRepo(maxAttempts = 3) {
+    const cmd = [
+        "set -o pipefail;",
+        `wget ${debian_WGET_TIMEOUT_ARGS.join(" ")} -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB`,
+        "| gpg --dearmor",
+        "| sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null",
+    ].join(" ");
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("bash", ["-c", cmd]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
+}
 async function ifort_debian_resolveInstalledVersion() {
     let output = "";
     await exec_exec("ifort", ["--version"], {
@@ -106381,25 +106453,35 @@ async function ifort_debian_resolveInstalledVersion() {
 }
 async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            await exec_exec("sudo", [
-                "timeout",
-                "--signal=TERM",
-                "--kill-after=10s",
-                "5m",
-                "apt-get",
-                "update",
-                "-y",
-                ...ifort_debian_APT_TIMEOUT_OPTS,
-            ]);
+        let output = "";
+        await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            "5m",
+            "apt-get",
+            "update",
+            "-y",
+            ...ifort_debian_APT_TIMEOUT_OPTS,
+        ], {
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+                stderr: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+        const intelFetchFailed = output.includes("Failed to fetch") &&
+            output.includes("apt.repos.intel.com");
+        if (!intelFetchFailed)
             return;
+        if (attempt === maxAttempts) {
+            throw new Error("Failed to fetch the Intel oneAPI apt repository index.");
         }
-        catch (err) {
-            if (attempt === maxAttempts)
-                throw err;
-            warning(`apt-get update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
-            await new Promise((res) => setTimeout(res, attempt * 10_000));
-        }
+        warning(`Intel oneAPI apt repository unreachable (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+        await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
 }
 async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
@@ -107048,21 +107130,21 @@ async function installLegacyNcurses(inputs) {
     const packages = {
         arm64: {
             libtinfo5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_arm64.deb",
+                url: "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libtinfo5_6.3-2_arm64.deb",
                 sha256: "bff6bf29035a4bbd5aa3584bfbc86c2d414cb468a22dbd09fe601b0d39ce4e67",
             },
             libncursesw5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_arm64.deb",
+                url: "https://ports.ubuntu.com/ubuntu-ports/pool/universe/n/ncurses/libncursesw5_6.3-2_arm64.deb",
                 sha256: "4abc034de6d0fe55032bdee039603b7a361ca1980c4f7faf781b64496ef0412a",
             },
         },
         amd64: {
             libtinfo5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libtinfo5_6.3-2_amd64.deb",
+                url: "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2_amd64.deb",
                 sha256: "d2597b5aec92a930cf549e1b429ad892595813e72ec7814685ea146a9fb715e5",
             },
             libncursesw5: {
-                url: "https://launchpad.net/ubuntu/+archive/primary/+files/libncursesw5_6.3-2_amd64.deb",
+                url: "https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncursesw5_6.3-2_amd64.deb",
                 sha256: "2cfb737d61b4243846ba3f8d70dac7307fab355aa43cbd2cb9d023bf8d606a5c",
             },
         },

@@ -133,6 +133,13 @@ const SUPPORTED_VERSIONS = {
   },
 } satisfies Record<Arch, Record<Msystem, readonly string[] | undefined>>;
 
+const LEGACY_KIT_VERSIONS = new Set([
+  "2022.2.0",
+  "2022.3.0",
+  "2023.1.0",
+  "2023.2.0",
+]);
+
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 
@@ -209,7 +216,14 @@ export async function installWin32(
     await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install...");
-    await runInstallerWithRetry(installerPath);
+    const extraArgs: string[] = [];
+    if (supportsComponentFilter(version, release.url)) {
+      const componentId = await resolveFortranComponentId(installerPath);
+      if (componentId) {
+        extraArgs.push(`--components=${componentId}`);
+      }
+    }
+    await runInstallerWithRetry(installerPath, extraArgs);
 
     core.info("Saving installation to cache...");
     await saveCompilerCache(cachePaths, cacheKey);
@@ -320,8 +334,45 @@ async function downloadToolWithRetry(
   throw lastError;
 }
 
+function isFullKitInstaller(url: string): boolean {
+  return /hpckit|hpc-toolkit/i.test(url);
+}
+
+function supportsComponentFilter(version: string, url: string): boolean {
+  return isFullKitInstaller(url) && !LEGACY_KIT_VERSIONS.has(version);
+}
+
+async function resolveFortranComponentId(
+  installerPath: string,
+): Promise<string | undefined> {
+  let output = "";
+  await exec.exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+
+  const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
+  if (!line) {
+    core.info(
+      "This installer doesn't expose the Fortran compiler as a separately " +
+        "installable component; installing the full kit instead.",
+    );
+    return undefined;
+  }
+
+  const id = line.trim().split(/\s+/)[0];
+  if (!id) {
+    throw new Error(`Failed to parse component ID from line: "${line}"`);
+  }
+  return id;
+}
+
 async function runInstallerWithRetry(
   installerPath: string,
+  extraArgs: string[] = [],
   maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -335,6 +386,7 @@ async function runInstallerWithRetry(
         "accept",
         "-p=NEED_VS2019_INTEGRATION=0",
         "-p=NEED_VS2022_INTEGRATION=0",
+        ...extraArgs,
       ],
       { ignoreReturnCode: true },
     );
