@@ -3,6 +3,9 @@
 [![CI](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
+> **Maintenance notice:** This GitHub Action is being moved to [fortran-lang/setup-fortran](https://github.com/fortran-lang/setup-fortran) and is no longer actively maintained in this repository. New versions are available through the beta tags in [fortran-lang/setup-fortran#245](https://github.com/fortran-lang/setup-fortran/pull/245).
+
+
 # setup-fortran
 
 Set up Fortran compiler toolchains for GitHub Actions.
