@@ -1,6 +1,6 @@
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-setup--fortran-blueviolet?logo=github)](https://github.com/marketplace/actions/setup-fortran-compilers)
-[![GitHub release](https://img.shields.io/github/v/release/fortran-lang/setup-fortran?color=orange)](https://github.com/fortran-lang/setup-fortran/releases)
-[![CI](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/minhqdao/setup-fortran?color=orange)](https://github.com/minhqdao/setup-fortran/releases)
+[![CI](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 # setup-fortran
@@ -20,7 +20,7 @@ Migrating from `v1` requires only a few changes:
 ## Usage
 
 ```yaml
-- uses: fortran-lang/setup-fortran@v2
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: <compiler>
     version: <version>
@@ -263,7 +263,7 @@ Use of the canonical names is recommended.
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: fortran-lang/setup-fortran@v2
+  - uses: minhqdao/setup-fortran@v2
   - run: ${{ env.FC }} hello.f90
 ```
 
@@ -273,7 +273,7 @@ supported version for the platform.
 ### Specific Version
 
 ```yaml
-- uses: fortran-lang/setup-fortran@v2
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: lfortran
     version: "0.65.0"
@@ -300,7 +300,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: fortran-lang/setup-fortran@v2
+      - uses: minhqdao/setup-fortran@v2
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
@@ -310,7 +310,7 @@ jobs:
 ### Windows with MSYS2
 
 ```yaml
-- uses: fortran-lang/setup-fortran@v2
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: lfortran
     msystem: ucrt64
@@ -363,7 +363,7 @@ Compilers have separate installation scripts for each platform they support.
 
 ## Reporting Issues
 
-Report bugs and feature requests in the [issue tracker](https://github.com/fortran-lang/setup-fortran/issues).
+Report bugs and feature requests in the [issue tracker](https://github.com/minhqdao/setup-fortran/issues).
 
 ## License
 
