@@ -3,19 +3,24 @@
 [![CI](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> **Maintenance notice:** This GitHub Action is being moved to [fortran-lang/setup-fortran](https://github.com/fortran-lang/setup-fortran) and therefore no longer actively maintained in this repository. New versions are available through the beta tags in [fortran-lang/setup-fortran#245](https://github.com/fortran-lang/setup-fortran/pull/245).
-
-
 # setup-fortran
 
 Set up Fortran compiler toolchains for GitHub Actions.
 Supports GNU, Intel, LLVM, NVIDIA, AMD, Arm, and LFortran compilers across
 Linux, macOS, and Windows.
 
+## Migration Guide
+
+Migrating from `v1` requires only a few changes:
+
+- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
+- `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
+- In 2022, oneAPI release numbers differed from compiler version numbers. For example, oneAPI `2022.1` on Windows installed `ifx` version `2022.2.0`. Compiler versions are now used consistently, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
+
 ## Usage
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: <compiler>
     version: <version>
@@ -112,30 +117,35 @@ Use of the canonical names is recommended.
 | 2021.1.1 | ✓            | ✓            |              |              |
 | 2021.1   | ✓            | ✓            |              |              |
 
-> In 2022, `ifx` compiler version numbers differed from release numbers. Specify the compiler version here, not the release number.
+> In 2022, `ifx` compiler version numbers differed from oneAPI release numbers. Specify the compiler version here, not the oneAPI release number.
 
 ---
 
 ### `ifort`
 
-| Version  | ubuntu-24.04 | ubuntu-22.04 | macos-26-intel | macos-15-intel | windows-2025 | windows-2022 |
-| -------- | ------------ | ------------ | -------------- | -------------- | ------------ | ------------ |
-| latest   | ✓            | ✓            | ✓              | ✓              | ✓            | ✓            |
-| 2021.13  | ✓            | ✓            |                |                | ✓            | ✓            |
-| 2021.12  | ✓            | ✓            |                |                | ✓            | ✓            |
-| 2021.11  | ✓            | ✓            |                |                | ✓            | ✓            |
-| 2021.10  | ✓            | ✓            | ✓              | ✓              | ✓            | ✓            |
-| 2021.9   | ✓            | ✓            | ✓              | ✓              | ✓            | ✓            |
-| 2021.8   | ✓            | ✓            | ✓              | ✓              |              |              |
-| 2021.7.1 | ✓            | ✓            |                |                |              |              |
-| 2021.7   | ✓            | ✓            |                |                | ✓            | ✓            |
-| 2021.6   | ✓            | ✓            | ✓              | ✓              | ✓            | ✓            |
-| 2021.5   | ✓            | ✓            | ✓              | ✓              |              |              |
-| 2021.4   | ✓            | ✓            |                |                |              |              |
-| 2021.3   | ✓            | ✓            | ✓              | ✓              |              |              |
-| 2021.2   | ✓            | ✓            | ✓              | ✓              |              |              |
-| 2021.1.2 | ✓            | ✓            |                |                |              |              |
-| 2021.1   | ✓            | ✓            | ✓              | ✓              |              |              |
+| Version  | ubuntu-24.04 | ubuntu-22.04 | macos-26 | macos-15 | macos-14 | macos-26-intel | macos-15-intel | windows-2025 | windows-2022 |
+| -------- | ------------ | ------------ | -------- | -------- | -------- | -------------- | -------------- | ------------ | ------------ |
+| latest   | ✓            | ✓            | ✓        | ✓        | ✓        | ✓              | ✓              | ✓            | ✓            |
+| 2021.13  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.12  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.11  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.10  | ✓            | ✓            | ✓        | ✓        | ✓        | ✓              | ✓              | ✓            | ✓            |
+| 2021.9   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              | ✓            | ✓            |
+| 2021.8   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.7.1 | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.7   | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.6   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              | ✓            | ✓            |
+| 2021.5   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.4   | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.3   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.2   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.1.2 | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.1   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+
+> Intel ships `ifort` for macOS as x86_64 binaries. On ARM64 runners they run
+> under Rosetta 2, which the action verifies (and installs if missing) before
+> installation. To keep companion C/C++ objects linkable there, the action
+> exports `CFLAGS`, `CXXFLAGS`, and `LDFLAGS` with `-arch x86_64`.
 
 ---
 
@@ -200,17 +210,18 @@ Use of the canonical names is recommended.
 
 ### `lfortran`
 
-| Version | ubuntu-24.04 | ubuntu-22.04 | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
-| ------- | ------------ | ------------ | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- |
-| latest  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      |
-| 0.64.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.63.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.62.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.61.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.60.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.59.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.58.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
-| 0.57.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
+| ------- | ------------ | ------------ | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- |
+| latest  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      |
+| 0.65.0  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.64.0  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.63.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.62.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.61.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.60.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.59.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.58.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.57.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
 
 ---
 
@@ -219,6 +230,7 @@ Use of the canonical names is recommended.
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-11-arm | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
 | ------- | ------------ | ------------ | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | -------------- | --------------------- | --------------------- | ---------------------- | ---------------------- |
 | latest  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓              | ✓                     | ✓                     | ✓                      | ✓                      |
+| 23      | ✓            |              | ✓                |                  |          |                |          |                |          | ✓            | ✓            | ✓              |                       |                       |                        |                        |
 | 22      | ✓            | ✓            | ✓                | ✓                |          |                |          |                |          | ✓            | ✓            | ✓              |                       |                       |                        |                        |
 | 21      | ✓            | ✓            | ✓                | ✓                | ✓        |                | ✓        |                |          |              |              | ✓              |                       |                       |                        |                        |
 | 20      | ✓            | ✓            | ✓                | ✓                | ✓        |                | ✓        |                |          |              |              | ✓              |                       |                       |                        |                        |
@@ -251,7 +263,7 @@ Use of the canonical names is recommended.
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: minhqdao/setup-fortran@v1
+  - uses: minhqdao/setup-fortran@v2
   - run: ${{ env.FC }} hello.f90
 ```
 
@@ -261,10 +273,10 @@ supported version for the platform.
 ### Specific Version
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: lfortran
-    version: "0.64.0"
+    version: "0.65.0"
 ```
 
 ### Matrix Build
@@ -276,7 +288,7 @@ strategy:
     toolchain:
       - { compiler: gfortran, version: "15" }
       - { compiler: ifx, version: "2026.1" }
-      - { compiler: lfortran, version: "0.64.0" }
+      - { compiler: lfortran, version: "0.65.0" }
     exclude:
       - os: macos-latest
         toolchain: { compiler: ifx, version: "2026.1" }
@@ -288,7 +300,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: minhqdao/setup-fortran@v1
+      - uses: minhqdao/setup-fortran@v2
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
@@ -298,7 +310,7 @@ jobs:
 ### Windows with MSYS2
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: minhqdao/setup-fortran@v2
   with:
     compiler: lfortran
     msystem: ucrt64
@@ -326,21 +338,28 @@ jobs:
 | `F77`     | Command or path to the Fortran compiler (alias for `FC`) |
 | `F90`     | Command or path to the Fortran compiler (alias for `FC`) |
 
-## Migration Guide
-
-Migrating from `fortran-lang/setup-fortran` to `minhqdao/setup-fortran` requires only a few changes:
-
-- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
-- `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
-- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
-
 ## Development
+
+Requires Node.js 24 or newer (`.nvmrc` pins the version CI uses).
+
+Install dependencies with `npm ci`.
 
 Run `npm run all` to format and lint the source, run unit tests, bundle the
 action into `dist`, and run the smoke tests.
 
 Commit changes to `dist` together with the source changes, as GitHub Actions
 executes the bundled code from this directory.
+
+## Maintenance
+
+### Adding a New Version
+
+1. Add the version to `SUPPORTED_VERSIONS` in the respective installation script (latest first).
+2. Add the version to the CI matrix for that compiler.
+3. Update the [README](README.md).
+4. Run `npm run all` — it will fail if the version isn't tested or documented.
+
+Compilers have separate installation scripts for each platform they support.
 
 ## Reporting Issues
 

@@ -14,6 +14,7 @@ jest.mock("fs", () => ({
   existsSync: jest.fn(),
   renameSync: jest.fn(),
   copyFileSync: jest.fn(),
+  writeFileSync: jest.fn(),
 }));
 
 describe("installWin32 (LFortran)", () => {
@@ -92,6 +93,7 @@ describe("installWin32 (LFortran)", () => {
           expect.stringContaining("0.63.0"),
           "lfortran==0.63.0",
         ]),
+        expect.objectContaining({ ignoreReturnCode: true }),
       );
     });
 
@@ -118,20 +120,46 @@ describe("installWin32 (LFortran)", () => {
       expect(result.cc).toBe("clang");
       expect(result.cxx).toBe("clang++");
     });
+
+    it("prepends the toolchain bin dir for Bash steps", async () => {
+      await installWin32(baseInputs);
+
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "BASH_ENV",
+        expect.stringContaining("setup-fortran-lfortran-bash-env.sh"),
+      );
+      expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining("setup-fortran-lfortran-bash-env.sh"),
+        expect.stringMatching(/^export PATH='.*Library\/bin':"\$PATH"\n$/),
+        { mode: 0o600 },
+      );
+    });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
+      const inputs = {
+        ...baseInputs,
+        msystem: Msystem.UCRT64,
+        version: "latest",
+      };
       await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
         "lfortran",
       ]);
+      expect(mockedExportVariable).not.toHaveBeenCalledWith(
+        "BASH_ENV",
+        expect.anything(),
+      );
     });
 
     it("reuses a working MSYS2 installation on a second invocation", async () => {
-      const inputs = { ...baseInputs, msystem: Msystem.UCRT64, version: "latest" };
+      const inputs = {
+        ...baseInputs,
+        msystem: Msystem.UCRT64,
+        version: "latest",
+      };
       await installWin32(inputs);
       await installWin32(inputs);
 

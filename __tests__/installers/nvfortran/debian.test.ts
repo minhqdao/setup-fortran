@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import { installDebian } from "../../../src/installers/nvfortran/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -31,7 +25,7 @@ describe("installDebian nvfortran", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -86,11 +80,19 @@ describe("installDebian nvfortran", () => {
     // Should install each .deb via dpkg
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
-      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libtinfo5")]),
+      expect.arrayContaining([
+        "dpkg",
+        "-i",
+        expect.stringContaining("libtinfo5"),
+      ]),
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
-      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libncursesw5")]),
+      expect.arrayContaining([
+        "dpkg",
+        "-i",
+        expect.stringContaining("libncursesw5"),
+      ]),
     );
   });
 
@@ -173,8 +175,39 @@ describe("installDebian nvfortran", () => {
     expect(mockedExec).not.toHaveBeenCalledWith(
       "sudo",
       expect.arrayContaining([
-        expect.stringMatching(/apt\.conf\.d|sources\.list|ubuntu\.sources/),
+        // Scoped-update options (`Dir::Etc::SourceList=...`) are runtime
+        // overrides, not file writes, so only real /etc/apt paths are checked.
+        expect.stringMatching(
+          /apt\.conf\.d|\/etc\/apt\/sources\.list|ubuntu\.sources/,
+        ),
       ]),
+    );
+  });
+
+  it("scopes apt-get update to the NVIDIA repository", async () => {
+    await installDebian(baseInputs);
+
+    // Unrelated repositories baked into the runner image (e.g. transient
+    // packages.microsoft.com failures) must not break the nvhpc install.
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "apt-get",
+        "update",
+        "-o",
+        "Dir::Etc::SourceList=sources.list.d/nvhpc.list",
+        "-o",
+        "Dir::Etc::SourceParts=-",
+      ]),
+    );
+  });
+
+  it("allows 25 minutes for the nvhpc apt install", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["25m", "apt-get", "install", "nvhpc-24-1"]),
     );
   });
 
@@ -222,9 +255,7 @@ describe("installDebian nvfortran", () => {
       "curl",
       expect.arrayContaining([
         "-o",
-        expect.stringContaining(
-          "nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
-        ),
+        expect.stringContaining("nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz"),
         "https://developer.download.nvidia.com/hpc-sdk/26.3/nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
       ]),
     );
@@ -240,6 +271,61 @@ describe("installDebian nvfortran", () => {
         ),
       ]),
     );
+  });
+
+  it("retries the tarball install when the first curl download fails", async () => {
+    const inputs = { ...baseInputs, version: "20.7" };
+    let tarballDownloads = 0;
+    mockedGetExecOutput.mockImplementation(async (command) => ({
+      stdout:
+        command === "dpkg-query"
+          ? "install ok installed install ok installed"
+          : "",
+      stderr: "",
+      exitCode: 0,
+    }));
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 20.7-0"));
+      }
+      if (
+        commandLine === "curl" &&
+        args?.some(
+          (arg) => typeof arg === "string" && arg.includes("nvhpc_2020_207_"),
+        )
+      ) {
+        tarballDownloads += 1;
+        if (tarballDownloads === 1) {
+          throw new Error("curl: (92) HTTP/2 framing layer error");
+        }
+      }
+      return 0;
+    });
+
+    jest.useFakeTimers();
+    const installPromise = installDebian(inputs);
+
+    // 20.7 skips APT and goes straight to the tarball path. The first
+    // download fails, so we advance past the 15s backoff and let the
+    // second attempt succeed.
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    jest.advanceTimersByTime(15_000);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    await installPromise;
+    jest.useRealTimers();
+
+    // The tarball path runs directly for 20.7 (no APT attempt) and is retried
+    // once on failure. We expect exactly 2 download attempts, but the first
+    // attempt throws before reaching the installer, so only the second
+    // attempt actually invokes the NVIDIA installer.
+    expect(tarballDownloads).toBe(2);
+    expect(
+      mockedExec.mock.calls.filter(
+        ([command, args]) =>
+          command === "sudo" && args?.includes("NVHPC_SILENT=true"),
+      ),
+    ).toHaveLength(1);
   });
 
   it("uses the CUDA 11.0 Arm tarball directly for version 20.9", async () => {

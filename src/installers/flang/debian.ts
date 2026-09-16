@@ -6,6 +6,7 @@ import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { scopedSourceListOptions } from "../../apt_sources";
 import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -22,13 +23,17 @@ import { verifySha256 } from "../../verify_download";
 //   - ARM64: LLVM 15/16 have no noble (24.04) repo and broken jammy (22.04)
 //     packaging. 17 is the effective floor on arm64.
 //   - X64: LLVM 15/16 are available on jammy (22.04) only; no noble repo.
-const SUPPORTED_VERSIONS = {
-  [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16"],
-  [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
+//   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
+//     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
+//     rejected with an explicit error in installDebian.
+export const SUPPORTED_VERSIONS = {
+  [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
+  [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 const LLVM_APT_KEY_SHA256 =
   "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const LLVM_SOURCE_LIST_FILE = "llvm.list";
 const APT_NETWORK_OPTIONS = [
   "-o",
   "Acquire::ForceIPv4=true",
@@ -54,9 +59,8 @@ function ubuntuCodename(osVersion: string): string {
 
 async function configureLlvmAptRepository(
   version: string,
-  osVersion: string,
+  codename: string,
 ): Promise<void> {
-  const codename = ubuntuCodename(osVersion);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "setup-fortran-llvm-"));
   const downloadedKey = path.join(tempDir, "llvm-snapshot.gpg.key");
   const keyring = path.join(tempDir, "llvm-snapshot.gpg");
@@ -104,7 +108,7 @@ async function configureLlvmAptRepository(
       "-m",
       "0644",
       sourceList,
-      "/etc/apt/sources.list.d/llvm.list",
+      `/etc/apt/sources.list.d/${LLVM_SOURCE_LIST_FILE}`,
     ]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -158,11 +162,22 @@ export async function installDebian(
 ): Promise<InstallationResult> {
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
+  const codename = ubuntuCodename(inputs.osVersion);
+
+  // apt.llvm.org stopped publishing for jammy (22.04) with LLVM 23; without
+  // this guard the failure surfaces as an opaque apt-get update 404.
+  if (major >= 23 && codename === "jammy") {
+    throw new Error(
+      `Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
+        `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
+        `Use an ubuntu-24.04 runner or request Flang 22 or older.`,
+    );
+  }
 
   core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
 
   core.info(`Adding the verified LLVM ${version} apt repository...`);
-  await configureLlvmAptRepository(version, inputs.osVersion);
+  await configureLlvmAptRepository(version, codename);
   await aptGetUpdateWithRetry();
 
   const pkgName = `flang-${version}`;
@@ -254,6 +269,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
         "apt-get",
         "update",
         "-y",
+        ...scopedSourceListOptions(LLVM_SOURCE_LIST_FILE),
         ...APT_NETWORK_OPTIONS,
       ],
       { ignoreReturnCode: true },

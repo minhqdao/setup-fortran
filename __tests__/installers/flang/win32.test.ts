@@ -4,13 +4,7 @@ import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
 import { installWin32 } from "../../../src/installers/flang/win32";
 import { setupMSYS2 } from "../../../src/setup_msys2";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -26,19 +20,36 @@ jest.mock("fs", () => ({
 
 describe("installWin32 (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => ({
-      ok: true,
-      status: 200,
-      json: async () =>
-        String(input).includes("/releases?")
-          ? [{ tag_name: "llvmorg-22.1.0", prerelease: false }]
-          : {
-              assets: [{
-                name: "LLVM-22.1.0-win64.exe",
-                digest: `sha256:${"a".repeat(64)}`,
-              }],
-            },
-    }) as unknown as Response);
+    global.fetch = jest.fn().mockImplementation(
+      async (input: string | URL) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () =>
+            String(input).includes("/releases?")
+              ? [
+                  { tag_name: "llvmorg-23.1.0", prerelease: false },
+                  { tag_name: "llvmorg-22.1.0", prerelease: false },
+                ]
+              : String(input).includes("llvmorg-23.1.0")
+                ? {
+                    assets: [
+                      {
+                        name: "LLVM-23.1.0-win64.msi",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
+                    ],
+                  }
+                : {
+                    assets: [
+                      {
+                        name: "LLVM-22.1.0-win64.exe",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
+                    ],
+                  },
+        }) as unknown as Response,
+    );
   });
 
   afterEach(() => {
@@ -64,7 +75,7 @@ describe("installWin32 (Flang)", () => {
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -108,21 +119,79 @@ describe("installWin32 (Flang)", () => {
       expect(mockedTc.cacheDir).toHaveBeenCalled();
     });
 
+    it("extracts the LLVM 23 MSI with an msiexec administrative install", async () => {
+      const inputs = { ...baseInputs, version: "23" };
+      mockedTc.find.mockReturnValue("");
+      // tc.downloadTool saves to an extensionless GUID path when no
+      // destination is passed — extraction must not dispatch on the extension.
+      mockedTc.downloadTool.mockResolvedValue(
+        "D:\\a\\_temp\\e50d54fe-ad02-446d-9587-48dee931e0c6",
+      );
+      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang23");
+
+      const result = await installWin32(inputs);
+
+      // The installer is downloaded under its real (extension-bearing) name.
+      expect(mockedTc.downloadTool).toHaveBeenCalledWith(
+        expect.stringContaining("LLVM-23.1.0-win64.msi"),
+        expect.stringContaining("LLVM-23.1.0-win64.msi"),
+      );
+      expect(mockedExec).toHaveBeenCalledWith("msiexec", [
+        "/a",
+        "D:\\a\\_temp\\e50d54fe-ad02-446d-9587-48dee931e0c6",
+        "/qn",
+        expect.stringContaining("TARGETDIR="),
+      ]);
+      // The WiX layout nests the install tree under a single LLVM directory,
+      // which is what gets cached so bin/ sits at the tool cache root.
+      expect(mockedTc.cacheDir).toHaveBeenCalledWith(
+        expect.stringMatching(/LLVM$/),
+        "flang-verified",
+        "23.1.0",
+        Arch.X64,
+      );
+      expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+    });
+
+    it("fails loudly when the msiexec extraction misses the bin directory", async () => {
+      const inputs = { ...baseInputs, version: "23" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.msi");
+      mockedFs.existsSync.mockImplementation(
+        (p) => !/LLVM[/\\]bin$/.test(String(p)),
+      );
+
+      await expect(installWin32(inputs)).rejects.toThrow(/expected layout/);
+      expect(mockedTc.cacheDir).not.toHaveBeenCalled();
+    });
+
     it("sets up MSVC libs and exports variables", async () => {
       mockedTc.find.mockReturnValue("C:\\Cache\\flang");
 
       await installWin32(baseInputs);
 
-      expect(mockedExportVariable).toHaveBeenCalledWith("LIB", expect.stringContaining("Cache"));
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "LIB",
+        expect.stringContaining("Cache"),
+      );
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = { ...baseInputs, version: "latest", msystem: Msystem.UCRT64 };
+      const inputs = {
+        ...baseInputs,
+        version: "latest",
+        msystem: Msystem.UCRT64,
+      };
       await installWin32(inputs);
 
-      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["flang"]);
+      // llvm-openmp is required for -fopenmp; the flang package only lists it
+      // as an optional dependency.
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
+        "flang",
+        "llvm-openmp",
+      ]);
     });
   });
 });

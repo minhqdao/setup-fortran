@@ -15,11 +15,13 @@ import { setupMSYS2 } from "../../setup_msys2";
 import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
 import { verifySha256 } from "../../verify_download";
 import {
+  condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
   lfortranEnvironment,
   resetLFortranEnvironment,
 } from "../../lfortran_environment";
+import { persistBinDirForBash } from "../../bash_env";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -33,9 +35,10 @@ import {
 //   x64 only — MSYS2 does not support ARM64. Version is always LATEST since
 //   pacman tracks the rolling release. The UCRT64 lfortran package tracks
 //   upstream closely (verified at 0.63.0).
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: [
+      "0.65.0",
       "0.64.0",
       "0.63.0",
       "0.62.0",
@@ -108,7 +111,7 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
         "/S",
         `/D=${environment.miniforgePrefix}`,
       ]);
-      await exec.exec(environment.conda, [
+      await condaCreateWithRetry(environment.conda, [
         "create",
         "-y",
         "-p",
@@ -156,6 +159,12 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
       "lld-link.exe not found; LFortran may fail to link on Windows.",
     );
   }
+
+  // lfortran links executables by invoking a bare `link` (x86_64-pc-windows-msvc
+  // target). In `shell: bash` steps Git Bash's /usr/bin precedes every
+  // GITHUB_PATH entry, so coreutils' link would shadow the proxy above. Reuse
+  // the MSVC installers' BASH_ENV mechanism to prepend the proxy's directory.
+  persistBinDirForBash(environment.binDir, "lfortran");
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",

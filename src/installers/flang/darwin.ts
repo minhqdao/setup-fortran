@@ -20,11 +20,18 @@ import { verifySha256 } from "../../verify_download";
 // Major or patch version → download from official LLVM GitHub releases.
 //
 // macOS asset naming on GitHub releases:
-//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available from at least 19+)
-//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (availability varies; verified at runtime)
+//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available for 19–21)
+//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (available for 19; verified at runtime)
+//
+// LLVM 23.1.0 published no macOS binaries at all; 23.1.1 re-added
+// LLVM-23.1.1-macOS-ARM64.tar.xz but it ships no flang/flang-new binary
+// (upstream Release.cmake excludes flang on Darwin, see
+// llvm/llvm-project#160546 — CI fails with "Could not find flang binary").
+// So 23+ cannot be added as concrete versions here. On macOS, Flang 23 is
+// only available through `version: latest`, which tracks the Homebrew formula.
 //
 // LATEST is listed first so it is the default when no version is specified.
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [LATEST, "19"],
   [Arch.ARM64]: [LATEST, "21", "20", "19"], // Only on macos-15+ runners
 } as const satisfies Record<Arch, readonly string[]>;
